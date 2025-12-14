@@ -18,7 +18,6 @@ define('DB_PASS', getenv('DB_PASS'));
 define('DB_API_SECRET', getenv('DB_API_SECRET'));
 // ----------------------------
 
-
 // Load the DatabaseManager class for DB operations.
 require_once 'Libraries/DatabaseManager.php';
 // Load the QuickChart library for generating charts.
