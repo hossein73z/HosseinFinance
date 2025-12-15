@@ -38,7 +38,7 @@ VALUES ('s0', '{"text": "🔙 برگشت 🔙"}', 0, null, null, null);
 INSERT INTO `test`.buttons (id, attrs, admin_key, messages, belong_to, keyboards)
 VALUES ('s1', '{"text": "❌ لغو ❌"}', 0, null, null, null);
 INSERT INTO `test`.buttons (id, attrs, admin_key, messages, belong_to, keyboards)
-VALUES ('w1', '{"text": "➕ ثبت وام جدید", "web_app": {"url": "https://hossein-finance.vercel.app/WebInterfaces/loans/add.html"}}', 0, null, '5', '[["s0"]]');
+VALUES ('w1', '{"text": "➕ ثبت وام جدید", "web_app": {"url": "https://hossein-development.vercel.app/WebInterfaces/loans/add.html"}}', 0, null, '5', '[["s0"]]');
 INSERT INTO `test`.buttons (id, attrs, admin_key, messages, belong_to, keyboards)
 VALUES ('a1', '{"text": "بخش مدیریت"}', 1, null, 0, '[["s0"]]');
 

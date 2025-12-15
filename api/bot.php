@@ -240,7 +240,7 @@ function choosePath(
             if ($person['last_btn'] == "1") level_1($person, $message); // View Holdings
             if ($person['last_btn'] == "2") level_2($person, $message); // Add Holding
             if ($person['last_btn'] == "4") level_4($person, $message); // View Prices
-            if ($person['last_btn'] == "7") level_7($person, $message); // Add Loan
+            if ($person['last_btn'] == "5") level_5($person, $message); // Add Loan
 
             $response = sendToTelegram('sendMessage', $data);
             if ($response) exit(json_encode(['status' => 'OK', 'telegram_response' => $response]));
@@ -257,7 +257,6 @@ function choosePath(
                 if ($pressed_button['id'] == "1") level_1($person);
                 if ($pressed_button['id'] == "2") level_2($person);
                 if ($pressed_button['id'] == "4") level_4($person);
-                if ($pressed_button['id'] == "7") level_7($person);
 
                 $data = [
                     'text' => json_decode($pressed_button['attrs'], true)['text'],
@@ -1470,7 +1469,7 @@ function level_4(array $person, array|null $message = null, array|null $query_da
  * Level 7: Add New Loan
  */
 #[NoReturn]
-function level_7(array $person, array|null $message = null, array|null $query_data = null): string|null
+function level_5(array $person, array|null $message = null, array|null $query_data = null): string|null
 {
     global $db;
     $data = [
@@ -1486,12 +1485,48 @@ function level_7(array $person, array|null $message = null, array|null $query_da
     if ($query_data) {
         return null;
     } elseif ($message) {
-        return null;
+        if (isset($message['web_app_data'])) {
+            $data = json_decode($message['web_app_data']['data'], true);
+
+            if (!$data || !isset($data['loans']) || !isset($data['installments'])) $data['text'] = '❌ خط در دریافت اطلاعات. داده‌ها معتبر نیستند.';
+            else {
+
+                $loanData = $data['loans'];
+                $loan_insert_data = [
+                    'person_id' => $person['id'],
+                    'name' => $loanData['name'],
+                    'total_amount' => $loanData['total_amount'],
+                    'received_date' => $loanData['received_date'],
+                    'total_installments' => $loanData['total_installments']
+                ];
+
+                $loan_id = $db->create('loans', $loan_insert_data);
+
+                if ($loan_id) {
+                    $installments = $data['installments'];
+                    $count = 0;
+
+                    foreach ($installments as $inst) {
+                        $inst_insert_data = [
+                            'loan_id' => $loan_id,
+                            'amount' => $inst['amount'],
+                            'due_date' => $inst['due_date'],
+                            'is_paid' => $inst['is_paid'] ? 1 : 0
+                        ];
+                        $db->create('installments', $inst_insert_data);
+                        $count++;
+                    }
+
+                    $data['text'] = "✅ وام «{$loanData['name']}» با موفقیت ثبت شد.\n📊 تعداد اقساط: $count";
+
+                } else $data['text'] = '❌ خطای پایگاه داده در ثبت وام.';
+            }
+        } else return null;
     } else {
         $data['text'] = 'این بخش هنوز راه نیوفتاده است!';
     }
 
-    $person['last_btn'] = 7;
+    $person['last_btn'] = 5;
     $db->update('persons', $person, ['id' => $person['id']]);
 
     $response = sendToTelegram('sendMessage', $data);
@@ -1576,63 +1611,4 @@ function createHoldingDetailText(array $holding, string|null $markdown = null, a
     if ($markdown === 'MarkdownV2') $price_tree = str_replace(["(", ")", ".", "-"], ["\(", "\)", "\.", "\-"], $price_tree);
 
     return $text . $holding['asset_name'] . $price_tree;
-}
-
-/**
- * Handles Web App Data (Loans)
- */
-function processLoanData(array $person, string $json_data): void
-{
-    global $db;
-
-    $data = json_decode($json_data, true);
-
-    if (!$data || !isset($data['loans']) || !isset($data['installments'])) {
-        sendToTelegram('sendMessage', [
-            'chat_id' => $person['chat_id'],
-            'text' => '❌ خط در دریافت اطلاعات. داده‌ها معتبر نیستند.'
-        ]);
-        return;
-    }
-
-    $loanData = $data['loans'];
-    $loan_insert_data = [
-        'person_id' => $person['id'],
-        'name' => $loanData['name'],
-        'total_amount' => $loanData['total_amount'],
-        'received_date' => $loanData['received_date'],
-        'total_installments' => $loanData['total_installments']
-    ];
-
-    $loan_id = $db->create('loans', $loan_insert_data);
-
-    if ($loan_id) {
-        $installments = $data['installments'];
-        $count = 0;
-
-        foreach ($installments as $inst) {
-            $inst_insert_data = [
-                'loan_id' => $loan_id,
-                'amount' => $inst['amount'],
-                'due_date' => $inst['due_date'],
-                'is_paid' => $inst['is_paid'] ? 1 : 0
-            ];
-            $db->create('installments', $inst_insert_data);
-            $count++;
-        }
-
-        sendToTelegram('sendMessage', [
-            'chat_id' => $person['chat_id'],
-            'text' => "✅ وام «{$loanData['name']}» با موفقیت ثبت شد.\n📊 تعداد اقساط: $count"
-        ]);
-
-        $person['last_btn'] = 5;
-        $db->update('persons', $person, ['id' => $person['id']]);
-
-    } else {
-        sendToTelegram('sendMessage', [
-            'chat_id' => $person['chat_id'],
-            'text' => '❌ خطای پایگاه داده در ثبت وام.'
-        ]);
-    }
 }
