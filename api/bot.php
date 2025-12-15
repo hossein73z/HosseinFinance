@@ -240,6 +240,7 @@ function choosePath(
             if ($person['last_btn'] == "1") level_1($person, $message); // View Holdings
             if ($person['last_btn'] == "2") level_2($person, $message); // Add Holding
             if ($person['last_btn'] == "4") level_4($person, $message); // View Prices
+            if ($person['last_btn'] == "7") level_7($person, $message); // Add Loan
 
             $response = sendToTelegram('sendMessage', $data);
             if ($response) exit(json_encode(['status' => 'OK', 'telegram_response' => $response]));
@@ -256,6 +257,7 @@ function choosePath(
                 if ($pressed_button['id'] == "1") level_1($person);
                 if ($pressed_button['id'] == "2") level_2($person);
                 if ($pressed_button['id'] == "4") level_4($person);
+                if ($pressed_button['id'] == "7") level_7($person);
 
                 $data = [
                     'text' => json_decode($pressed_button['attrs'], true)['text'],
@@ -1462,6 +1464,38 @@ function level_4(array $person, array|null $message = null, array|null $query_da
         exit(json_encode(['status' => 'OK', 'telegram_response' => $response]));
     }
 
+}
+
+/**
+ * Level 1: My Holdings
+ */
+#[NoReturn]
+function level_7(array $person, array|null $message = null, array|null $query_data = null): string|null
+{
+    global $db;
+    $data = [
+        'chat_id' => $person['chat_id'],
+        'reply_markup' => [
+            'keyboard' => createKeyboardsArray(7, $person['is_admin'], $db),
+            'resize_keyboard' => true,
+            'input_field_placeholder' => '➕ ثبت وام جدید',
+        ]
+    ];
+
+
+    if ($query_data) {
+        return null;
+    } elseif ($message) {
+        return;
+    } else {
+        $data['text'] = 'این بخش هنوز راه نیوفتاده است!';
+    }
+
+    $person['last_btn'] = 7;
+    $db->update('persons', $person, ['id' => $person['id']]);
+
+    $response = sendToTelegram('sendMessage', $data);
+    exit(json_encode(['status' => 'OK', 'telegram_response' => $response]));
 }
 
 /**
