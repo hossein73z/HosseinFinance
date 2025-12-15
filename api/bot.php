@@ -258,12 +258,12 @@ function choosePath(
                 if ($pressed_button['id'] == "4") level_4($person);
 
                 $data = [
-                    'text' => $pressed_button['text'],
+                    'text' => $pressed_button['attrs']['text'],
                     'chat_id' => $person['chat_id'],
                     'reply_markup' => [
                         'keyboard' => createKeyboardsArray($pressed_button['id'], $person['is_admin'], $db),
                         'resize_keyboard' => true,
-                        'input_field_placeholder' => $pressed_button['text'],
+                        'input_field_placeholder' => $pressed_button['attrs']['text'],
                     ]
                 ];
 
@@ -306,7 +306,7 @@ function backButton(array $person): void
         $last_level = $db->read('buttons', ['id' => $current_level['belong_to']], true);
 
         $last_button['id'] = $last_level['id'];
-        $last_button['text'] = $last_level['text'];
+        $last_button['attrs']['text'] = $last_level['attrs']['text'];
         $last_button['adminKey'] = $last_level['admin_key'];
         $last_button['messages'] = $last_level['messages'];
         $last_button['belongsTo'] = $last_level['belongs_to'];
