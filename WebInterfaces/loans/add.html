@@ -1,3 +1,5 @@
+--- START OF FILE add.html ---
+
 <!DOCTYPE html>
 <html lang="fa" dir="rtl">
 <head>
@@ -24,6 +26,7 @@
             --hint-color: var(--tg-theme-hint-color, #999);
             --button-color: var(--tg-theme-button-color, #4a90e2);
             --button-text-color: var(--tg-theme-button-text-color, #ffffff);
+            --danger-color: #dc3545;
         }
 
         html, body {
@@ -73,17 +76,18 @@
             font-weight: 500;
         }
 
+        /* Input styling with explicit colors for Dark Mode */
         input, select, textarea {
             width: 100%;
             padding: 10px;
-            border: 1px solid #ddd;
+            border: 1px solid var(--hint-color);
             border-radius: 8px;
             font-family: 'Vazirmatn', sans-serif;
             box-sizing: border-box;
             font-size: 0.95rem;
             transition: border-color 0.2s;
-            background: var(--bg-color);
-            color: var(--text-color);
+            background-color: var(--bg-color); /* Fix for dark mode */
+            color: var(--text-color); /* Fix for dark mode */
         }
 
         textarea#installments_summary {
@@ -102,6 +106,36 @@
         input:focus, select:focus, textarea:focus {
             border-color: var(--button-color);
             outline: none;
+        }
+
+        /* Input Group for Date Picker */
+        .input-group {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .input-group input {
+            flex: 1;
+            border-top-left-radius: 0;
+            border-bottom-left-radius: 0;
+        }
+
+        .input-group .date-btn {
+            width: 45px;
+            margin-top: 0;
+            padding: 0;
+            height: 42px; /* Match input height roughly */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+            border-top-right-radius: 0;
+            border-bottom-right-radius: 0;
+            background-color: var(--secondary-bg-color);
+            color: var(--text-color);
+            border: 1px solid var(--hint-color);
+            font-size: 1.2rem;
         }
 
         button {
@@ -124,7 +158,7 @@
         }
 
         button.danger-btn {
-            background-color: #dc3545;
+            background-color: var(--danger-color);
             color: white;
         }
 
@@ -164,8 +198,13 @@
             flex-shrink: 0;
         }
 
-        .installment-row input.row-date {
-            position: relative;
+        /* Fix row input widths */
+        .installment-row .input-group {
+            flex: 1;
+        }
+
+        .installment-row .row-amount {
+            flex: 1;
         }
 
         .btn-group {
@@ -174,15 +213,47 @@
             margin-top: 15px;
         }
 
-        /* Datepicker Overrides for Dark Mode Compatibility */
+        /* --- Datepicker Customization for Dark Mode & UX --- */
         .datepicker-plot-area {
             font-family: 'Vazirmatn', sans-serif !important;
             border-radius: 12px !important;
-            border: none !important;
+            border: 1px solid var(--hint-color) !important;
+            background-color: var(--bg-color) !important;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.3) !important;
+        }
+
+        /* Header and text colors */
+        .datepicker-plot-area .datepicker-header,
+        .datepicker-plot-area .datepicker-day-view .month-grid-box .header .header-row-cell,
+        .datepicker-plot-area .datepicker-day-view .table-days span {
+            color: var(--text-color) !important;
+        }
+
+        /* Navigation arrows */
+        .datepicker-plot-area .datepicker-navigator .nav-btn {
+            background-color: var(--secondary-bg-color) !important;
+            color: var(--text-color) !important;
+        }
+
+        /* The toolbox container */
+        .datepicker-plot-area .toolbox {
+            border-top: 1px solid var(--secondary-bg-color);
+            padding: 5px;
+            background-color: var(--bg-color);
+        }
+
+        /* Override the Submit button to look like a Danger/Cancel button */
+        .datepicker-plot-area .toolbox .btn-submit {
+            background-color: var(--danger-color) !important;
+            color: #fff !important;
+            border-radius: 6px !important;
+            width: 90% !important;
+            margin: 0 auto !important;
+            display: block !important;
         }
 
         .datepicker-container {
-            z-index: 9999 !important;
+            z-index: 99999 !important;
         }
 
     </style>
@@ -208,8 +279,10 @@
 
             <div class="form-group">
                 <label for="received_date">تاریخ دریافت</label>
-                <input type="text" id="received_date" class="pdate-input" placeholder="انتخاب تاریخ" autocomplete="off"
-                       required>
+                <div class="input-group">
+                    <input type="text" id="received_date" placeholder="YYYY/MM/DD" autocomplete="off" required>
+                    <button type="button" class="date-btn" data-target="received_date">📅</button>
+                </div>
             </div>
 
             <div class="form-group">
@@ -235,8 +308,10 @@
             </div>
             <div class="form-group">
                 <label for="gen_start_date">تاریخ اولین قسط</label>
-                <input type="text" id="gen_start_date" class="pdate-input" placeholder="انتخاب تاریخ"
-                       autocomplete="off">
+                <div class="input-group">
+                    <input type="text" id="gen_start_date" placeholder="YYYY/MM/DD" autocomplete="off">
+                    <button type="button" class="date-btn" data-target="gen_start_date">📅</button>
+                </div>
             </div>
             <div class="row-group form-group">
                 <div>
@@ -279,9 +354,9 @@
 <script>
     // Initialize Telegram Web App
     const tg = window.Telegram.WebApp;
-    tg.expand(); // Optional: Expands the web app to full height
+    tg.expand();
 
-    // --- Utils (Same as before) ---
+    // --- Utils ---
     function toEnglishDigits(str) {
         if (!str) return '';
         var persianNumbers = [/۰/g, /۱/g, /۲/g, /۳/g, /۴/g, /۵/g, /۶/g, /۷/g, /۸/g, /۹/g];
@@ -317,22 +392,77 @@
         });
     }
 
-    function initDatePicker(selector) {
-        $(selector).persianDatepicker({
-            format: 'YYYY/MM/DD',
-            initialValue: false,
-            autoClose: true,
-            responsive: true,
-            persianDigit: true
+    // --- Date Picker Logic ---
+
+    // Helper to parse Jalali date string "1403/05/20" to array [1403, 5, 20]
+    function parseDateStr(str) {
+        if (!str) return null;
+        const s = toEnglishDigits(str).replace(/-/g, '/');
+        const parts = s.split('/');
+        if (parts.length === 3) {
+            return parts.map(Number);
+        }
+        return null;
+    }
+
+    // Initialize listeners for calendar buttons
+    function attachDatePickerListeners() {
+        // Use document body delegate to handle dynamically added rows
+        $('body').off('click', '.date-btn').on('click', '.date-btn', function (e) {
+            e.preventDefault();
+            const btn = $(this);
+            const input = btn.prev('input'); // The input is right before the button
+
+            // Get current value from input to set initial date
+            const currentVal = input.val();
+            let initialDate = new persianDate().valueOf(); // Default: Now
+
+            const parsed = parseDateStr(currentVal);
+            if (parsed) {
+                // If input has valid date, use it so picker opens on that year/month
+                initialDate = new persianDate(parsed).valueOf();
+            }
+
+            // Init picker attached to the button
+            btn.persianDatepicker({
+                format: 'YYYY/MM/DD',
+                initialValue: false, // We handle initial date via 'date' property
+                responsive: false, // Fix: Prevents full screen modal on mobile
+                autoClose: true,
+                persianDigit: true,
+                // Make the 'Submit' button act as 'Cancel'
+                toolbox: {
+                    calendarSwitch: {enabled: false},
+                    submitButton: {
+                        enabled: true,
+                        text: {fa: "لغو"},
+                        // Styling handled in CSS (.toolbox .btn-submit) to be Red
+                        onSubmit: function (calendar) {
+                            calendar.hide(); // Just close, don't select
+                        }
+                    }
+                },
+                onSelect: function (unix) {
+                    const pd = new persianDate(unix);
+                    input.val(pd.format('YYYY/MM/DD'));
+                },
+                onShow: function () {
+                    // Set the view to the parsed date explicitly
+                    this.setDate(initialDate);
+                }
+            });
+
+            // Show immediately
+            btn.data('datepicker').show();
         });
     }
 
-    // Init Logic
     $(document).ready(function () {
-        initDatePicker('.pdate-input');
+        attachDatePickerListeners();
         document.querySelectorAll('.currency-input').forEach(input => attachCurrencyListeners(input));
     });
 
+    // --- Calculation Logic ---
     function calculateNextJalaliDate(dateStr, count, unit) {
         dateStr = dateStr.replace(/-/g, '/');
         dateStr = toEnglishDigits(dateStr);
@@ -414,7 +544,7 @@
         startDateVal = toEnglishDigits(startDateVal);
 
         if (!count || !startDateVal || !periodQty || !amount) {
-            tg.showAlert('لطفا تمام فیلدها را پر کنید'); // Using Telegram Native Alert
+            tg.showAlert('لطفا تمام فیلدها را پر کنید');
             return;
         }
 
@@ -424,15 +554,20 @@
             let dateStr = calculateNextJalaliDate(startDateVal, totalUnitsToAdd, periodUnit);
             const row = document.createElement('div');
             row.className = 'installment-row';
+            // Modified HTML structure for date input with button
             row.innerHTML = `
                 <span>${i + 1}</span>
-                <input type="text" class="row-date" value="${dateStr}" readonly style="cursor: pointer;">
+                <div class="input-group">
+                    <input type="text" class="row-date" value="${dateStr}">
+                    <button type="button" class="date-btn">📅</button>
+                </div>
                 <input type="text" class="row-amount currency-input" value="${addCommas(amount)}">
             `;
             container.appendChild(row);
         }
         container.querySelectorAll('.currency-input').forEach(input => attachCurrencyListeners(input));
-        initDatePicker('.installment-row .row-date');
+        // No need to initDatePicker here, the global delegate listener handles it
+
         stepGen.classList.add('hidden');
         stepList.classList.remove('hidden');
     });
