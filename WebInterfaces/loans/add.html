@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ثبت وام و اقساط</title>
+
+    <!-- Telegram Web App Script -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+    <!-- Vazir Font -->
+    <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css" rel="stylesheet"
+          type="text/css"/>
+
+    <!-- Persian Datepicker CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/persian-datepicker@1.2.0/dist/css/persian-datepicker.min.css">
+
+    <style>
+        /* --- Telegram Theme Variables Integration --- */
+        :root {
+            --bg-color: var(--tg-theme-bg-color, #fff);
+            --secondary-bg-color: var(--tg-theme-secondary-bg-color, #f4f4f9);
+            --text-color: var(--tg-theme-text-color, #222);
+            --hint-color: var(--tg-theme-hint-color, #999);
+            --button-color: var(--tg-theme-button-color, #4a90e2);
+            --button-text-color: var(--tg-theme-button-text-color, #ffffff);
+        }
+
+        html, body {
+            min-height: 100%;
+            margin: 0;
+            padding: 0;
+            background-color: var(--secondary-bg-color);
+            color: var(--text-color);
+        }
+
+        body {
+            font-family: 'Vazirmatn', sans-serif;
+            padding: 10px;
+            box-sizing: border-box;
+            padding-bottom: 50px;
+        }
+
+        .container {
+            background-color: var(--bg-color);
+            padding: 15px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+            width: 100%;
+            max-width: 450px;
+            margin: 0 auto;
+            box-sizing: border-box;
+        }
+
+        h2, h3 {
+            text-align: center;
+            color: var(--text-color);
+            margin-top: 0;
+            margin-bottom: 15px;
+            font-size: 1.1rem;
+        }
+
+        .form-group {
+            margin-bottom: 12px;
+            position: relative;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: var(--hint-color);
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        input, select, textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-family: 'Vazirmatn', sans-serif;
+            box-sizing: border-box;
+            font-size: 0.95rem;
+            transition: border-color 0.2s;
+            background: var(--bg-color);
+            color: var(--text-color);
+        }
+
+        textarea#installments_summary {
+            resize: vertical;
+            min-height: 120px;
+            font-size: 0.85rem;
+            line-height: 1.6;
+            white-space: pre;
+            background-color: var(--secondary-bg-color);
+            color: var(--text-color);
+            direction: ltr;
+            text-align: right;
+            border: 1px solid var(--hint-color);
+        }
+
+        input:focus, select:focus, textarea:focus {
+            border-color: var(--button-color);
+            outline: none;
+        }
+
+        button {
+            width: 100%;
+            padding: 12px;
+            background-color: var(--button-color);
+            color: var(--button-text-color);
+            border: none;
+            border-radius: 8px;
+            font-family: 'Vazirmatn', sans-serif;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+
+        button.secondary-btn {
+            background-color: #6c757d;
+            color: white;
+        }
+
+        button.danger-btn {
+            background-color: #dc3545;
+            color: white;
+        }
+
+        button:active {
+            transform: translateY(1px);
+        }
+
+        /* Helpers */
+        .hidden {
+            display: none !important;
+        }
+
+        .row-group {
+            display: flex;
+            gap: 8px;
+            align-items: flex-end;
+        }
+
+        .row-group > div {
+            flex: 1;
+        }
+
+        .installment-row {
+            display: flex;
+            gap: 5px;
+            margin-bottom: 8px;
+            align-items: center;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 8px;
+        }
+
+        .installment-row span {
+            width: 25px;
+            text-align: center;
+            color: var(--hint-color);
+            font-size: 0.8rem;
+            flex-shrink: 0;
+        }
+
+        .installment-row input.row-date {
+            position: relative;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 8px;
+            margin-top: 15px;
+        }
+
+        /* Datepicker Overrides for Dark Mode Compatibility */
+        .datepicker-plot-area {
+            font-family: 'Vazirmatn', sans-serif !important;
+            border-radius: 12px !important;
+            border: none !important;
+        }
+
+        .datepicker-container {
+            z-index: 9999 !important;
+        }
+
+    </style>
+</head>
+<body>
+
+<div class="container">
+
+    <!-- VIEW 1: MAIN LOAN FORM -->
+    <div id="view-main">
+        <h2>افزودن وام جدید</h2>
+        <form id="loanForm">
+            <div class="form-group">
+                <label for="name">عنوان وام</label>
+                <input type="text" id="name" placeholder="مثلا: وام مسکن" required>
+            </div>
+
+            <div class="form-group">
+                <label for="total_amount">مبلغ کل (ریال)</label>
+                <input type="text" id="total_amount" class="currency-input" placeholder="200,000,000"
+                       inputmode="numeric" required>
+            </div>
+
+            <div class="form-group">
+                <label for="received_date">تاریخ دریافت</label>
+                <input type="text" id="received_date" class="pdate-input" placeholder="انتخاب تاریخ" autocomplete="off"
+                       required>
+            </div>
+
+            <div class="form-group">
+                <label>اطلاعات اقساط</label>
+                <button type="button" id="btnGoToInstallments" class="secondary-btn" style="margin-bottom: 10px;">تعریف
+                    اقساط
+                </button>
+                <textarea id="installments_summary" placeholder="لیست اقساط اینجا نمایش داده می‌شود..."
+                          readonly></textarea>
+            </div>
+
+            <button type="submit" id="submitBtn">ثبت و ارسال به ربات</button>
+        </form>
+    </div>
+
+    <!-- VIEW 2: INSTALLMENT GENERATOR/EDITOR -->
+    <div id="view-installments" class="hidden">
+        <div id="step-generator">
+            <h3>تولید خودکار اقساط</h3>
+            <div class="form-group">
+                <label for="gen_count">تعداد اقساط</label>
+                <input type="number" id="gen_count" placeholder="مثلا: 12">
+            </div>
+            <div class="form-group">
+                <label for="gen_start_date">تاریخ اولین قسط</label>
+                <input type="text" id="gen_start_date" class="pdate-input" placeholder="انتخاب تاریخ"
+                       autocomplete="off">
+            </div>
+            <div class="row-group form-group">
+                <div>
+                    <label for="gen_period_qty">هر چند...</label>
+                    <input type="number" id="gen_period_qty" value="1">
+                </div>
+                <div>
+                    <label for="gen_period_unit">دوره زمانی</label>
+                    <select id="gen_period_unit">
+                        <option value="month" selected>ماه</option>
+                        <option value="week">هفته</option>
+                        <option value="day">روز</option>
+                        <option value="year">سال</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="gen_amount">مبلغ هر قسط (ریال)</label>
+                <input type="text" id="gen_amount" class="currency-input" placeholder="مثلا: 107,000,000">
+            </div>
+            <button type="button" id="btnGenerate">مشاهده لیست اقساط</button>
+            <button type="button" class="danger-btn" id="btnCancelInstallments" style="margin-top:10px;">انصراف</button>
+        </div>
+
+        <div id="step-list" class="hidden">
+            <h3>لیست اقساط</h3>
+            <div id="installments_container"></div>
+            <div class="btn-group">
+                <button type="button" class="secondary-btn" id="btnBackToGen">تولید مجدد</button>
+                <button type="button" id="btnConfirmInstallments">تایید و ثبت</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://unpkg.com/persian-date@1.1.0/dist/persian-date.min.js"></script>
+<script src="https://unpkg.com/persian-datepicker@1.2.0/dist/js/persian-datepicker.min.js"></script>
+
+<script>
+    // Initialize Telegram Web App
+    const tg = window.Telegram.WebApp;
+    tg.expand(); // Optional: Expands the web app to full height
+
+    // --- Utils (Same as before) ---
+    function toEnglishDigits(str) {
+        if (!str) return '';
+        var persianNumbers = [/۰/g, /۱/g, /۲/g, /۳/g, /۴/g, /۵/g, /۶/g, /۷/g, /۸/g, /۹/g];
+        var arabicNumbers = [/٠/g, /١/g, /٢/g, /٣/g, /٤/g, /٥/g, /٦/g, /٧/g, /٨/g, /٩/g];
+        for (var i = 0; i < 10; i++) {
+            str = str.replace(persianNumbers[i], i).replace(arabicNumbers[i], i);
+        }
+        return str;
+    }
+
+    function addCommas(nStr) {
+        nStr += '';
+        var x = nStr.split('.');
+        var x1 = x[0];
+        var x2 = x.length > 1 ? '.' + x[1] : '';
+        var rgx = /(\d+)(\d{3})/;
+        while (rgx.test(x1)) x1 = x1.replace(rgx, '$1' + ',' + '$2');
+        return x1 + x2;
+    }
+
+    function removeCommas(str) {
+        if (!str) return '';
+        return str.replace(/,/g, '');
+    }
+
+    function attachCurrencyListeners(element) {
+        element.addEventListener('keyup', function (e) {
+            let val = removeCommas(e.target.value);
+            val = toEnglishDigits(val);
+            if (!isNaN(val) && val !== '') {
+                e.target.value = addCommas(val);
+            }
+        });
+    }
+
+    function initDatePicker(selector) {
+        $(selector).persianDatepicker({
+            format: 'YYYY/MM/DD',
+            initialValue: false,
+            autoClose: true,
+            responsive: true,
+            persianDigit: true
+        });
+    }
+
+    // Init Logic
+    $(document).ready(function () {
+        initDatePicker('.pdate-input');
+        document.querySelectorAll('.currency-input').forEach(input => attachCurrencyListeners(input));
+    });
+
+    function calculateNextJalaliDate(dateStr, count, unit) {
+        dateStr = dateStr.replace(/-/g, '/');
+        dateStr = toEnglishDigits(dateStr);
+        const parts = dateStr.split('/').map(Number);
+        if (parts.length !== 3) return dateStr;
+        let y = parts[0], m = parts[1], d = parts[2];
+
+        for (let i = 0; i < count; i++) {
+            if (unit === 'year') y++;
+            else if (unit === 'month') {
+                m++;
+                if (m > 12) {
+                    m = 1;
+                    y++;
+                }
+                let maxDays = (m <= 6) ? 31 : (m <= 11) ? 30 : 29;
+                if (d > maxDays) d = maxDays;
+            } else if (unit === 'week') addDays(7);
+            else if (unit === 'day') addDays(1);
+        }
+
+        function addDays(daysToAdd) {
+            d += daysToAdd;
+            while (true) {
+                let maxDays = (m <= 6) ? 31 : (m <= 11) ? 30 : 29;
+                if (d <= maxDays) break;
+                d -= maxDays;
+                m++;
+                if (m > 12) {
+                    m = 1;
+                    y++;
+                }
+            }
+        }
+
+        return `${y}/${String(m).padStart(2, '0')}/${String(d).padStart(2, '0')}`;
+    }
+
+    // --- Application State ---
+    let finalInstallments = [];
+
+    // --- UI References ---
+    const viewMain = document.getElementById('view-main');
+    const viewInst = document.getElementById('view-installments');
+    const stepGen = document.getElementById('step-generator');
+    const stepList = document.getElementById('step-list');
+    const container = document.getElementById('installments_container');
+    const summaryTextarea = document.getElementById('installments_summary');
+    const btnGoToInstallments = document.getElementById('btnGoToInstallments');
+
+    // --- Navigation ---
+    btnGoToInstallments.addEventListener('click', () => {
+        viewMain.classList.add('hidden');
+        viewInst.classList.remove('hidden');
+        if (finalInstallments.length > 0 && stepList.classList.contains('hidden')) {
+            stepGen.classList.remove('hidden');
+            stepList.classList.add('hidden');
+        }
+    });
+
+    document.getElementById('btnCancelInstallments').addEventListener('click', () => {
+        viewInst.classList.add('hidden');
+        viewMain.classList.remove('hidden');
+    });
+
+    document.getElementById('btnBackToGen').addEventListener('click', () => {
+        stepList.classList.add('hidden');
+        stepGen.classList.remove('hidden');
+    });
+
+    // --- Generation ---
+    document.getElementById('btnGenerate').addEventListener('click', () => {
+        const count = parseInt(document.getElementById('gen_count').value);
+        let startDateVal = document.getElementById('gen_start_date').value;
+        const periodQty = parseInt(document.getElementById('gen_period_qty').value);
+        const periodUnit = document.getElementById('gen_period_unit').value;
+        const rawAmount = document.getElementById('gen_amount').value;
+        const amount = removeCommas(toEnglishDigits(rawAmount));
+        startDateVal = toEnglishDigits(startDateVal);
+
+        if (!count || !startDateVal || !periodQty || !amount) {
+            tg.showAlert('لطفا تمام فیلدها را پر کنید'); // Using Telegram Native Alert
+            return;
+        }
+
+        container.innerHTML = '';
+        for (let i = 0; i < count; i++) {
+            let totalUnitsToAdd = i * periodQty;
+            let dateStr = calculateNextJalaliDate(startDateVal, totalUnitsToAdd, periodUnit);
+            const row = document.createElement('div');
+            row.className = 'installment-row';
+            row.innerHTML = `
+                <span>${i + 1}</span>
+                <input type="text" class="row-date" value="${dateStr}" readonly style="cursor: pointer;">
+                <input type="text" class="row-amount currency-input" value="${addCommas(amount)}">
+            `;
+            container.appendChild(row);
+        }
+        container.querySelectorAll('.currency-input').forEach(input => attachCurrencyListeners(input));
+        initDatePicker('.installment-row .row-date');
+        stepGen.classList.add('hidden');
+        stepList.classList.remove('hidden');
+    });
+
+    // --- Confirm Installments ---
+    document.getElementById('btnConfirmInstallments').addEventListener('click', () => {
+        const rows = document.querySelectorAll('.installment-row');
+        const tempInstallments = [];
+        let isValid = true;
+
+        rows.forEach(row => {
+            let date = toEnglishDigits(row.querySelector('.row-date').value);
+            let amt = removeCommas(toEnglishDigits(row.querySelector('.row-amount').value));
+            if (!date || !amt) isValid = false;
+            tempInstallments.push({due_date: date, amount: Number(amt), is_paid: false});
+        });
+
+        if (!isValid) {
+            tg.showAlert('لطفا مقادیر خالی را اصلاح کنید');
+            return;
+        }
+
+        finalInstallments = tempInstallments;
+        let summaryText = "";
+        finalInstallments.forEach((item, index) => {
+            summaryText += `${index + 1}. ${item.due_date} -- ${addCommas(item.amount)} ریال\n`;
+        });
+        summaryTextarea.value = summaryText;
+        btnGoToInstallments.innerText = 'ویرایش اقساط';
+        viewInst.classList.add('hidden');
+        viewMain.classList.remove('hidden');
+    });
+
+    // --- SEND DATA TO TELEGRAM BOT ---
+    document.getElementById('loanForm').addEventListener('submit', function (e) {
+        e.preventDefault();
+
+        if (finalInstallments.length === 0) {
+            tg.showAlert('لطفا ابتدا اقساط را تعریف کنید');
+            return;
+        }
+
+        const name = document.getElementById('name').value;
+        const totalAmount = removeCommas(toEnglishDigits(document.getElementById('total_amount').value));
+        const receivedDate = toEnglishDigits(document.getElementById('received_date').value);
+
+        const payload = {
+            "loans": {
+                "name": name,
+                "total_amount": Number(totalAmount),
+                "received_date": receivedDate,
+                "total_installments": finalInstallments.length
+            },
+            "installments": finalInstallments
+        };
+
+        // Send data back to Telegram and close the WebApp
+        tg.sendData(JSON.stringify(payload));
+    });
+</script>
+
+</body>
+</html>
