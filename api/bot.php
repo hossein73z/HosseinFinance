@@ -306,7 +306,7 @@ function backButton(array $person): void
         $last_level = $db->read('buttons', ['id' => $current_level['belong_to']], true);
 
         $last_button['id'] = $last_level['id'];
-        $last_button['attrs']['text'] = $last_level['attrs']['text'];
+        $last_button['attrs'] = $last_level['attrs'];
         $last_button['adminKey'] = $last_level['admin_key'];
         $last_button['messages'] = $last_level['messages'];
         $last_button['belongsTo'] = $last_level['belongs_to'];
