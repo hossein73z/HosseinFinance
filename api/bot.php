@@ -258,12 +258,12 @@ function choosePath(
                 if ($pressed_button['id'] == "4") level_4($person);
 
                 $data = [
-                    'text' => $pressed_button['attrs']['text'],
+                    'text' => json_decode($pressed_button['attrs'], true)['text'],
                     'chat_id' => $person['chat_id'],
                     'reply_markup' => [
                         'keyboard' => createKeyboardsArray($pressed_button['id'], $person['is_admin'], $db),
                         'resize_keyboard' => true,
-                        'input_field_placeholder' => $pressed_button['attrs']['text'],
+                        'input_field_placeholder' => json_decode($pressed_button['attrs'], true)['text'],
                     ]
                 ];
 
