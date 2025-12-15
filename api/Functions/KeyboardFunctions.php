@@ -5,6 +5,7 @@
  *
  * @param string $text The text of the button that was pressed.
  * @param int|string $parent_btn_id The ID of the parent button whose keyboard contained the pressed button.
+ * @param bool $admin Whether the user is an admin.
  * @param DatabaseManager $db The database manager instance.
  * @return array|null The details of the pressed button, or an empty array if not found.
  */
@@ -15,8 +16,18 @@ function getPressedButton(string $text, int|string $parent_btn_id, bool $admin, 
     if (!$ids) return null;
 
     $admin = ($admin) ? [true, false] : false;
-    // Search for a button with the given text among the merged IDs.
-    $pressed_button = $db->read(table: 'buttons', conditions: ['id' => $ids['merged'], 'admin_key' => $admin, 'text' => $text], single: true);
+
+    // Search for a button with the given text among the merged IDs using JSON extraction.
+    // We use the TiDB/MySQL inline JSON extraction operator `->>` (equivalent to JSON_UNQUOTE(JSON_EXTRACT(...))).
+    $pressed_button = $db->read(
+        table: 'buttons',
+        conditions: [
+            'id' => $ids['merged'],
+            'admin_key' => $admin,
+            'attrs->>"$.text"' => $text
+        ],
+        single: true
+    );
 
     if ($pressed_button) return $pressed_button;
     else return null;
@@ -26,6 +37,7 @@ function getPressedButton(string $text, int|string $parent_btn_id, bool $admin, 
  * Creates a Telegram-ready keyboard array structure from a parent button's ID.
  *
  * @param int|string $parent_btn_id The ID of the parent button whose keyboard should be created.
+ * @param bool $admin Whether the user is an admin.
  * @param DatabaseManager $db The database manager instance.
  * @return array|null The array formatted for a Telegram keyboard, or null if no buttons are found.
  */
@@ -50,8 +62,12 @@ function createKeyboardsArray(int|string $parent_btn_id, bool $admin, DatabaseMa
     // Iterate through the separate (row-based) IDs to build the Telegram keyboard structure.
     foreach ($ids['separate'] as $index => $btn_ids) {
         foreach ($btn_ids as $btn_id) {
-            // Append the button text to the correct row and column.
-            if ($buttons[$btn_id]) $telegram_keyboard[$index][]['text'] = $buttons[$btn_id]['text'];
+            // Check if button exists in fetched data
+            if (isset($buttons[$btn_id])) {
+                // Decode the attributes JSON to get the text
+                $attrs = json_decode($buttons[$btn_id]['attrs'], true);
+                $telegram_keyboard[$index][] = $attrs;
+            }
         }
     }
     return $telegram_keyboard;
@@ -116,17 +132,22 @@ function createButtonTextTree(array $buttons): string
             $is_last_row = ($rowIndex === $rows - 1);
 
             foreach ($keyboard_ids_row as $colIndex => $keyboard_id) {
+                if (!isset($buttons[$keyboard_id])) continue;
+
                 $button = $buttons[$keyboard_id];
                 $is_last_button_in_row = ($colIndex === $row_buttons - 1);
+
+                // Decode attrs to get text
+                $attrs = json_decode($button['attrs'], true);
+                $btn_text = $attrs['text'] ?? 'Unknown';
 
                 // Determine the symbol for the current button's connection.
                 $connector = ($is_last_row && $is_last_button_in_row) ? '┘── ╸ ' : '┤── ╸ ';
 
                 // Append the current button's text with the structural prefix.
-                $tree .= $prefix . $connector . $button['text'] . "\n";
+                $tree .= $prefix . $connector . $btn_text . "\n";
 
                 // Determine the new prefix for the child nodes.
-                // Use spaces if this is the last button in the last row, otherwise use the vertical pipe '│'.
                 $next_prefix = $prefix . (($is_last_row && $is_last_button_in_row) ? '           ' : '│        ');
 
                 // Recurse if the current button itself has nested keyboards.
@@ -139,6 +160,10 @@ function createButtonTextTree(array $buttons): string
         return $tree;
     }
 
+    // Get root text
+    $root_attrs = json_decode($buttons[0]['attrs'], true);
+    $root_text = $root_attrs['text'] ?? 'Root';
+
     // Start the tree with the root button's text, followed by the recursive children.
-    return $buttons[0]['text'] . "\n" . buildTreeRecursively($root_keyboard_ids, $buttons, '');
+    return $root_text . "\n" . buildTreeRecursively($root_keyboard_ids, $buttons, '');
 }

@@ -136,8 +136,19 @@ class DatabaseManager
         $params = [];
 
         foreach ($conditions as $column => $value) {
-            $columnSql = (strpos($column, '.') !== false) ? $column : "`$column`";
-            $sanitizedColumn = str_replace('.', '_', $column);
+            // 1. Determine SQL syntax:
+            // If it contains '->' (JSON) or '.' (Table.Column), do not wrap in backticks.
+            // Otherwise, wrap in backticks to be safe.
+            if (str_contains($column, '->') || str_contains($column, '.')) {
+                $columnSql = $column;
+            } else {
+                $columnSql = "`$column`";
+            }
+
+            // 2. Create a safe PDO placeholder name:
+            // Remove ANY character that is not A-Z, 0-9, or underscore.
+            // This turns 'attrs->>"$.text"' into 'attrstext'
+            $sanitizedColumn = preg_replace('/[^a-zA-Z0-9_]/', '', $column);
 
             if (is_array($value)) {
                 if (empty($value)) {
