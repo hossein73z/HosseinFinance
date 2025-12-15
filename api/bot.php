@@ -1467,7 +1467,7 @@ function level_4(array $person, array|null $message = null, array|null $query_da
 }
 
 /**
- * Level 1: My Holdings
+ * Level 7: Add New Loan
  */
 #[NoReturn]
 function level_7(array $person, array|null $message = null, array|null $query_data = null): string|null
@@ -1486,7 +1486,7 @@ function level_7(array $person, array|null $message = null, array|null $query_da
     if ($query_data) {
         return null;
     } elseif ($message) {
-        return;
+        return null;
     } else {
         $data['text'] = 'این بخش هنوز راه نیوفتاده است!';
     }
