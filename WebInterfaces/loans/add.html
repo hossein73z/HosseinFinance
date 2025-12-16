@@ -2,18 +2,14 @@
 <html lang="fa" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>ثبت وام و اقساط</title>
 
-    <!-- Telegram Web App Script -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-
-    <!-- Vazir Font -->
     <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css" rel="stylesheet"
           type="text/css"/>
 
     <style>
-        /* --- Telegram Theme Variables Integration --- */
         :root {
             --bg-color: var(--tg-theme-bg-color, #fff);
             --secondary-bg-color: var(--tg-theme-secondary-bg-color, #f4f4f9);
@@ -21,6 +17,7 @@
             --hint-color: var(--tg-theme-hint-color, #999);
             --button-color: var(--tg-theme-button-color, #4a90e2);
             --button-text-color: var(--tg-theme-button-text-color, #ffffff);
+            --error-color: #dc3545;
         }
 
         html, body {
@@ -29,10 +26,13 @@
             padding: 0;
             background-color: var(--secondary-bg-color);
             color: var(--text-color);
+            font-family: 'Vazirmatn', sans-serif;
+            overflow-x: hidden;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
         }
 
         body {
-            font-family: 'Vazirmatn', sans-serif;
             padding: 10px;
             box-sizing: border-box;
             padding-bottom: 50px;
@@ -59,7 +59,6 @@
 
         .form-group {
             margin-bottom: 12px;
-            position: relative;
         }
 
         label {
@@ -70,6 +69,11 @@
             font-weight: 500;
         }
 
+        .input-with-icon {
+            position: relative;
+            width: 100%;
+        }
+
         input, select, textarea {
             width: 100%;
             padding: 10px;
@@ -78,9 +82,39 @@
             font-family: 'Vazirmatn', sans-serif;
             box-sizing: border-box;
             font-size: 0.95rem;
-            transition: border-color 0.2s;
+            transition: border-color 0.2s, background-color 0.2s;
             background: var(--bg-color);
             color: var(--text-color);
+        }
+
+        /* Error state for invalid dates */
+        input.input-error {
+            border-color: var(--error-color) !important;
+            background-color: rgba(220, 53, 69, 0.05);
+        }
+
+        input.has-date-picker {
+            padding-left: 40px;
+        }
+
+        .date-picker-trigger {
+            position: absolute;
+            left: 5px;
+            top: 50%;
+            transform: translateY(-50%);
+            cursor: pointer;
+            padding: 5px;
+            color: var(--button-color);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2;
+        }
+
+        .date-picker-trigger svg {
+            width: 20px;
+            height: 20px;
+            fill: currentColor;
         }
 
         textarea#installments_summary {
@@ -129,7 +163,6 @@
             transform: translateY(1px);
         }
 
-        /* Helpers */
         .hidden {
             display: none !important;
         }
@@ -161,16 +194,142 @@
             flex-shrink: 0;
         }
 
-        .installment-row input.row-date {
-            position: relative;
-        }
-
         .btn-group {
             display: flex;
             gap: 8px;
             margin-top: 15px;
         }
 
+        /* --- DATE PICKER MODAL --- */
+        #date-picker-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            display: none;
+            flex-direction: column;
+            justify-content: flex-end;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        #date-picker-overlay.active {
+            opacity: 1;
+        }
+
+        .picker-container {
+            background: var(--bg-color);
+            border-top-left-radius: 20px;
+            border-top-right-radius: 20px;
+            padding: 20px 10px;
+            transform: translateY(100%);
+            transition: transform 0.3s cubic-bezier(0.1, 0.7, 0.1, 1);
+            box-shadow: 0 -5px 25px rgba(0, 0, 0, 0.1);
+        }
+
+        #date-picker-overlay.active .picker-container {
+            transform: translateY(0);
+        }
+
+        .picker-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 15px;
+            padding: 0 10px;
+        }
+
+        .picker-btn {
+            background: none;
+            border: none;
+            color: var(--button-color);
+            font-size: 1rem;
+            cursor: pointer;
+            padding: 5px 15px;
+        }
+
+        .picker-btn.cancel {
+            color: var(--hint-color);
+        }
+
+        .wheels-wrapper {
+            position: relative;
+            display: flex;
+            height: 200px;
+            overflow: hidden;
+            direction: ltr;
+        }
+
+        .wheel-highlight {
+            position: absolute;
+            top: 50%;
+            left: 0;
+            width: 100%;
+            height: 40px;
+            margin-top: -20px;
+            background: var(--secondary-bg-color);
+            border-top: 1px solid #ddd;
+            border-bottom: 1px solid #ddd;
+            pointer-events: none;
+            z-index: 1;
+            opacity: 0.5;
+        }
+
+        .wheel-col {
+            flex: 1;
+            height: 100%;
+            overflow-y: scroll;
+            scroll-snap-type: y mandatory;
+            text-align: center;
+            z-index: 2;
+            padding: 0;
+            margin: 0;
+            list-style: none;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+            cursor: grab;
+        }
+
+        .wheel-col:active {
+            cursor: grabbing;
+        }
+
+        .wheel-col::-webkit-scrollbar {
+            display: none;
+        }
+
+        .wheel-col li {
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.1rem;
+            color: var(--hint-color);
+            scroll-snap-align: center;
+            scroll-snap-stop: always;
+            transition: color 0.1s, transform 0.1s;
+        }
+
+        .wheel-spacer {
+            height: 80px !important;
+            flex-shrink: 0;
+            pointer-events: none;
+        }
+
+        .wheel-title {
+            text-align: center;
+            font-size: 0.75rem;
+            color: var(--hint-color);
+            margin-bottom: 5px;
+        }
+
+        .wheel-col li.active {
+            color: var(--text-color);
+            font-weight: bold;
+            transform: scale(1.1);
+        }
     </style>
 </head>
 <body>
@@ -194,7 +353,10 @@
 
             <div class="form-group">
                 <label for="received_date">تاریخ دریافت</label>
-                <input type="text" id="received_date" placeholder="1403/01/01" required>
+                <div class="input-with-icon">
+                    <!-- Note: removed readonly -->
+                    <input type="text" id="received_date" class="has-date-picker" placeholder="1403/01/01" required>
+                </div>
             </div>
 
             <div class="form-group">
@@ -220,7 +382,10 @@
             </div>
             <div class="form-group">
                 <label for="gen_start_date">تاریخ اولین قسط</label>
-                <input type="text" id="gen_start_date" placeholder="1403/02/01">
+                <div class="input-with-icon">
+                    <!-- Note: removed readonly -->
+                    <input type="text" id="gen_start_date" class="has-date-picker" placeholder="1403/02/01">
+                </div>
             </div>
             <div class="row-group form-group">
                 <div>
@@ -256,8 +421,30 @@
     </div>
 </div>
 
+<!-- Date Picker Overlay -->
+<div id="date-picker-overlay">
+    <div class="picker-container">
+        <div class="picker-header">
+            <button class="picker-btn cancel" id="picker-cancel">انصراف</button>
+            <button class="picker-btn" id="picker-done">تایید</button>
+        </div>
+
+        <div style="display: flex; text-align: center; direction: ltr;">
+            <div class="wheel-title" style="flex:1">Year</div>
+            <div class="wheel-title" style="flex:1">Month</div>
+            <div class="wheel-title" style="flex:1">Day</div>
+        </div>
+
+        <div class="wheels-wrapper">
+            <div class="wheel-highlight"></div>
+            <ul class="wheel-col" id="col-year"></ul>
+            <ul class="wheel-col" id="col-month"></ul>
+            <ul class="wheel-col" id="col-day"></ul>
+        </div>
+    </div>
+</div>
+
 <script>
-    // Initialize Telegram Web App
     const tg = window.Telegram.WebApp;
     tg.expand();
 
@@ -287,21 +474,311 @@
         return str.replace(/,/g, '');
     }
 
+    // --- DATE VALIDATION HELPERS ---
+
+    // Check if string is a valid YYYY/MM/DD or YYYY-MM-DD Jalali date
+    function isValidJalaliDateString(str) {
+        if (!str) return false;
+        str = toEnglishDigits(str);
+
+        // Match 4 digits, separator, 1-2 digits, separator, 1-2 digits
+        const regex = /^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/;
+        const match = str.match(regex);
+
+        if (!match) return false;
+
+        const y = parseInt(match[1]);
+        const m = parseInt(match[2]);
+        const d = parseInt(match[3]);
+
+        // Basic Range Checks
+        if (y < 1300 || y > 1500) return false;
+        if (m < 1 || m > 12) return false;
+        if (d < 1 || d > 31) return false;
+        if (m > 6 && d === 31) return false; // Second half of year has 30 days (mostly)
+
+        return {y, m, d}; // Return parsed object if valid
+    }
+
+    // Get current date in Jalali (using Intl)
+    function getTodayJalali() {
+        try {
+            // 'fa-IR-u-nu-latn' forces Western digits (0-9)
+            const d = new Date();
+            const formatter = new Intl.DateTimeFormat('fa-IR-u-nu-latn', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit'
+            });
+            const parts = formatter.formatToParts(d);
+            const y = parseInt(parts.find(p => p.type === 'year').value);
+            const m = parseInt(parts.find(p => p.type === 'month').value);
+            const dVal = parseInt(parts.find(p => p.type === 'day').value);
+            return {y, m, d: dVal};
+        } catch (e) {
+            // Fallback just in case
+            return {y: 1403, m: 1, d: 1};
+        }
+    }
+
     function attachCurrencyListeners(element) {
-        element.addEventListener('keyup', function (e) {
-            let val = removeCommas(e.target.value);
-            val = toEnglishDigits(val);
-            if (!isNaN(val) && val !== '') {
-                e.target.value = addCommas(val);
+        // Change 'keyup' to 'input' for better real-time handling (including paste)
+        element.addEventListener('input', function (e) {
+            const input = e.target;
+
+            // 1. Capture current cursor position
+            const selectionStart = input.selectionStart;
+            const originalValue = input.value;
+
+            // 2. Count how many digits (0-9) are to the right of the cursor
+            // We use this anchor because commas change position, but digits usually stay relative
+            let digitsAfterCursor = 0;
+            for (let i = selectionStart; i < originalValue.length; i++) {
+                if (/[0-9\u0660-\u0669\u06f0-\u06f9]/.test(originalValue[i])) {
+                    digitsAfterCursor++;
+                }
+            }
+
+            // 3. Process the value
+            let rawValue = removeCommas(input.value);
+            rawValue = toEnglishDigits(rawValue);
+
+            // If empty or invalid, let it be (but clean it up if it's just text)
+            if (isNaN(rawValue) && rawValue !== '') {
+                // optionally handle invalid input here
+            }
+
+            // 4. Re-format with commas
+            const formattedValue = rawValue === '' ? '' : addCommas(rawValue);
+
+            // 5. Update value and restore cursor
+            if (input.value !== formattedValue) {
+                input.value = formattedValue;
+
+                // Find the new cursor index so that we still have 'digitsAfterCursor' digits to the right
+                let newCursorPos = formattedValue.length;
+                let currentDigitsFound = 0;
+
+                while (newCursorPos > 0 && currentDigitsFound < digitsAfterCursor) {
+                    newCursorPos--;
+                    // Check if the character at this position is a digit
+                    if (/[0-9]/.test(formattedValue[newCursorPos])) {
+                        currentDigitsFound++;
+                    }
+                }
+
+                // Set the cursor
+                input.setSelectionRange(newCursorPos, newCursorPos);
             }
         });
     }
 
-    // Init Logic
+    // --- CUSTOM DATE PICKER LOGIC ---
+    const pickerOverlay = document.getElementById('date-picker-overlay');
+    const colYear = document.getElementById('col-year');
+    const colMonth = document.getElementById('col-month');
+    const colDay = document.getElementById('col-day');
+    const btnDone = document.getElementById('picker-done');
+    const btnCancel = document.getElementById('picker-cancel');
+
+    let activeInput = null;
+    const ITEM_HEIGHT = 40;
+
+    function initDatePicker() {
+        const spacer = '<li class="wheel-spacer"></li>';
+
+        let yearsHTML = spacer;
+        for (let i = 1380; i <= 1450; i++) yearsHTML += `<li data-val="${i}">${i}</li>`;
+        yearsHTML += spacer;
+        colYear.innerHTML = yearsHTML;
+
+        let monthsHTML = spacer;
+        for (let i = 1; i <= 12; i++) monthsHTML += `<li data-val="${i}">${String(i).padStart(2, '0')}</li>`;
+        monthsHTML += spacer;
+        colMonth.innerHTML = monthsHTML;
+
+        updateDays(31);
+
+        [colYear, colMonth, colDay].forEach(col => {
+            col.addEventListener('scroll', () => highlightActive(col));
+            col.addEventListener('scrollend', () => {
+                if (col === colMonth) validateDays();
+            });
+            enableDragToScroll(col);
+        });
+
+        btnCancel.addEventListener('click', closePicker);
+        btnDone.addEventListener('click', confirmDate);
+    }
+
+    function enableDragToScroll(slider) {
+        let isDown = false;
+        let startY;
+        let scrollTop;
+
+        slider.addEventListener('mousedown', (e) => {
+            isDown = true;
+            startY = e.pageY - slider.offsetTop;
+            scrollTop = slider.scrollTop;
+            slider.style.scrollSnapType = 'none';
+        });
+
+        slider.addEventListener('mouseleave', () => {
+            if (isDown) {
+                isDown = false;
+                slider.style.scrollSnapType = 'y mandatory';
+            }
+        });
+
+        slider.addEventListener('mouseup', () => {
+            isDown = false;
+            slider.style.scrollSnapType = 'y mandatory';
+        });
+
+        slider.addEventListener('mousemove', (e) => {
+            if (!isDown) return;
+            e.preventDefault();
+            const y = e.pageY - slider.offsetTop;
+            const walk = (y - startY) * 1.5;
+            slider.scrollTop = scrollTop - walk;
+        });
+    }
+
+    function updateDays(count) {
+        const spacer = '<li class="wheel-spacer"></li>';
+        let daysHTML = spacer;
+        for (let i = 1; i <= count; i++) daysHTML += `<li data-val="${i}">${String(i).padStart(2, '0')}</li>`;
+        daysHTML += spacer;
+        colDay.innerHTML = daysHTML;
+        enableDragToScroll(colDay);
+        highlightActive(colDay);
+    }
+
+    function validateDays() {
+        const m = getSelectedValue(colMonth);
+        let max = 31;
+        if (m > 6 && m <= 11) max = 30;
+        if (m == 12) max = 30;
+
+        const currentSelection = getSelectedValue(colDay);
+        const currentItems = colDay.querySelectorAll('li[data-val]').length;
+
+        if (currentItems !== max) {
+            updateDays(max);
+            scrollToValue(colDay, Math.min(currentSelection, max));
+        }
+    }
+
+    function getSelectedValue(col) {
+        const scrollTop = col.scrollTop;
+        const index = Math.round(scrollTop / ITEM_HEIGHT);
+        const items = col.querySelectorAll('li[data-val]');
+        if (items[index]) return parseInt(items[index].getAttribute('data-val'));
+        return 1;
+    }
+
+    function highlightActive(col) {
+        const scrollTop = col.scrollTop;
+        const index = Math.round(scrollTop / ITEM_HEIGHT);
+        const items = col.querySelectorAll('li[data-val]');
+        items.forEach(li => li.classList.remove('active'));
+        if (items[index]) items[index].classList.add('active');
+    }
+
+    function scrollToValue(col, val) {
+        const items = Array.from(col.querySelectorAll('li[data-val]'));
+        const index = items.findIndex(li => parseInt(li.getAttribute('data-val')) == val);
+        if (index !== -1) {
+            col.scrollTop = index * ITEM_HEIGHT;
+            highlightActive(col);
+        }
+    }
+
+    function openPicker(input) {
+        activeInput = input;
+        const val = input.value;
+
+        // Try to parse existing date
+        let parsed = isValidJalaliDateString(val);
+
+        // If invalid or empty, default to Today
+        if (!parsed) {
+            parsed = getTodayJalali();
+        }
+
+        pickerOverlay.style.display = 'flex';
+        setTimeout(() => {
+            pickerOverlay.classList.add('active');
+            scrollToValue(colYear, parsed.y);
+            scrollToValue(colMonth, parsed.m);
+            validateDays();
+            scrollToValue(colDay, parsed.d);
+        }, 10);
+    }
+
+    function closePicker() {
+        pickerOverlay.classList.remove('active');
+        setTimeout(() => {
+            pickerOverlay.style.display = 'none';
+        }, 300);
+    }
+
+    function confirmDate() {
+        if (!activeInput) return;
+        const y = getSelectedValue(colYear);
+        const m = String(getSelectedValue(colMonth)).padStart(2, '0');
+        const d = String(getSelectedValue(colDay)).padStart(2, '0');
+        activeInput.value = `${y}/${m}/${d}`;
+
+        // Remove error state since picker always gives valid date
+        activeInput.classList.remove('input-error');
+
+        closePicker();
+    }
+
+    // Attach listeners for both Icon (Picker) and Input (Typing Validation)
+    function attachDatePicker(inputElement) {
+        const wrapper = inputElement.closest('.input-with-icon');
+
+        // 1. Validation on typing
+        inputElement.addEventListener('input', function (e) {
+            const val = e.target.value;
+            // Allow empty string to not show red error?
+            // The prompt said "show small error if text is not well formatted".
+            // If empty is considered "not well formatted" (required), we show error.
+            if (val.length > 0) {
+                if (!isValidJalaliDateString(val)) {
+                    inputElement.classList.add('input-error');
+                } else {
+                    inputElement.classList.remove('input-error');
+                }
+            } else {
+                inputElement.classList.remove('input-error');
+            }
+        });
+
+        // 2. Icon Logic
+        if (wrapper.querySelector('.date-picker-trigger')) return;
+
+        const icon = document.createElement('span');
+        icon.className = 'date-picker-trigger';
+        icon.innerHTML = `<svg viewBox="0 0 24 24"><path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20a2 2 0 0 0 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zM9 14H7v-2h2v2zm4 0h-2v-2h2v2zm4 0h-2v-2h2v2zm-8 4H7v-2h2v2zm4 0h-2v-2h2v2zm4 0h-2v-2h2v2z"/></svg>`;
+
+        inputElement.parentNode.insertBefore(icon, inputElement);
+
+        icon.addEventListener('click', (e) => {
+            e.stopPropagation();
+            openPicker(inputElement);
+        });
+    }
+
     document.addEventListener('DOMContentLoaded', function () {
+        initDatePicker();
         document.querySelectorAll('.currency-input').forEach(input => attachCurrencyListeners(input));
+        document.querySelectorAll('.has-date-picker').forEach(input => attachDatePicker(input));
     });
 
+    // --- APP LOGIC ---
     function calculateNextJalaliDate(dateStr, count, unit) {
         dateStr = dateStr.replace(/-/g, '/');
         dateStr = toEnglishDigits(dateStr);
@@ -340,10 +817,7 @@
         return `${y}/${String(m).padStart(2, '0')}/${String(d).padStart(2, '0')}`;
     }
 
-    // --- Application State ---
     let finalInstallments = [];
-
-    // --- UI References ---
     const viewMain = document.getElementById('view-main');
     const viewInst = document.getElementById('view-installments');
     const stepGen = document.getElementById('step-generator');
@@ -352,8 +826,14 @@
     const summaryTextarea = document.getElementById('installments_summary');
     const btnGoToInstallments = document.getElementById('btnGoToInstallments');
 
-    // --- Navigation ---
     btnGoToInstallments.addEventListener('click', () => {
+        // Validate date before proceeding
+        const dateInput = document.getElementById('received_date');
+        if (!isValidJalaliDateString(dateInput.value)) {
+            tg.showAlert('لطفا تاریخ دریافت را صحیح وارد کنید');
+            return;
+        }
+
         viewMain.classList.add('hidden');
         viewInst.classList.remove('hidden');
         if (finalInstallments.length > 0 && stepList.classList.contains('hidden')) {
@@ -372,7 +852,6 @@
         stepGen.classList.remove('hidden');
     });
 
-    // --- Generation ---
     document.getElementById('btnGenerate').addEventListener('click', () => {
         const count = parseInt(document.getElementById('gen_count').value);
         let startDateVal = document.getElementById('gen_start_date').value;
@@ -382,8 +861,13 @@
         const amount = removeCommas(toEnglishDigits(rawAmount));
         startDateVal = toEnglishDigits(startDateVal);
 
-        if (!count || !startDateVal || !periodQty || !amount) {
+        if (!count || !periodQty || !amount) {
             tg.showAlert('لطفا تمام فیلدها را پر کنید');
+            return;
+        }
+
+        if (!isValidJalaliDateString(startDateVal)) {
+            tg.showAlert('تاریخ اولین قسط معتبر نیست');
             return;
         }
 
@@ -393,33 +877,37 @@
             let dateStr = calculateNextJalaliDate(startDateVal, totalUnitsToAdd, periodUnit);
             const row = document.createElement('div');
             row.className = 'installment-row';
+            // Added 'input-with-icon' and 'has-date-picker' (removed readonly)
             row.innerHTML = `
                 <span>${i + 1}</span>
-                <input type="text" class="row-date" value="${dateStr}" placeholder="1403/01/01">
+                <div class="input-with-icon">
+                    <input type="text" class="row-date has-date-picker" value="${dateStr}">
+                </div>
                 <input type="text" class="row-amount currency-input" value="${addCommas(amount)}">
             `;
             container.appendChild(row);
+            attachDatePicker(row.querySelector('.row-date'));
         }
         container.querySelectorAll('.currency-input').forEach(input => attachCurrencyListeners(input));
         stepGen.classList.add('hidden');
         stepList.classList.remove('hidden');
     });
 
-    // --- Confirm Installments ---
     document.getElementById('btnConfirmInstallments').addEventListener('click', () => {
         const rows = document.querySelectorAll('.installment-row');
         const tempInstallments = [];
         let isValid = true;
-
         rows.forEach(row => {
             let date = toEnglishDigits(row.querySelector('.row-date').value);
             let amt = removeCommas(toEnglishDigits(row.querySelector('.row-amount').value));
-            if (!date || !amt) isValid = false;
+
+            if (!isValidJalaliDateString(date) || !amt) isValid = false;
+
             tempInstallments.push({due_date: date, amount: Number(amt), is_paid: false});
         });
 
         if (!isValid) {
-            tg.showAlert('لطفا مقادیر خالی را اصلاح کنید');
+            tg.showAlert('لطفا تاریخ‌ها و مبالغ را اصلاح کنید');
             return;
         }
 
@@ -434,18 +922,20 @@
         viewMain.classList.remove('hidden');
     });
 
-    // --- SEND DATA TO TELEGRAM BOT ---
     document.getElementById('loanForm').addEventListener('submit', function (e) {
         e.preventDefault();
-
         if (finalInstallments.length === 0) {
             tg.showAlert('لطفا ابتدا اقساط را تعریف کنید');
             return;
         }
-
         const name = document.getElementById('name').value;
         const totalAmount = removeCommas(toEnglishDigits(document.getElementById('total_amount').value));
         const receivedDate = toEnglishDigits(document.getElementById('received_date').value);
+
+        if (!isValidJalaliDateString(receivedDate)) {
+            tg.showAlert('تاریخ دریافت وام معتبر نیست');
+            return;
+        }
 
         const payload = {
             "loans": {
@@ -456,11 +946,8 @@
             },
             "installments": finalInstallments
         };
-
-        // Send data back to Telegram and close the WebApp
         tg.sendData(JSON.stringify(payload));
     });
 </script>
-
 </body>
 </html>

@@ -122,37 +122,40 @@ if (isset($update['message'])) {
         }
     }
 
-    // Handle Web App Data (e.g. Loans)
-    if (isset($global_message['web_app_data'])) {
-        processLoanData($global_person, $global_message['web_app_data']['data']);
-        exit();
-    }
-
     // ------------------------------
     // ----- The core bot logic -----
     // ------------------------------
 
-    $global_pressed_button = getPressedButton(
-        text: $global_message['text'],
-        parent_btn_id: $global_person['last_btn'],
-        admin: $global_person['is_admin'],
-        db: $db
-    );
+    if (isset($global_message['web_app_data'])) {
 
-    // Global Command Routing
-    if ($global_message['text'] == '/holdings') {
-        level_1($global_person);
-    } elseif ($global_message['text'] == '/prices') {
-        level_4($global_person);
-    } else {
-        // Route based on button/state
         choosePath(
-            pressed_button: $global_pressed_button,
+            pressed_button: false,
             message: $global_message,
             person: $global_person
         );
-    }
 
+    } else {
+        $global_pressed_button = getPressedButton(
+            text: $global_message['text'],
+            parent_btn_id: $global_person['last_btn'],
+            admin: $global_person['is_admin'],
+            db: $db
+        );
+
+        // Global Command Routing
+        if ($global_message['text'] == '/holdings') {
+            level_1($global_person);
+        } elseif ($global_message['text'] == '/prices') {
+            level_4($global_person);
+        } else {
+            // Route based on button/state
+            choosePath(
+                pressed_button: $global_pressed_button,
+                message: $global_message,
+                person: $global_person
+            );
+        }
+    }
 } elseif (isset($update['callback_query'])) {
     // Process 'Inline' button presses.
 
@@ -1475,7 +1478,7 @@ function level_5(array $person, array|null $message = null, array|null $query_da
     $data = [
         'chat_id' => $person['chat_id'],
         'reply_markup' => [
-            'keyboard' => createKeyboardsArray(7, $person['is_admin'], $db),
+            'keyboard' => createKeyboardsArray(5, $person['is_admin'], $db),
             'resize_keyboard' => true,
             'input_field_placeholder' => '➕ ثبت وام جدید',
         ]
@@ -1486,12 +1489,12 @@ function level_5(array $person, array|null $message = null, array|null $query_da
         return null;
     } elseif ($message) {
         if (isset($message['web_app_data'])) {
-            $data = json_decode($message['web_app_data']['data'], true);
+            $web_app_data = json_decode($message['web_app_data']['data'], true);
 
-            if (!$data || !isset($data['loans']) || !isset($data['installments'])) $data['text'] = '❌ خط در دریافت اطلاعات. داده‌ها معتبر نیستند.';
+            if (!$web_app_data || !isset($web_app_data['loans']) || !isset($web_app_data['installments'])) $data['text'] = '❌ خط در دریافت اطلاعات. داده‌ها معتبر نیستند.';
             else {
 
-                $loanData = $data['loans'];
+                $loanData = $web_app_data['loans'];
                 $loan_insert_data = [
                     'person_id' => $person['id'],
                     'name' => $loanData['name'],
@@ -1503,7 +1506,7 @@ function level_5(array $person, array|null $message = null, array|null $query_da
                 $loan_id = $db->create('loans', $loan_insert_data);
 
                 if ($loan_id) {
-                    $installments = $data['installments'];
+                    $installments = $web_app_data['installments'];
                     $count = 0;
 
                     foreach ($installments as $inst) {
