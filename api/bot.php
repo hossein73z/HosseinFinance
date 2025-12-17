@@ -1527,13 +1527,44 @@ function level_5(array $person, array|null $message = null, array|null $query_da
             }
         } else return null;
     } else {
-        $data['text'] = 'این بخش هنوز راه نیوفتاده است!';
+        $loans = $db->read(
+            'loans l',
+            conditions: ['person_id' => $person['id']],
+            selectColumns: "
+                l.*, 
+                JSON_ARRAYAGG(
+                    JSON_OBJECT(
+                        'id', i.id,
+                        'amount', i.amount,
+                        'due_date', i.due_date,
+                        'is_paid', i.is_paid
+                    )
+                ) as installments
+                ",
+            join: "LEFT JOIN installments i ON l.id=i.loan_id",
+            groupBy: 'l.id',
+        );
+
+        if ($loans) {
+            $data['text'] = 'وام‌های ثبت شده‌ی شما:';
+            foreach ($loans as $loan) {
+                $data['text'] .= "\n‏    " . $loan['name'] . ":";
+
+                $installments = json_decode($loan['installments'], true);
+                foreach ($installments as $installment) {
+                    $paid_icon = ($installment['is_paid']) ? '✔' : '❌';
+                    $data['text'] .= "\n‏        " . beautifulNumber($installment['due_date'], null) . ": " . beautifulNumber($installment['amount']) . $paid_icon;
+                }
+                $data['text'] .= "\n";
+            }
+        } else $data['text'] = 'هیچ وام ثبت شده‌ای ندارید!';
     }
 
-    $person['last_btn'] = 5;
-    $db->update('persons', $person, ['id' => $person['id']]);
-
     $response = sendToTelegram('sendMessage', $data);
+    if ($response) {
+        $person['last_btn'] = 5;
+        $db->update('persons', $person, ['id' => $person['id']]);
+    }
     exit(json_encode(['status' => 'OK', 'telegram_response' => $response]));
 }
 
