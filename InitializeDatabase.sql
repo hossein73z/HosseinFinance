@@ -30,9 +30,7 @@ VALUES ('3', '{"text": "ابزارها"}', 0, null, '0', '[["4"], ["s0"]]');
 INSERT INTO `test`.buttons (id, attrs, admin_key, messages, belong_to, keyboards)
 VALUES ('4', '{"text": "قیمت‌ها"}', 0, null, '3', '[["s0"]]');
 INSERT INTO `test`.buttons (id, attrs, admin_key, messages, belong_to, keyboards)
-VALUES ('5', '{"text": "🏦 وام و اقساط"}', 0, null, '0', '[["w1"], ["6"], ["s0"]]');
-INSERT INTO `test`.buttons (id, attrs, admin_key, messages, belong_to, keyboards)
-VALUES ('6', '{"text": "📋 لیست وام‌های من"}', 0, null, '5', '[["s0"]]');
+VALUES ('5', '{"text": "🏦 وام و اقساط"}', 0, null, '0', '[["w1"], ["s0"]]');
 INSERT INTO `test`.buttons (id, attrs, admin_key, messages, belong_to, keyboards)
 VALUES ('s0', '{"text": "🔙 برگشت 🔙"}', 0, null, null, null);
 INSERT INTO `test`.buttons (id, attrs, admin_key, messages, belong_to, keyboards)
