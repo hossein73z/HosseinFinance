@@ -2,37 +2,63 @@
 /**
  * api.php
  *
- * Remote Database Endpoint.
- * Utilizes DatabaseManager.php and settings from config.php.
+ * Remote Database Endpoint for Vercel.
+ * Dynamic / Future-proof version.
  */
 
-// Load Configuration first
-require_once '../config.php';
+// -------------------------------------------------------------------------
+// CONFIGURATION VIA ENVIRONMENT VARIABLES
+// -------------------------------------------------------------------------
 
-// Load Database Manager
-require_once '../Libraries/DatabaseManager.php';
+if (!defined('DB_HOST')) define('DB_HOST', getenv('DB_HOST'));
+if (!defined('DB_NAME')) define('DB_NAME', getenv('DB_NAME'));
+if (!defined('DB_USER')) define('DB_USER', getenv('DB_USER'));
+if (!defined('DB_PASS')) define('DB_PASS', getenv('DB_PASS'));
 
-// Standard API Headers
+$apiSecret = getenv('DB_API_SECRET');
+$allowedTablesEnv = getenv('DB_ALLOWED_TABLES');
+$allowedTables = $allowedTablesEnv ? array_map('trim', explode(',', $allowedTablesEnv)) : [];
+
+// -------------------------------------------------------------------------
+// LOAD LIBRARIES
+// -------------------------------------------------------------------------
+
+$dbManagerPath = __DIR__ . '/../Libraries/DatabaseManager.php';
+
+if (file_exists($dbManagerPath)) {
+    require_once $dbManagerPath;
+} else {
+    http_response_code(500);
+    echo json_encode(["success" => false, "message" => "Server Error: DatabaseManager library not found."]);
+    exit;
+}
+
+// -------------------------------------------------------------------------
+// HEADERS
+// -------------------------------------------------------------------------
+
 header("Content-Type: application/json; charset=UTF-8");
-header("Access-Control-Allow-Methods: POST");
+header("Access-Control-Allow-Methods: POST, OPTIONS");
 header("Access-Control-Max-Age: 3600");
 header("Access-Control-Allow-Headers: Content-Type, Access-Control-Allow-Headers, Authorization, X-Requested-With, X-Api-Key");
 
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    http_response_code(200);
+    exit;
+}
+
 // -------------------------------------------------------------------------
-// AUTHENTICATION & INPUT HANDLING
+// AUTHENTICATION & INPUT
 // -------------------------------------------------------------------------
 
-// 1. Validate API Key from Headers
-$headers = array_change_key_case(getallheaders(), CASE_LOWER);
-$apiKey = $headers['x-api-key'] ?? '';
+$requestKey = $_SERVER['HTTP_X_API_KEY'] ?? '';
 
-if ($apiKey !== DB_API_SECRET) {
+if ($requestKey !== $apiSecret) {
     http_response_code(401);
     echo json_encode(["success" => false, "message" => "Unauthorized: Invalid API Key"]);
     exit;
 }
 
-// 2. Decode JSON Input
 $input = json_decode(file_get_contents("php://input"), true);
 
 if (!$input) {
@@ -41,99 +67,70 @@ if (!$input) {
     exit;
 }
 
-// 3. Extract and Validate Parameters
+// Extract generic parameters
 $operation = $input['operation'] ?? '';
 $table = $input['table'] ?? '';
 
-// Check against the Allowlist defined in config.php
-if (!in_array($table, DB_ALLOWED_TABLES)) {
+// Validate Allowlist
+if (!in_array($table, $allowedTables)) {
     http_response_code(403);
-    echo json_encode(["success" => false, "message" => "Access to table '$table' is denied or table does not exist in allowlist."]);
+    echo json_encode(["success" => false, "message" => "Access to table '$table' is denied."]);
     exit;
 }
 
 // -------------------------------------------------------------------------
-// PROCESS OPERATIONS
+// DYNAMIC PROCESS EXECUTION
 // -------------------------------------------------------------------------
 
 try {
-    // DatabaseManager uses DB_HOST, DB_NAME, etc., from config.php automatically
     $db = DatabaseManager::getInstance();
 
-    $result = null;
-    $message = "Operation successful";
-
-    switch ($operation) {
-
-        case 'create':
-            if (empty($input['data'])) throw new Exception("Missing 'data' array");
-            $result = $db->create($table, $input['data']);
-            if (!$result) throw new Exception("Create operation failed");
-            $message = "Record created with ID: " . $result;
-            break;
-
-        case 'createBatch':
-            if (empty($input['dataRows'])) throw new Exception("Missing 'dataRows' array");
-            $result = $db->createBatch($table, $input['dataRows']);
-            if ($result === false) throw new Exception("Batch create failed");
-            $message = "$result rows created";
-            break;
-
-        case 'read':
-            $conditions = $input['conditions'] ?? [];
-            $single = $input['single'] ?? false;
-            $select = $input['select'] ?? '*';
-            $distinct = $input['distinct'] ?? false;
-            $join = $input['join'] ?? '';
-            $orderBy = $input['orderBy'] ?? [];
-            $limit = $input['limit'] ?? null;
-            $offset = $input['offset'] ?? 0;
-            $chunkSize = $input['chunkSize'] ?? null;
-
-            $result = $db->read(
-                $table, $conditions, $single, $select,
-                $distinct, $join, $orderBy, $limit, $offset, $chunkSize
-            );
-
-            if ($result === false) $result = [];
-            break;
-
-        case 'update':
-            if (empty($input['data']) || empty($input['conditions'])) {
-                throw new Exception("Missing 'data' or 'conditions'");
-            }
-            $result = $db->update($table, $input['data'], $input['conditions']);
-            if ($result === false) throw new Exception("Update failed");
-            $message = "$result rows updated";
-            break;
-
-        case 'upsert':
-            if (empty($input['data'])) throw new Exception("Missing 'data'");
-            $result = $db->upsert($table, $input['data']);
-            if ($result === false) throw new Exception("Upsert failed");
-            break;
-
-        case 'upsertBatch':
-            if (empty($input['dataRows'])) throw new Exception("Missing 'dataRows'");
-            $result = $db->upsertBatch($table, $input['dataRows']);
-            if ($result === false) throw new Exception("Batch upsert failed");
-            break;
-
-        case 'delete':
-            if (empty($input['conditions'])) throw new Exception("Missing 'conditions'");
-            $resetAI = $input['resetAutoIncrement'] ?? false;
-            $result = $db->delete($table, $input['conditions'], $resetAI);
-            if ($result === false) throw new Exception("Delete failed");
-            $message = "$result rows deleted";
-            break;
-
-        default:
-            throw new Exception("Invalid operation provided: '$operation'");
+    // 1. Check if the requested function exists in DatabaseManager
+    if (!method_exists($db, $operation)) {
+        throw new Exception("Invalid operation: '$operation'");
     }
+
+    // 2. Prepare Arguments
+    // We take the entire input array as arguments
+    $args = $input;
+
+    // Remove keys that are meant for API logic, not Database logic
+    unset($args['operation']);
+    unset($args['x-api-key']);
+
+    // --- KEY MAPPING (Aliases) ---
+    // This bridges the gap between JSON keys and PHP Function Variable names.
+    // If your JSON sends "select" but PHP needs "$selectColumns":
+    if (isset($args['select'])) {
+        $args['selectColumns'] = $args['select'];
+        unset($args['select']);
+    }
+
+    // 3. Execute Dynamically using Named Arguments
+    // PHP 8.0+ allows call_user_func_array to accept an associative array.
+    // Keys in $args will act as parameter names (e.g., 'orderBy' => [])
+    // This makes the order of arguments irrelevant.
+    try {
+        $result = call_user_func_array([$db, $operation], $args);
+    } catch (ArgumentCountError $e) {
+        throw new Exception("Missing required arguments for '$operation'. Details: " . $e->getMessage());
+    } catch (TypeError $e) {
+        throw new Exception("Invalid argument types for '$operation'. Details: " . $e->getMessage());
+    }
+
+    // 4. Handle Result Logic
+    // If result is strict FALSE, we assume failure (based on your class logic)
+    if ($result === false) {
+        throw new Exception("Database operation '$operation' failed.");
+    }
+
+    // Generate a generic success message
+    $count = is_array($result) ? count($result) : ($result === true ? 1 : $result);
+    $msg = "Operation '$operation' successful.";
 
     echo json_encode([
         "success" => true,
-        "message" => $message,
+        "message" => $msg,
         "data" => $result
     ]);
 
