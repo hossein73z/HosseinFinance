@@ -20,25 +20,21 @@ CREATE TABLE IF NOT EXISTS `test`.`buttons`
     keyboards TEXT             DEFAULT NULL
 ) DEFAULT CHARSET = utf8mb4;
 INSERT INTO `test`.buttons (id, attrs, admin_key, messages, belong_to, keyboards)
-VALUES ('0', '{"text": "صفحه اصلی"}', 0, null, null, '[["1", "5"], ["3"], ["a1"]]');
+VALUES ('0', '{"text": "صفحه اصلی"}', 0, null, null, '[["1", "5"], ["3"], ["2"]]');
 INSERT INTO `test`.buttons (id, attrs, admin_key, messages, belong_to, keyboards)
-VALUES ('1', '{"text": "دارایی‌ها"}', 0, null, '0', '[["2"], ["s0"]]');
+VALUES ('1', '{"text": "دارایی‌ها"}', 0, null, '0', '[["s0"]]');
 INSERT INTO `test`.buttons (id, attrs, admin_key, messages, belong_to, keyboards)
-VALUES ('2', '{"text": "افزودن دارایی جدید"}', 0, null, '1', '[["s1", "s0"]]');
+VALUES ('2', '{"text": "بخش مدیریت"}', 1, null, '0', '[["s0"]]');
 INSERT INTO `test`.buttons (id, attrs, admin_key, messages, belong_to, keyboards)
 VALUES ('3', '{"text": "ابزارها"}', 0, null, '0', '[["4"], ["s0"]]');
 INSERT INTO `test`.buttons (id, attrs, admin_key, messages, belong_to, keyboards)
 VALUES ('4', '{"text": "قیمت‌ها"}', 0, null, '3', '[["s0"]]');
 INSERT INTO `test`.buttons (id, attrs, admin_key, messages, belong_to, keyboards)
-VALUES ('5', '{"text": "🏦 وام و اقساط"}', 0, null, '0', '[["w1"], ["s0"]]');
+VALUES ('5', '{"text": "🏦 وام و اقساط"}', 0, null, '0', '[["s0"]]');
 INSERT INTO `test`.buttons (id, attrs, admin_key, messages, belong_to, keyboards)
 VALUES ('s0', '{"text": "🔙 برگشت 🔙"}', 0, null, null, null);
 INSERT INTO `test`.buttons (id, attrs, admin_key, messages, belong_to, keyboards)
 VALUES ('s1', '{"text": "❌ لغو ❌"}', 0, null, null, null);
-INSERT INTO `test`.buttons (id, attrs, admin_key, messages, belong_to, keyboards)
-VALUES ('w1', '{"text": "➕ ثبت وام جدید", "web_app": {"url": "https://hossein-development.vercel.app/WebInterfaces/loans/add.html"}}', 0, null, '5', '[["s0"]]');
-INSERT INTO `test`.buttons (id, attrs, admin_key, messages, belong_to, keyboards)
-VALUES ('a1', '{"text": "بخش مدیریت"}', 1, null, 0, '[["s0"]]');
 
 CREATE TABLE IF NOT EXISTS `test`.`assets`
 (

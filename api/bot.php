@@ -126,34 +126,25 @@ if (isset($update['message'])) {
     // ----- The core bot logic -----
     // ------------------------------
 
-    if (isset($message['web_app_data'])) {
+    $pressed_button = getPressedButton(
+        text: $message['text'] ?? '',
+        parent_btn_id: $person['last_btn'],
+        admin: $person['is_admin'],
+        db: $db
+    );
 
+    // Global Command Routing
+    if ($message['text'] == '/holdings') {
+        level_1($person);
+    } elseif ($message['text'] == '/prices') {
+        level_4($person);
+    } else {
+        // Route based on button/state
         choosePath(
+            pressed_button: $pressed_button,
             message: $message,
             person: $person
         );
-
-    } else {
-        $pressed_button = getPressedButton(
-            text: $message['text'],
-            parent_btn_id: $person['last_btn'],
-            admin: $person['is_admin'],
-            db: $db
-        );
-
-        // Global Command Routing
-        if ($message['text'] == '/holdings') {
-            level_1($person);
-        } elseif ($message['text'] == '/prices') {
-            level_4($person);
-        } else {
-            // Route based on button/state
-            choosePath(
-                pressed_button: $pressed_button,
-                message: $message,
-                person: $person
-            );
-        }
     }
 } elseif (isset($update['callback_query'])) {
     // Process 'Inline' button presses.
@@ -192,8 +183,8 @@ DatabaseManager::closeConnection();
 function choosePath(
     array|null|false $pressed_button = null,
     array|null|false $message = null,
-    array|null $person = null,
-    array|null $callback_query = null
+    array|null       $person = null,
+    array|null       $callback_query = null
 ): void
 {
     global $db;
@@ -207,7 +198,7 @@ function choosePath(
         ];
 
         $text = null;
-        if ($person['last_btn'] == 1) $text = level_1(person: $person, message: $message, callback_query: $callback_query);
+        if ($person['last_btn'] == 1) level_1(person: $person, message: $message, callback_query: $callback_query);
         if ($person['last_btn'] == 4) $text = level_4(person: $person, message: $message, callback_query: $callback_query);
 
         if ($text) $data['text'] = $text;
@@ -227,8 +218,7 @@ function choosePath(
 
             $text = null;
             // Route to active level handler (Input Step)
-            if ($person['last_btn'] == "1") $text = level_1($person, $message); // View Holdings
-            if ($person['last_btn'] == "2") $text = level_2($person, $message); // Add Holding
+            if ($person['last_btn'] == "1") level_1($person, $message); // View Holdings
             if ($person['last_btn'] == "4") $text = level_4($person, $message); // View Prices
             if ($person['last_btn'] == "5") $text = level_5($person, $message); // Add Loan
 
@@ -245,7 +235,6 @@ function choosePath(
             } else {
                 // Menu Navigation
                 if ($pressed_button['id'] == "1") level_1($person);
-                if ($pressed_button['id'] == "2") level_2($person);
                 if ($pressed_button['id'] == "4") level_4($person);
                 if ($pressed_button['id'] == "5") level_5($person);
 
@@ -325,7 +314,7 @@ function cancelButton(array $person): void
  * Level 1: My Holdings
  */
 #[NoReturn]
-function level_1(array $person, array|null $message = null, array|null $callback_query = null): string|null
+function level_1(array $person, array|null $message = null, array|null $callback_query = null): void
 {
     global $db;
     $telegram_method = 'sendMessage';
@@ -337,6 +326,11 @@ function level_1(array $person, array|null $message = null, array|null $callback
             'input_field_placeholder' => 'دارایی‌ها',
         ]
     ];
+
+    // Add web_app button
+    $data['reply_markup']['keyboard'] = array_merge(
+        [[['text' => '➕ افزودن دارایی جدید', 'web_app' => ['url' => 'https://' . getenv('VERCEL_PROJECT_PRODUCTION_URL') . '/WebInterfaces/holdings/add.html?k=' . getenv('DB_API_SECRET')]]]],
+        $data['reply_markup']['keyboard']);
 
     $holdings = $db->read(
         table: 'holdings h',
@@ -383,9 +377,9 @@ function level_1(array $person, array|null $message = null, array|null $callback
 
                 } catch (Exception $e) {
                     error_log("[ERROR] Chart generation failed: " . $e->getMessage());
-                    return 'خطا در ساخت نمودار!';
+                    $data['text'] = 'خطا در ساخت نمودار!';
                 }
-            } else return 'قیمتی یافت نشد!';
+            } else $data['text'] = 'قیمتی یافت نشد!';
         }
         if (array_key_first($query_data) === 'edit_holding') {
 
@@ -446,7 +440,7 @@ function level_1(array $person, array|null $message = null, array|null $callback
                         ]
                     ]
                 ];
-            } else return 'دارایی با ای مشخصه یافت نشد!';
+            } else  $data['text'] = 'دارایی با ای مشخصه یافت نشد!';
 
             $telegram_method = 'editMessageText';
 
@@ -490,7 +484,7 @@ function level_1(array $person, array|null $message = null, array|null $callback
 
                         $telegram_method = 'editMessageText';
 
-                    } else return 'دارایی با این مشخصه یافت نشد!';
+                    } else  $data['text'] = 'دارایی با این مشخصه یافت نشد!';
 
                 } else {
                     $result = $db->delete('holdings', ['id' => $query_data['delete_holding']['holding_id']], resetAutoIncrement: true);
@@ -502,7 +496,7 @@ function level_1(array $person, array|null $message = null, array|null $callback
                             'message_id' => $message['message_id'],
                         ]);
                         level_1($person);
-                    } else return 'دارایی با این مشخصه یافت نشد!';
+                    } else  $data['text'] = 'دارایی با این مشخصه یافت نشد!';
                 }
 
             }
@@ -544,8 +538,8 @@ function level_1(array $person, array|null $message = null, array|null $callback
 
                         $telegram_method = 'editMessageText';
 
-                    } else return 'دارایی با این مشخصه یافت نشد!';
-                } else return 'دسته‌بندی‌ای در دیتابیس یافت نشد!';
+                    } else  $data['text'] = 'دارایی با این مشخصه یافت نشد!';
+                } else  $data['text'] = 'دسته‌بندی‌ای در دیتابیس یافت نشد!';
 
             }
             {
@@ -590,8 +584,8 @@ function level_1(array $person, array|null $message = null, array|null $callback
 
                             $telegram_method = 'editMessageText';
 
-                        } else return 'دارایی‌ای برای این دسته یافت نشد!';
-                    } else return 'دسته‌بندی‌ای در دیتابیس یافت نشد!';
+                        } else  $data['text'] = 'دارایی‌ای برای این دسته یافت نشد!';
+                    } else  $data['text'] = 'دسته‌بندی‌ای در دیتابیس یافت نشد!';
 
                 }
                 if (array_key_first($query_data) === 'edit_asset') {
@@ -604,7 +598,7 @@ function level_1(array $person, array|null $message = null, array|null $callback
                             'message_id' => $message['message_id'],
                         ]);
                         level_1($person);
-                    } else return 'خطا در ویرایش دارایی!';
+                    } else  $data['text'] = 'خطا در ویرایش دارایی!';
 
                 }
             }
@@ -635,7 +629,7 @@ function level_1(array $person, array|null $message = null, array|null $callback
                     }
                     exit(json_encode(['status' => 'OK', 'telegram_response' => $response]));
 
-                } else return 'دارایی با این مشخصه یافت نشد!';
+                } else  $data['text'] = 'دارایی با این مشخصه یافت نشد!';
             }
             if (array_key_first($query_data) === 'edit_amount') {
 
@@ -664,7 +658,7 @@ function level_1(array $person, array|null $message = null, array|null $callback
                     }
                     exit(json_encode(['status' => 'OK', 'telegram_response' => $response]));
 
-                } else return 'دارایی با این مشخصه یافت نشد!';
+                } else  $data['text'] = 'دارایی با این مشخصه یافت نشد!';
             }
             if (array_key_first($query_data) === 'edit_date') {
 
@@ -693,7 +687,7 @@ function level_1(array $person, array|null $message = null, array|null $callback
                     }
                     exit(json_encode(['status' => 'OK', 'telegram_response' => $response]));
 
-                } else return 'دارایی با این مشخصه یافت نشد!';
+                } else  $data['text'] = 'دارایی با این مشخصه یافت نشد!';
             }
             if (array_key_first($query_data) === 'view_holding') {
 
@@ -723,92 +717,110 @@ function level_1(array $person, array|null $message = null, array|null $callback
 
                     $telegram_method = 'editMessageText';
 
-                } else return 'دارایی با این مشخصه یافت نشد!';
+                } else  $data['text'] = 'دارایی با این مشخصه یافت نشد!';
 
             }
         }
 
     } elseif ($message) {
 
-        // Check deep-link: /start <holding_id>
-        $matched = preg_match("/^\/start hoding_(\d*)$/m", $message['text'], $matches);
-        if ($matched) {
+        if (isset($message['web_app_data'])) {
+            $holding = json_decode($message['web_app_data']['data'], true);
 
-            if ($matches[1]) {
+            $result = $db->upsert('holdings', [
+                "person_id" => $person['id'],
+                "asset_id" => $holding["asset_id"],
+                "amount" => $holding["amount"],
+                "avg_price" => $holding["avg_price"],
+                "date" => $holding["date"],
+                "time" => $holding["time"],
+                "note" => $holding["note"],
+            ]);
 
-                $index = array_search($matches[1], array_column($holdings, 'id'));
-                $holding = ($index !== false) ? $holdings[$index] : null;
-
-                if ($holding) {
-                    $data['text'] = createHoldingDetailText(holding: $holding);
-                    $data['reply_markup'] = [
-                        'inline_keyboard' => [
-                            [
-                                [
-                                    'text' => '📊 نمایش نمودار',
-                                    'callback_data' => json_encode(['show_chart' => ['asset_id' => $holding['asset_id']]])
-                                ],
-                            ], [
-                                [
-                                    'text' => '✏ ویرایش',
-                                    'callback_data' => json_encode(['edit_holding' => ['holding_id' => $holding['id']]])
-                                ],
-                            ]
-                        ]
-                    ];
-
-                } else return 'دارایی با این مشخصه یافت نشد!';
-            } else return 'الگوی پیام اشتباه است!';
+            if ($result) {
+                $data['text'] = "✅ دارایی جدید با موفقیت ثبت شد.";
+            } else $data['text'] = '❌ خطای پایگاه داده در ثبت دارایی جدید.';
 
         } else {
+            // Check deep-link: /start <holding_id>
+            $matched = preg_match("/^\/start hoding_(\d*)$/m", $message['text'], $matches);
+            if ($matched) {
 
-            $progress = json_decode($person['progress'], true);
-            if ($progress) {
-                if (array_key_last($progress) == 'edit_holding_price') {
+                if ($matches[1]) {
 
-                    $cleaned_number = cleanAndValidateNumber($message['text']);
-                    if ($cleaned_number) {
+                    $index = array_search($matches[1], array_column($holdings, 'id'));
+                    $holding = ($index !== false) ? $holdings[$index] : null;
 
-                        $result = $db->update('holdings', ['avg_price' => $cleaned_number], ['id' => $progress["edit_holding_price"]["holding_id"]]);
+                    if ($holding) {
+                        $data['text'] = createHoldingDetailText(holding: $holding);
+                        $data['reply_markup'] = [
+                            'inline_keyboard' => [
+                                [
+                                    [
+                                        'text' => '📊 نمایش نمودار',
+                                        'callback_data' => json_encode(['show_chart' => ['asset_id' => $holding['asset_id']]])
+                                    ],
+                                ], [
+                                    [
+                                        'text' => '✏ ویرایش',
+                                        'callback_data' => json_encode(['edit_holding' => ['holding_id' => $holding['id']]])
+                                    ],
+                                ]
+                            ]
+                        ];
 
-                        if ($result) $text = '✅ دارایی با موفقیت ویرایش شد!';
-                        else $text = 'خطا در ویرایش دارایی!';
+                    } else  $data['text'] = 'دارایی با این مشخصه یافت نشد!';
+                } else  $data['text'] = 'الگوی پیام اشتباه است!';
 
-                        sendToTelegram('sendMessage', ['chat_id' => $person['chat_id'], 'text' => $text,]);
+            } else {
 
-                        $db->update('persons', ['progress' => null], ['id' => $person['id']]);
-                        level_1($person);
+                $progress = json_decode($person['progress'], true);
+                if ($progress) {
+                    if (array_key_last($progress) == 'edit_holding_price') {
 
-                    } else return 'لطفاً قیمت را تنها با استفاده از اعداد ارسال کنید!';
-                }
-                if (array_key_last($progress) == 'edit_holding_amount') {
+                        $cleaned_number = cleanAndValidateNumber($message['text']);
+                        if ($cleaned_number) {
 
-                    $cleaned_number = cleanAndValidateNumber($message['text']);
-                    if ($cleaned_number) {
+                            $result = $db->update('holdings', ['avg_price' => $cleaned_number], ['id' => $progress["edit_holding_price"]["holding_id"]]);
 
-                        $result = $db->update('holdings', ['amount' => $cleaned_number], ['id' => $progress["edit_holding_amount"]["holding_id"]]);
+                            if ($result) $text = '✅ دارایی با موفقیت ویرایش شد!';
+                            else $text = 'خطا در ویرایش دارایی!';
 
-                        if ($result) $text = '✅ دارایی با موفقیت ویرایش شد!';
-                        else $text = 'خطا در ویرایش دارایی!';
+                            sendToTelegram('sendMessage', ['chat_id' => $person['chat_id'], 'text' => $text,]);
 
-                        sendToTelegram('sendMessage', ['chat_id' => $person['chat_id'], 'text' => $text,]);
+                            $db->update('persons', ['progress' => null], ['id' => $person['id']]);
+                            level_1($person);
 
-                        $db->update('persons', ['progress' => null], ['id' => $person['id']]);
-                        level_1($person);
+                        } else  $data['text'] = 'لطفاً قیمت را تنها با استفاده از اعداد ارسال کنید!';
+                    }
+                    if (array_key_last($progress) == 'edit_holding_amount') {
 
-                    } else $data['text'] = 'لطفاً مقدار دارایی را تنها با استفاده از اعداد ارسال کنید!';
-                }
-                if (array_key_last($progress) == 'edit_holding_date') {
+                        $cleaned_number = cleanAndValidateNumber($message['text']);
+                        if ($cleaned_number) {
 
-                    $waiting_response = sendToTelegram('sendMessage', [
-                        'text' => '🧠 در حال پردازش پیام توسط هوش مصنوعی ...',
-                        'chat_id' => $person['chat_id'],
-                    ]);
+                            $result = $db->update('holdings', ['amount' => $cleaned_number], ['id' => $progress["edit_holding_amount"]["holding_id"]]);
 
-                    $jalali = majidAPI_date_time()['result']['jalali'];
-                    $current_datetime = "$jalali[date] $jalali[time]";
+                            if ($result) $text = '✅ دارایی با موفقیت ویرایش شد!';
+                            else $text = 'خطا در ویرایش دارایی!';
 
-                    $user_query = "
+                            sendToTelegram('sendMessage', ['chat_id' => $person['chat_id'], 'text' => $text,]);
+
+                            $db->update('persons', ['progress' => null], ['id' => $person['id']]);
+                            level_1($person);
+
+                        } else $data['text'] = 'لطفاً مقدار دارایی را تنها با استفاده از اعداد ارسال کنید!';
+                    }
+                    if (array_key_last($progress) == 'edit_holding_date') {
+
+                        $waiting_response = sendToTelegram('sendMessage', [
+                            'text' => '🧠 در حال پردازش پیام توسط هوش مصنوعی ...',
+                            'chat_id' => $person['chat_id'],
+                        ]);
+
+                        $jalali = majidAPI_date_time()['result']['jalali'];
+                        $current_datetime = "$jalali[date] $jalali[time]";
+
+                        $user_query = "
                     TASK:
                         I want a JSONized string to use in my application.
                         Read the user request bellow and extract the exact time and date the user is mentioning in the request.
@@ -826,60 +838,59 @@ function level_1(array $person, array|null $message = null, array|null $callback
                             ```json {\"status\": \"Error\", \"result\": \"PROPER ERROR\"}```";
 
 
-                    try {
-                        $majidAPI_response = majidAPI_ai($user_query);
+                        try {
+                            $majidAPI_response = majidAPI_ai($user_query);
 
-                        sendToTelegram('deleteMessage', [
-                            'chat_id' => $waiting_response['result']['chat']['id'],
-                            'message_id' => $waiting_response['result']['message_id']
-                        ]);
+                            sendToTelegram('deleteMessage', [
+                                'chat_id' => $waiting_response['result']['chat']['id'],
+                                'message_id' => $waiting_response['result']['message_id']
+                            ]);
 
-                        if (!$majidAPI_response) {
-                            error_log("[ERROR] MajidAPI failed to return a response.");
-                            return '[ERROR] MajidAPI failed to return a response.';
+                            if (!$majidAPI_response) {
+                                error_log("[ERROR] MajidAPI failed to return a response.");
+                                $data['text'] = '[ERROR] MajidAPI failed to return a response.';
+                            } elseif ($majidAPI_response['status'] === 200) {
+                                preg_match_all("/^```json\s(.*?)\s```$/m", $majidAPI_response['result'], $matches);
+                                $ai_response = json_decode($matches[1][0], true);
+
+                                if ($ai_response['status'] === 'Success') {
+
+                                    $result = $db->update(
+                                        'holdings',
+                                        [
+                                            'date' => $ai_response['result']['date'],
+                                            'time' => $ai_response['result']['time']
+                                        ],
+                                        ['id' => $progress["edit_holding_date"]["holding_id"]]);
+
+                                    if ($result) {
+                                        $data['text'] = "✅ دارایی جدید با موفقیت ثبت شد!";
+                                    } else {
+                                        $data['text'] = "❌ خطا در ثبت دارایی.";
+                                        error_log("[ERROR] Error updating holding date.");
+                                    }
+
+                                    sendToTelegram('sendMessage', $data);
+                                    level_1($person);
+
+                                } elseif ($ai_response['status'] === 'Error') sendToTelegram('sendMessage', ['chat_id' => $person['chat_id'], 'text' => 'هوش مصنوعی قادر به استخراج اطلاعات تاریخ و زمان از پیام شما نبود. لطفاً دوباره تلاش کنید.']);
+                                else error_log("[ERROR] AI No date found: " . json_encode($majidAPI_response));
+
+                            } else {
+                                error_log("[ERROR] AI Unknown Error: " . json_encode($majidAPI_response));
+                                $data['text'] = "[ERROR] AI Unknown Error: " . json_encode($majidAPI_response);
+                            }
+
+                            $db->update('persons', ['progress' => null], ['id' => $person['id']]);
+
+                        } catch (Exception $e) {
+                            error_log("[EXCEPTION] " . $e->getMessage());
+                            exit("❌ An exception occurred: " . $e->getMessage());
                         }
-                        elseif ($majidAPI_response['status'] === 200) {
-                            preg_match_all("/^```json\s(.*?)\s```$/m", $majidAPI_response['result'], $matches);
-                            $ai_response = json_decode($matches[1][0], true);
-
-                            if ($ai_response['status'] === 'Success') {
-
-                                $result = $db->update(
-                                    'holdings',
-                                    [
-                                        'date' => $ai_response['result']['date'],
-                                        'time' => $ai_response['result']['time']
-                                    ],
-                                    ['id' => $progress["edit_holding_date"]["holding_id"]]);
-
-                                if ($result) {
-                                    $data['text'] = "✅ دارایی جدید با موفقیت ثبت شد!";
-                                } else {
-                                    $data['text'] = "❌ خطا در ثبت دارایی.";
-                                    error_log("[ERROR] Error updating holding date.");
-                                }
-
-                                sendToTelegram('sendMessage', $data);
-                                level_1($person);
-
-                            } elseif ($ai_response['status'] === 'Error') sendToTelegram('sendMessage', ['chat_id' => $person['chat_id'], 'text' => 'هوش مصنوعی قادر به استخراج اطلاعات تاریخ و زمان از پیام شما نبود. لطفاً دوباره تلاش کنید.']);
-                            else error_log("[ERROR] AI No date found: " . json_encode($majidAPI_response));
-
-                        } else {
-                            error_log("[ERROR] AI Unknown Error: " . json_encode($majidAPI_response));
-                            return "[ERROR] AI Unknown Error: " . json_encode($majidAPI_response);
-                        }
-
-                        $db->update('persons', ['progress' => null], ['id' => $person['id']]);
-                        exit();
-
-                    } catch (Exception $e) {
-                        error_log("[EXCEPTION] " . $e->getMessage());
-                        exit("❌ An exception occurred: " . $e->getMessage());
                     }
-                }
 
-            } else return null;
+                } else  $data['text'] = 'پیام نامفهوم است!';
+            }
         }
 
     } else {
@@ -904,277 +915,6 @@ function level_1(array $person, array|null $message = null, array|null $callback
 
         $db->update('persons', ['last_btn' => 1], ['id' => $person['id']]);
     }
-    $response = sendToTelegram($telegram_method, $data);
-    exit(json_encode(['status' => 'OK', 'telegram_response' => $response]));
-}
-
-/**
- * Level 2: Add New Holding (Multi-step form)
- * Setting `$message` to false activates 'back' mode
- * and automatically fills message['text']
- */
-#[NoReturn]
-function level_2(array $person, array|null|bool $message = null): string|null
-{
-    global $db;
-    $telegram_method = 'sendMessage';
-    $data = [
-        'chat_id' => $person['chat_id'],
-        'reply_markup' => [
-            'keyboard' => createKeyboardsArray(2, $person['is_admin'], $db),
-            'resize_keyboard' => true,
-            'input_field_placeholder' => 'دارایی‌ها',
-        ]
-    ];
-
-    if ($message === null) {
-
-        $asset_types = $db->read('assets', selectColumns: 'asset_type', distinct: true);
-        if ($asset_types) {
-
-            $asset_types = array_column($asset_types, 'asset_type');
-            foreach ($asset_types as $asset_type) $data['reply_markup']['keyboard'][] = [['text' => $asset_type]];
-
-            $data['text'] = "دسته بندی دارایی جدید را از دکمه‌های زیر انتخاب کنید:";
-            $progress = ["asset_type" => null];
-
-            $person['last_btn'] = 2;
-            $person['progress'] = json_encode($progress);
-            $db->update('persons', $person, ['id' => $person['id']]);
-
-        } else $data['text'] = "دسته‌بندی‌ای در دیتابیس یافت نشد!";
-
-    } else {
-
-        if ($person['progress']) $progress = json_decode($person['progress'], true);
-        else $progress = null;
-
-        // Step 1: Asset Type
-        if ($progress && array_key_last($progress) == 'asset_type') {
-
-            if (is_bool($message) && $message === false) $message = ['text' => $progress['asset_type']];
-
-            $assets = $db->read('assets', ['asset_type' => $message['text']], selectColumns: 'name', distinct: true);
-            if ($assets) {
-
-                $assets = array_column($assets, 'name');
-                foreach ($assets as $asset) $data['reply_markup']['keyboard'][] = [['text' => $asset]];
-
-                $data['text'] = "دارایی جدید را از دکمه‌های زیر انتخاب کنید:";
-                $progress["asset_type"] = $message['text'];
-                $progress["asset"] = null;
-
-                $response = sendToTelegram('sendMessage', $data);
-                if ($response) $db->update('persons', ['progress' => json_encode($progress)], ['id' => $person['id']]);
-
-                exit(json_encode(['status' => 'OK', 'telegram_response' => $response]));
-
-            } else {
-                $person['progress'] = null;
-                level_2($person);
-            }
-        }
-
-        // Step 2: Asset Name
-        if ($progress && array_key_last($progress) == 'asset') {
-
-            if (is_bool($message) && $message === false) $message = ['text' => $progress['asset']['name']];
-
-            $asset = $db->read('assets', ['name' => $message['text']], true);
-            if ($asset) {
-
-                $data['text'] = "میزان دارایی را به شکل عددی ارسال کنید.";
-                $progress["asset"] = $asset;
-                $progress["amount"] = null;
-
-                $response = sendToTelegram('sendMessage', $data);
-                if ($response) $db->update('persons', ['progress' => json_encode($progress)], ['id' => $person['id']]);
-
-                exit(json_encode(['status' => 'OK', 'telegram_response' => $response]));
-
-            } else {
-                array_pop($progress);
-                $person['progress'] = json_encode($progress);
-                level_2($person, false);
-            }
-
-        }
-
-        // Step 3: Amount
-        if ($progress && array_key_last($progress) == 'amount') {
-
-            if (is_bool($message) && $message === false) $message = ['text' => $progress['amount']];
-
-            $cleaned_number = cleanAndValidateNumber($message['text']);
-            if ($cleaned_number) {
-
-                $asset = $progress['asset'];
-                $data['text'] = 'میانگین قیمت خرید هر واحد را به ' . $asset['base_currency'] . ' وارد کنید:' . "\n\n" .
-                    'قیمت کنونی ' . $asset['name'] . ': ' . beautifulNumber($asset['price']) . ' ' . $asset['base_currency'] . ' است.';
-                $progress["amount"] = $cleaned_number;
-                $progress["price"] = null;
-
-                $response = sendToTelegram('sendMessage', $data);
-                if ($response) $db->update('persons', ['progress' => json_encode($progress)], ['id' => $person['id']]);
-
-                exit(json_encode(['status' => 'OK', 'telegram_response' => $response]));
-
-            } else {
-                array_pop($progress);
-                $person['progress'] = json_encode($progress);
-                level_2($person, false);
-            }
-
-        }
-
-        // Step 4: Price
-        if ($progress && array_key_last($progress) == 'price') {
-
-            if (is_bool($message) && $message === false) $message = ['text' => $progress['price']];
-
-            $cleaned_number = cleanAndValidateNumber($message['text']);
-            if ($cleaned_number) {
-
-                $data['text'] = 'تاریخ خرید را وارد کنید. سعی کنید به طور واضح تاریخ و ساعت انجام خرید این دارایی را بنویسید. این پیام توسط هوش مصنوعی پردازش می‌شود.';
-
-                $progress["price"] = $cleaned_number;
-                $progress["date"] = null;
-
-                $response = sendToTelegram('sendMessage', $data);
-                if ($response) $db->update('persons', ['progress' => json_encode($progress)], ['id' => $person['id']]);
-
-                exit(json_encode(['status' => 'OK', 'telegram_response' => $response]));
-
-            } else {
-                array_pop($progress);
-                $person['progress'] = json_encode($progress);
-                level_2($person, false);
-            }
-
-        }
-
-        // Step 4.5: Exchange Rate (Ignored in logic flow but preserved)
-        if ($progress && array_key_last($progress) == 'exchange_rate') {
-
-            if (is_bool($message) && $message === false) $message = ['text' => $progress['exchange_rate']];
-
-            $cleaned_number = cleanAndValidateNumber($message['text']);
-            if ($cleaned_number) {
-
-                $data['text'] = 'تاریخ خرید را وارد کنید. سعی کنید به طور واضح تاریخ و ساعت انجام خرید این دارایی را بنویسید. این پیام توسط هوش مصنوعی پردازش می‌شود.';
-                $progress["exchange_rate"] = $cleaned_number;
-                $progress["date"] = null;
-
-                $response = sendToTelegram('sendMessage', $data);
-                if ($response) $db->update('persons', ['progress' => json_encode($progress)], ['id' => $person['id']]);
-
-                exit(json_encode(['status' => 'OK', 'telegram_response' => $response]));
-
-            } else {
-                array_pop($progress);
-                $person['progress'] = json_encode($progress);
-                level_2($person, false);
-            }
-
-        }
-
-        // Step 5: Date/Time (AI)
-        if ($progress && array_key_last($progress) == 'date') {
-
-            if (is_bool($message) && $message === false) $message = ['text' => $progress['price']];
-
-            $waiting_response = sendToTelegram('sendMessage', [
-                'text' => '🧠 در حال پردازش پیام توسط هوش مصنوعی ...',
-                'chat_id' => $person['chat_id'],
-            ]);
-
-            $jalali = majidAPI_date_time()['result']['jalali'];
-            $current_datetime = "$jalali[date] $jalali[time]";
-
-            $user_query = "
-                    TASK:
-                        I want a JSONized string to use in my application.
-                        Read the user request bellow and extract the exact time and date the user is mentioning in the request.
-                        The date is going to be in Hijri Jalali. So it probably will be in range of year 1300 to 1500.
-                        Pay extra attention if the date or time the user is mentioning is relative to current date or time.
-                        Current date and time are: '$current_datetime'
-                    USER REQUEST:
-                        ```
-                            " . $message['text'] . "
-                        ```
-                    OUTPUT:
-                        Return the result STRICTLY as a JSON object following this schema:
-                            ```json {\"status\": \"Success\", \"result\": {\"date\": \"yyy-mm-dd\", \"time\": \"hh:mm\"}}```
-                        Or this schema if there is no date nor time specified in the user request:
-                            ```json {\"status\": \"Error\", \"result\": \"PROPER ERROR\"}```";
-
-
-            try {
-                $majidAPI_response = majidAPI_ai($user_query);
-
-                sendToTelegram('deleteMessage', [
-                    'chat_id' => $waiting_response['result']['chat']['id'],
-                    'message_id' => $waiting_response['result']['message_id']
-                ]);
-
-                if (!$majidAPI_response) {
-
-                    $data['text'] = 'مشکل در برقراری ارتباط با سرور هوش مصنوعی. لطفاً دوباره امتحان کنید.';
-                    error_log("[ERROR] MajidAPI failed.");
-
-                } elseif ($majidAPI_response['status'] === 200) {
-                    preg_match_all("/^```json\s(.*?)\s```$/m", $majidAPI_response['result'], $matches);
-                    $ai_response = json_decode($matches[1][0], true);
-
-                    if ($ai_response['status'] === 'Success') {
-
-                        $holding['person_id'] = $person['id'];
-                        $holding['asset_id'] = $progress['asset']['id'];
-                        $holding['amount'] = $progress['amount'];
-                        $holding['avg_price'] = $progress['price'];
-                        $holding['exchange_rate'] = $progress['asset']['exchange_rate'];
-                        $holding['date'] = $ai_response['result']['date'];
-                        $holding['time'] = $ai_response['result']['time'];
-
-                        $add_result = $db->create('holdings', $holding);
-
-                        if ($add_result) {
-                            $data['text'] = "✅ دارایی جدید با موفقیت ثبت شد!";
-                        } else {
-                            $data['text'] = "❌ خطا در ثبت دارایی.";
-                            error_log("[ERROR] Error adding new holding: " . json_encode($holding));
-                        }
-
-                        $db->update('persons', ['progress' => null], ['id' => $person['id']]);
-
-                    } elseif ($ai_response['status'] === 'Error') {
-                        array_pop($progress);
-                        $person['progress'] = json_encode($progress);
-                        level_2($person, false);
-
-                    } else {
-                        $data['text'] = 'خطا در پردازش پاسخ از سرور هوش مصنوعی. لطفاً دوباره امتحان کنید.';
-                        error_log("[ERROR] AI No date found: " . json_encode($majidAPI_response));
-                    }
-
-                } else {
-                    $data['text'] = 'خطای ناشناخته. لطفاً دوباره امتحان کنید.';
-                    error_log("[ERROR] AI Unexpected Response: " . json_encode($majidAPI_response));
-                }
-
-            } catch (Exception $e) {
-                $data['text'] = "❌ An exception occurred: " . $e->getMessage();
-            }
-
-            sendToTelegram('sendMessage', $data);
-            if (isset($add_result)) cancelButton($person);
-            exit(json_encode(['status' => 'OK', 'Progress' => $progress]));
-        }
-
-        $data['text'] = "Fatal Error!";
-        error_log("[CRITICAL] No progress in Level 2. User: " . $person['id']);
-    }
-
     $response = sendToTelegram($telegram_method, $data);
     exit(json_encode(['status' => 'OK', 'telegram_response' => $response]));
 }
@@ -1474,7 +1214,7 @@ function level_4(array $person, array|null $message = null, array|null $callback
  * Level 7: Add New Loan
  */
 #[NoReturn]
-function level_5(array $person, array|null $message = null, array|null $query_data = null): string|null
+function level_5(array $person, array|null $message = null, array|null $query_data = null): void
 {
     global $db;
     $data = [
@@ -1485,10 +1225,13 @@ function level_5(array $person, array|null $message = null, array|null $query_da
             'input_field_placeholder' => '➕ ثبت وام جدید',
         ]
     ];
-
+    // Add web_app button
+    $data['reply_markup']['keyboard'] = array_merge(
+        [[['text' => '➕ ثبت وام جدید', 'web_app' => ['url' => 'https://' . getenv('VERCEL_PROJECT_PRODUCTION_URL') . '/WebInterfaces/loans/add.html']]]],
+        $data['reply_markup']['keyboard']);
 
     if ($query_data) {
-        return null;
+        $data['text'] = 'خطا';
     } elseif ($message) {
         if (isset($message['web_app_data'])) {
             $web_app_data = json_decode($message['web_app_data']['data'], true);
@@ -1526,7 +1269,7 @@ function level_5(array $person, array|null $message = null, array|null $query_da
 
                 } else $data['text'] = '❌ خطای پایگاه داده در ثبت وام.';
             }
-        } else return null;
+        } else $data['text'] = 'پیام نامفهوم است!';
     } else {
         $loans = $db->read(
             'loans l',
