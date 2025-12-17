@@ -736,7 +736,6 @@
         closePicker();
     }
 
-    // Attach listeners for both Icon (Picker) and Input (Typing Validation)
     function attachDatePicker(inputElement) {
         const wrapper = inputElement.closest('.input-with-icon');
 
@@ -772,10 +771,84 @@
         });
     }
 
+    function attachDateMask(element) {
+        element.addEventListener('input', function (e) {
+            let input = e.target;
+            let originalValue = input.value;
+            let selectionStart = input.selectionStart;
+
+            // 1. Count digits before the cursor to restore position later
+            //    (We only care about digits, ignoring existing slashes)
+            let digitsBeforeCursor = 0;
+            for (let i = 0; i < selectionStart; i++) {
+                if (/[0-9\u0660-\u0669\u06f0-\u06f9]/.test(originalValue[i])) {
+                    digitsBeforeCursor++;
+                }
+            }
+
+            // 2. Clean input: Convert Persian digits -> English, then remove non-digits
+            let val = toEnglishDigits(originalValue);
+            let clean = val.replace(/\D/g, '');
+
+            // 3. Prevent user from typing more than 8 digits (YYYYMMDD)
+            if (clean.length > 8) {
+                clean = clean.substring(0, 8);
+            }
+
+            // 4. Format the string (YYYY/MM/DD)
+            let formatted = '';
+            if (clean.length > 0) {
+                // First 4 digits (Year)
+                formatted += clean.substring(0, 4);
+            }
+            if (clean.length >= 5) {
+                // Add slash and Month
+                formatted += '/' + clean.substring(4, 6);
+            }
+            if (clean.length >= 7) {
+                // Add slash and Day
+                formatted += '/' + clean.substring(6, 8);
+            }
+
+            // 5. Update value only if changed
+            if (input.value !== formatted) {
+                input.value = formatted;
+
+                // 6. Restore Cursor Position
+                //    Find the position in the new string where 'digitsBeforeCursor'
+                //    digits have been passed.
+                let newPos = 0;
+                let digitsEncountered = 0;
+
+                for (let i = 0; i < formatted.length; i++) {
+                    if (digitsEncountered === digitsBeforeCursor) {
+                        break;
+                    }
+                    if (/\d/.test(formatted[i])) {
+                        digitsEncountered++;
+                    }
+                    newPos++;
+                }
+
+                // Special handling: If the calculated position lands exactly on a slash
+                // (e.g. typing the 4th digit automatically adds a slash),
+                // move the cursor *after* the slash so the user can keep typing.
+                if (formatted[newPos] === '/') {
+                    newPos++;
+                }
+
+                input.setSelectionRange(newPos, newPos);
+            }
+        });
+    }
+
     document.addEventListener('DOMContentLoaded', function () {
         initDatePicker();
         document.querySelectorAll('.currency-input').forEach(input => attachCurrencyListeners(input));
-        document.querySelectorAll('.has-date-picker').forEach(input => attachDatePicker(input));
+        document.querySelectorAll('.has-date-picker').forEach(input => {
+            attachDatePicker(input);
+            attachDateMask(input);
+        });
     });
 
     // --- APP LOGIC ---
@@ -886,7 +959,9 @@
                 <input type="text" class="row-amount currency-input" value="${addCommas(amount)}">
             `;
             container.appendChild(row);
-            attachDatePicker(row.querySelector('.row-date'));
+            const newDateInput = row.querySelector('.row-date');
+            attachDatePicker(newDateInput);
+            attachDateMask(newDateInput);
         }
         container.querySelectorAll('.currency-input').forEach(input => attachCurrencyListeners(input));
         stepGen.classList.add('hidden');
