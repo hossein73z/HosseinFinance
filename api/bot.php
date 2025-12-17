@@ -138,6 +138,8 @@ if (isset($update['message'])) {
         level_1($person);
     } elseif ($message['text'] == '/prices') {
         level_4($person);
+    } elseif ($message['text'] == '/loans') {
+        level_5($person);
     } else {
         // Route based on button/state
         choosePath(
@@ -334,14 +336,14 @@ function level_1(array $person, array|null $message = null, array|null $callback
         $data['reply_markup']['keyboard'] = array_merge([[[
             'text' => '✏ ویرایش',
             'web_app' => [
-                'url' => 'https://' . getenv('VERCEL_PROJECT_PRODUCTION_URL') . '/WebInterfaces/holdings/add.html?k=' . getenv('DB_API_SECRET') . '&edit_holding_id=' . $progress['view_holding']['holding_id']]
+                'url' => 'https://' . getenv('VERCEL_PROJECT_PRODUCTION_URL') . '/assets/add_holding.html?k=' . getenv('DB_API_SECRET') . '&edit_holding_id=' . $progress['view_holding']['holding_id']]
         ]]], $data['reply_markup']['keyboard']);
     } else { // User has just entered level 1
         // Add holding button
         $data['reply_markup']['keyboard'] = array_merge([[[
             'text' => '➕ افزودن دارایی جدید',
             'web_app' => [
-                'url' => 'https://' . getenv('VERCEL_PROJECT_PRODUCTION_URL') . '/WebInterfaces/holdings/add.html?k=' . getenv('DB_API_SECRET')]
+                'url' => 'https://' . getenv('VERCEL_PROJECT_PRODUCTION_URL') . '/assets/add_holding.html?k=' . getenv('DB_API_SECRET')]
         ]]], $data['reply_markup']['keyboard']);
     }
 
@@ -446,7 +448,7 @@ function level_1(array $person, array|null $message = null, array|null $callback
                         $data['reply_markup']['keyboard'] = array_merge([[[
                             'text' => '✏ ویرایش',
                             'web_app' => [
-                                'url' => 'https://' . getenv('VERCEL_PROJECT_PRODUCTION_URL') . '/WebInterfaces/holdings/add.html?k=' . getenv('DB_API_SECRET') . '&edit_holding_id=' . $holding['id']]
+                                'url' => 'https://' . getenv('VERCEL_PROJECT_PRODUCTION_URL') . '/assets/add_holding.html?k=' . getenv('DB_API_SECRET') . '&edit_holding_id=' . $holding['id']]
                         ]]], $data['reply_markup']['keyboard']);
 
                         // Set user progress
@@ -774,7 +776,7 @@ function level_5(array $person, array|null $message = null, array|null $callback
 
     // Add web_app button(s)
     $data['reply_markup']['keyboard'] = array_merge(
-        [[['text' => '➕ ثبت وام جدید', 'web_app' => ['url' => 'https://' . getenv('VERCEL_PROJECT_PRODUCTION_URL') . '/WebInterfaces/loans/add.html']]]],
+        [[['text' => '➕ ثبت وام جدید', 'web_app' => ['url' => 'https://' . getenv('VERCEL_PROJECT_PRODUCTION_URL') . '/assets/add_loan.html']]]],
         $data['reply_markup']['keyboard']);
 
     if ($callback_query) {
