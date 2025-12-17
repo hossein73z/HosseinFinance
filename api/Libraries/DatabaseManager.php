@@ -246,23 +246,46 @@ class DatabaseManager
         }
     }
 
+    /**
+     * @param string|array $join Can be a raw string or an array of join definitions
+     */
     public function read(
-        string $table,
-        array  $conditions = [],
-        bool   $single = false,
-        string $selectColumns = '*',
-        bool   $distinct = false,
-        string $join = '',
-        array  $orderBy = [],
-        ?int   $limit = null,
-        int    $offset = 0,
-        ?int   $chunkSize = null
+        string       $table,
+        array        $conditions = [],
+        bool         $single = false,
+        string       $selectColumns = '*',
+        bool         $distinct = false,
+        string|array $join = [], // Changed from string to string|array
+        array        $orderBy = [],
+        ?int         $limit = null,
+        int          $offset = 0,
+        ?int         $chunkSize = null
     ): array|bool
     {
         $where = $this->buildWhere($conditions);
         $distinctClause = $distinct ? 'DISTINCT ' : '';
-        $orderParts = [];
 
+        // --- 1. Handle Table Name & Alias ---
+        // If table string has a space (e.g., "loans l"), don't wrap in backticks.
+        // Otherwise, wrap it for safety.
+        $tableClause = (!str_contains($table, ' ')) ? "`$table`" : $table;
+
+        // --- 2. Handle Joins (String or Array) ---
+        $joinClause = '';
+        if (is_array($join) && !empty($join)) {
+            foreach ($join as $j) {
+                // Default to LEFT JOIN if type not specified
+                $type = isset($j['type']) ? strtoupper($j['type']) : 'LEFT';
+                $joinTable = $j['table'];
+                $onCondition = $j['on'];
+                $joinClause .= " $type JOIN $joinTable ON $onCondition";
+            }
+        } elseif (is_string($join)) {
+            $joinClause = " $join";
+        }
+
+        // --- Handle Ordering ---
+        $orderParts = [];
         if (!empty($orderBy)) {
             foreach ($orderBy as $column => $direction) {
                 $sanitizedDirection = (strtoupper($direction) === 'DESC') ? 'DESC' : 'ASC';
@@ -271,18 +294,19 @@ class DatabaseManager
         }
         $orderByClause = !empty($orderParts) ? " ORDER BY " . implode(', ', $orderParts) : "";
 
+        // --- Construct Main Query Part ---
+        // Notice we use $tableClause and $joinClause variable now
+        $baseSql = "SELECT $distinctClause $selectColumns FROM $tableClause $joinClause";
+        if (!empty($where['clause'])) $baseSql .= " WHERE " . $where['clause'];
+        $baseSql .= $orderByClause;
+
         // --- Handle Chunking ---
         if ($chunkSize !== null && $chunkSize > 0) {
-            $sql = "SELECT $distinctClause $selectColumns FROM `$table` $join";
-            if (!empty($where['clause'])) $sql .= " WHERE " . $where['clause'];
-            $sql .= $orderByClause;
+            $sql = $baseSql;
 
+            // Limit logic for chunks
             if ($limit !== null && $limit > 0) {
-                if ($offset > 0) {
-                    $sql .= " LIMIT $offset, $limit";
-                } else {
-                    $sql .= " LIMIT $limit";
-                }
+                $sql .= ($offset > 0) ? " LIMIT $offset, $limit" : " LIMIT $limit";
             } elseif ($offset > 0) {
                 $sql .= " LIMIT $offset, 18446744073709551615";
             }
@@ -290,7 +314,7 @@ class DatabaseManager
             try {
                 $stmt = $this->pdo->prepare($sql);
                 $stmt->execute($where['params']);
-                $allData = $stmt->fetchAll();
+                $allData = $stmt->fetchAll(PDO::FETCH_ASSOC); // Enforce Assoc for better handling
 
                 if (empty($allData)) return [];
 
@@ -301,24 +325,18 @@ class DatabaseManager
                 return $chunks;
 
             } catch (PDOException $e) {
-                error_log("READ (CHUNK) operation failed for table $table: " . $e->getMessage());
+                error_log("READ (CHUNK) operation failed: " . $e->getMessage());
                 return false;
             }
         }
 
         // --- Handle Standard Query ---
-        $sql = "SELECT $distinctClause $selectColumns FROM `$table` $join";
-        if (!empty($where['clause'])) $sql .= " WHERE " . $where['clause'];
-        $sql .= $orderByClause;
+        $sql = $baseSql;
 
         if ($single) {
             $sql .= " LIMIT 1";
         } elseif ($limit !== null && $limit > 0) {
-            if ($offset > 0) {
-                $sql .= " LIMIT $offset, $limit";
-            } else {
-                $sql .= " LIMIT $limit";
-            }
+            $sql .= ($offset > 0) ? " LIMIT $offset, $limit" : " LIMIT $limit";
         } elseif ($offset > 0) {
             $sql .= " LIMIT $offset, 18446744073709551615";
         }
@@ -326,9 +344,9 @@ class DatabaseManager
         try {
             $stmt = $this->pdo->prepare($sql);
             $stmt->execute($where['params']);
-            return $single ? $stmt->fetch() : $stmt->fetchAll();
+            return $single ? $stmt->fetch(PDO::FETCH_ASSOC) : $stmt->fetchAll(PDO::FETCH_ASSOC);
         } catch (PDOException $e) {
-            error_log("READ operation failed for table $table: " . $e->getMessage());
+            error_log("READ operation failed: " . $e->getMessage());
             return false;
         }
     }

@@ -260,6 +260,7 @@ function choosePath(
                 if ($pressed_button['id'] == "1") level_1($person);
                 if ($pressed_button['id'] == "2") level_2($person);
                 if ($pressed_button['id'] == "4") level_4($person);
+                if ($pressed_button['id'] == "5") level_5($person);
 
                 $data = [
                     'text' => json_decode($pressed_button['attrs'], true)['text'],
