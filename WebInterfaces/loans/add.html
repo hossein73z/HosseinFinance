@@ -87,6 +87,11 @@
             color: var(--text-color);
         }
 
+        /* Ensure Persian numbers look good */
+        input, textarea {
+            text-align: right;
+        }
+
         /* Error state for invalid dates */
         input.input-error {
             border-color: var(--error-color) !important;
@@ -125,7 +130,7 @@
             white-space: pre;
             background-color: var(--secondary-bg-color);
             color: var(--text-color);
-            direction: ltr;
+            direction: ltr; /* Keeps lists aligned well, but text is right-aligned */
             text-align: right;
             border: 1px solid var(--hint-color);
         }
@@ -198,6 +203,46 @@
             display: flex;
             gap: 8px;
             margin-top: 15px;
+        }
+
+        /* --- LOADING OVERLAY --- */
+        #loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: var(--bg-color);
+            z-index: 2000;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 0.3s ease-out;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid var(--secondary-bg-color);
+            border-top: 4px solid var(--button-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 15px;
+        }
+
+        .loading-text {
+            color: var(--hint-color);
+            font-size: 0.9rem;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+            100% {
+                transform: rotate(360deg);
+            }
         }
 
         /* --- DATE PICKER MODAL --- */
@@ -334,6 +379,12 @@
 </head>
 <body>
 
+<!-- Loading Overlay -->
+<div id="loading-overlay">
+    <div class="spinner"></div>
+    <div class="loading-text">در حال آماده‌سازی...</div>
+</div>
+
 <div class="container">
 
     <!-- VIEW 1: MAIN LOAN FORM -->
@@ -347,15 +398,14 @@
 
             <div class="form-group">
                 <label for="total_amount">مبلغ کل (ریال)</label>
-                <input type="text" id="total_amount" class="currency-input" placeholder="200,000,000"
+                <input type="text" id="total_amount" class="currency-input" placeholder="۲۰۰,۰۰۰,۰۰۰"
                        inputmode="numeric" required>
             </div>
 
             <div class="form-group">
                 <label for="received_date">تاریخ دریافت</label>
                 <div class="input-with-icon">
-                    <!-- Note: removed readonly -->
-                    <input type="text" id="received_date" class="has-date-picker" placeholder="1403/01/01" required>
+                    <input type="text" id="received_date" class="has-date-picker" placeholder="۱۴۰۳/۰۱/۰۱" required>
                 </div>
             </div>
 
@@ -378,19 +428,18 @@
             <h3>تولید خودکار اقساط</h3>
             <div class="form-group">
                 <label for="gen_count">تعداد اقساط</label>
-                <input type="number" id="gen_count" placeholder="مثلا: 12">
+                <input type="text" id="gen_count" class="simple-number" inputmode="numeric" placeholder="مثلا: ۱۲">
             </div>
             <div class="form-group">
                 <label for="gen_start_date">تاریخ اولین قسط</label>
                 <div class="input-with-icon">
-                    <!-- Note: removed readonly -->
-                    <input type="text" id="gen_start_date" class="has-date-picker" placeholder="1403/02/01">
+                    <input type="text" id="gen_start_date" class="has-date-picker" placeholder="۱۴۰۳/۰۲/۰۱">
                 </div>
             </div>
             <div class="row-group form-group">
                 <div>
                     <label for="gen_period_qty">هر چند...</label>
-                    <input type="number" id="gen_period_qty" value="1">
+                    <input type="text" id="gen_period_qty" class="simple-number" inputmode="numeric" value="۱">
                 </div>
                 <div>
                     <label for="gen_period_unit">دوره زمانی</label>
@@ -404,7 +453,8 @@
             </div>
             <div class="form-group">
                 <label for="gen_amount">مبلغ هر قسط (ریال)</label>
-                <input type="text" id="gen_amount" class="currency-input" placeholder="مثلا: 107,000,000">
+                <input type="text" id="gen_amount" class="currency-input" inputmode="numeric"
+                       placeholder="مثلا: ۱۰۷,۰۰۰,۰۰۰">
             </div>
             <button type="button" id="btnGenerate">مشاهده لیست اقساط</button>
             <button type="button" class="danger-btn" id="btnCancelInstallments" style="margin-top:10px;">انصراف</button>
@@ -430,9 +480,9 @@
         </div>
 
         <div style="display: flex; text-align: center; direction: ltr;">
-            <div class="wheel-title" style="flex:1">Year</div>
-            <div class="wheel-title" style="flex:1">Month</div>
-            <div class="wheel-title" style="flex:1">Day</div>
+            <div class="wheel-title" style="flex:1">سال</div>
+            <div class="wheel-title" style="flex:1">ماه</div>
+            <div class="wheel-title" style="flex:1">روز</div>
         </div>
 
         <div class="wheels-wrapper">
@@ -448,15 +498,33 @@
     const tg = window.Telegram.WebApp;
     tg.expand();
 
+    // --- Loading Control ---
+    function hideLoading() {
+        const overlay = document.getElementById('loading-overlay');
+        overlay.style.opacity = '0';
+        setTimeout(() => {
+            overlay.style.display = 'none';
+        }, 300);
+    }
+
     // --- Utils ---
     function toEnglishDigits(str) {
         if (!str) return '';
+        str = String(str);
         var persianNumbers = [/۰/g, /۱/g, /۲/g, /۳/g, /۴/g, /۵/g, /۶/g, /۷/g, /۸/g, /۹/g];
         var arabicNumbers = [/٠/g, /١/g, /٢/g, /٣/g, /٤/g, /٥/g, /٦/g, /٧/g, /٨/g, /٩/g];
         for (var i = 0; i < 10; i++) {
             str = str.replace(persianNumbers[i], i).replace(arabicNumbers[i], i);
         }
         return str;
+    }
+
+    function toPersianDigits(str) {
+        if (str === null || str === undefined) return '';
+        const id = ['۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹'];
+        return String(str).replace(/[0-9]/g, function (w) {
+            return id[+w]
+        });
     }
 
     function addCommas(nStr) {
@@ -476,12 +544,10 @@
 
     // --- DATE VALIDATION HELPERS ---
 
-    // Check if string is a valid YYYY/MM/DD or YYYY-MM-DD Jalali date
     function isValidJalaliDateString(str) {
         if (!str) return false;
         str = toEnglishDigits(str);
 
-        // Match 4 digits, separator, 1-2 digits, separator, 1-2 digits
         const regex = /^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/;
         const match = str.match(regex);
 
@@ -491,19 +557,16 @@
         const m = parseInt(match[2]);
         const d = parseInt(match[3]);
 
-        // Basic Range Checks
         if (y < 1300 || y > 1500) return false;
         if (m < 1 || m > 12) return false;
         if (d < 1 || d > 31) return false;
-        if (m > 6 && d === 31) return false; // Second half of year has 30 days (mostly)
+        if (m > 6 && d === 31) return false;
 
-        return {y, m, d}; // Return parsed object if valid
+        return {y, m, d};
     }
 
-    // Get current date in Jalali (using Intl)
     function getTodayJalali() {
         try {
-            // 'fa-IR-u-nu-latn' forces Western digits (0-9)
             const d = new Date();
             const formatter = new Intl.DateTimeFormat('fa-IR-u-nu-latn', {
                 year: 'numeric',
@@ -516,59 +579,115 @@
             const dVal = parseInt(parts.find(p => p.type === 'day').value);
             return {y, m, d: dVal};
         } catch (e) {
-            // Fallback just in case
             return {y: 1403, m: 1, d: 1};
         }
     }
 
+    // --- MASKING LOGIC ---
+
     function attachCurrencyListeners(element) {
-        // Change 'keyup' to 'input' for better real-time handling (including paste)
         element.addEventListener('input', function (e) {
             const input = e.target;
-
-            // 1. Capture current cursor position
             const selectionStart = input.selectionStart;
             const originalValue = input.value;
 
-            // 2. Count how many digits (0-9) are to the right of the cursor
-            // We use this anchor because commas change position, but digits usually stay relative
-            let digitsAfterCursor = 0;
-            for (let i = selectionStart; i < originalValue.length; i++) {
+            // Logical digits check (0-9, Persian digits)
+            let meaningfulCharsBeforeCursor = 0;
+            for (let i = 0; i < selectionStart; i++) {
                 if (/[0-9\u0660-\u0669\u06f0-\u06f9]/.test(originalValue[i])) {
-                    digitsAfterCursor++;
+                    meaningfulCharsBeforeCursor++;
                 }
             }
 
-            // 3. Process the value
             let rawValue = removeCommas(input.value);
             rawValue = toEnglishDigits(rawValue);
-
-            // If empty or invalid, let it be (but clean it up if it's just text)
-            if (isNaN(rawValue) && rawValue !== '') {
-                // optionally handle invalid input here
+            // clean non-digits (keep dot if you needed decimals, but typically loan installment is integer.
+            // If decimal needed, enable dot logic similar to previous file. Here we stick to integer per context of previous simple loan form)
+            // But let's allow decimals to be safe for consistency with Asset file:
+            let englishVal = rawValue.replace(/[^0-9.]/g, '');
+            // Handle multiple dots
+            const dots = englishVal.split('.');
+            if (dots.length > 2) {
+                englishVal = dots[0] + '.' + dots.slice(1).join('');
             }
 
-            // 4. Re-format with commas
-            const formattedValue = rawValue === '' ? '' : addCommas(rawValue);
+            let formattedEnglish = '';
+            if (englishVal) {
+                const parts = englishVal.split('.');
+                parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+                formattedEnglish = parts.join('.');
+            }
 
-            // 5. Update value and restore cursor
-            if (input.value !== formattedValue) {
-                input.value = formattedValue;
+            const finalPersian = toPersianDigits(formattedEnglish);
 
-                // Find the new cursor index so that we still have 'digitsAfterCursor' digits to the right
-                let newCursorPos = formattedValue.length;
-                let currentDigitsFound = 0;
-
-                while (newCursorPos > 0 && currentDigitsFound < digitsAfterCursor) {
-                    newCursorPos--;
-                    // Check if the character at this position is a digit
-                    if (/[0-9]/.test(formattedValue[newCursorPos])) {
-                        currentDigitsFound++;
+            if (input.value !== finalPersian) {
+                input.value = finalPersian;
+                let newPos = 0;
+                let foundChars = 0;
+                for (let i = 0; i < finalPersian.length; i++) {
+                    if (foundChars >= meaningfulCharsBeforeCursor) break;
+                    if (/[0-9\u0660-\u0669\u06f0-\u06f9\.]/.test(finalPersian[i])) {
+                        foundChars++;
                     }
+                    newPos++;
                 }
+                input.setSelectionRange(newPos, newPos);
+            }
+        });
+    }
 
-                // Set the cursor
-                input.setSelectionRange(newCursorPos, newCursorPos);
+    // For simple numbers (count, period) that don't need commas but need Persian
+    function attachSimpleNumberMask(element) {
+        element.addEventListener('input', function (e) {
+            const input = e.target;
+            let val = toEnglishDigits(input.value);
+            val = val.replace(/\D/g, ''); // Integers only
+            const persian = toPersianDigits(val);
+            if (input.value !== persian) {
+                input.value = persian;
+            }
+        });
+    }
+
+    function attachDateMask(element) {
+        element.addEventListener('input', function (e) {
+            let input = e.target;
+            let originalValue = input.value;
+            let selectionStart = input.selectionStart;
+
+            let digitsBeforeCursor = 0;
+            for (let i = 0; i < selectionStart; i++) {
+                if (/[0-9\u0660-\u0669\u06f0-\u06f9]/.test(originalValue[i])) {
+                    digitsBeforeCursor++;
+                }
+            }
+
+            let val = toEnglishDigits(originalValue);
+            let clean = val.replace(/\D/g, '');
+
+            if (clean.length > 8) {
+                clean = clean.substring(0, 8);
+            }
+
+            let formatted = '';
+            if (clean.length > 0) formatted += clean.substring(0, 4);
+            if (clean.length >= 5) formatted += '/' + clean.substring(4, 6);
+            if (clean.length >= 7) formatted += '/' + clean.substring(6, 8);
+
+            const persianFormatted = toPersianDigits(formatted);
+
+            if (input.value !== persianFormatted) {
+                input.value = persianFormatted;
+                let newPos = 0;
+                let digitsEncountered = 0;
+
+                for (let i = 0; i < persianFormatted.length; i++) {
+                    if (digitsEncountered === digitsBeforeCursor) break;
+                    if (/[0-9\u06f0-\u06f9]/.test(persianFormatted[i])) digitsEncountered++;
+                    newPos++;
+                }
+                if (persianFormatted[newPos] === '/') newPos++;
+                input.setSelectionRange(newPos, newPos);
             }
         });
     }
@@ -588,12 +707,12 @@
         const spacer = '<li class="wheel-spacer"></li>';
 
         let yearsHTML = spacer;
-        for (let i = 1380; i <= 1450; i++) yearsHTML += `<li data-val="${i}">${i}</li>`;
+        for (let i = 1380; i <= 1450; i++) yearsHTML += `<li data-val="${i}">${toPersianDigits(i)}</li>`;
         yearsHTML += spacer;
         colYear.innerHTML = yearsHTML;
 
         let monthsHTML = spacer;
-        for (let i = 1; i <= 12; i++) monthsHTML += `<li data-val="${i}">${String(i).padStart(2, '0')}</li>`;
+        for (let i = 1; i <= 12; i++) monthsHTML += `<li data-val="${i}">${toPersianDigits(String(i).padStart(2, '0'))}</li>`;
         monthsHTML += spacer;
         colMonth.innerHTML = monthsHTML;
 
@@ -647,7 +766,7 @@
     function updateDays(count) {
         const spacer = '<li class="wheel-spacer"></li>';
         let daysHTML = spacer;
-        for (let i = 1; i <= count; i++) daysHTML += `<li data-val="${i}">${String(i).padStart(2, '0')}</li>`;
+        for (let i = 1; i <= count; i++) daysHTML += `<li data-val="${i}">${toPersianDigits(String(i).padStart(2, '0'))}</li>`;
         daysHTML += spacer;
         colDay.innerHTML = daysHTML;
         enableDragToScroll(colDay);
@@ -697,11 +816,7 @@
     function openPicker(input) {
         activeInput = input;
         const val = input.value;
-
-        // Try to parse existing date
         let parsed = isValidJalaliDateString(val);
-
-        // If invalid or empty, default to Today
         if (!parsed) {
             parsed = getTodayJalali();
         }
@@ -728,23 +843,18 @@
         const y = getSelectedValue(colYear);
         const m = String(getSelectedValue(colMonth)).padStart(2, '0');
         const d = String(getSelectedValue(colDay)).padStart(2, '0');
-        activeInput.value = `${y}/${m}/${d}`;
 
-        // Remove error state since picker always gives valid date
+        // Set value in Persian
+        activeInput.value = toPersianDigits(`${y}/${m}/${d}`);
         activeInput.classList.remove('input-error');
-
         closePicker();
     }
 
     function attachDatePicker(inputElement) {
         const wrapper = inputElement.closest('.input-with-icon');
 
-        // 1. Validation on typing
         inputElement.addEventListener('input', function (e) {
             const val = e.target.value;
-            // Allow empty string to not show red error?
-            // The prompt said "show small error if text is not well formatted".
-            // If empty is considered "not well formatted" (required), we show error.
             if (val.length > 0) {
                 if (!isValidJalaliDateString(val)) {
                     inputElement.classList.add('input-error');
@@ -756,7 +866,6 @@
             }
         });
 
-        // 2. Icon Logic
         if (wrapper.querySelector('.date-picker-trigger')) return;
 
         const icon = document.createElement('span');
@@ -771,90 +880,27 @@
         });
     }
 
-    function attachDateMask(element) {
-        element.addEventListener('input', function (e) {
-            let input = e.target;
-            let originalValue = input.value;
-            let selectionStart = input.selectionStart;
-
-            // 1. Count digits before the cursor to restore position later
-            //    (We only care about digits, ignoring existing slashes)
-            let digitsBeforeCursor = 0;
-            for (let i = 0; i < selectionStart; i++) {
-                if (/[0-9\u0660-\u0669\u06f0-\u06f9]/.test(originalValue[i])) {
-                    digitsBeforeCursor++;
-                }
-            }
-
-            // 2. Clean input: Convert Persian digits -> English, then remove non-digits
-            let val = toEnglishDigits(originalValue);
-            let clean = val.replace(/\D/g, '');
-
-            // 3. Prevent user from typing more than 8 digits (YYYYMMDD)
-            if (clean.length > 8) {
-                clean = clean.substring(0, 8);
-            }
-
-            // 4. Format the string (YYYY/MM/DD)
-            let formatted = '';
-            if (clean.length > 0) {
-                // First 4 digits (Year)
-                formatted += clean.substring(0, 4);
-            }
-            if (clean.length >= 5) {
-                // Add slash and Month
-                formatted += '/' + clean.substring(4, 6);
-            }
-            if (clean.length >= 7) {
-                // Add slash and Day
-                formatted += '/' + clean.substring(6, 8);
-            }
-
-            // 5. Update value only if changed
-            if (input.value !== formatted) {
-                input.value = formatted;
-
-                // 6. Restore Cursor Position
-                //    Find the position in the new string where 'digitsBeforeCursor'
-                //    digits have been passed.
-                let newPos = 0;
-                let digitsEncountered = 0;
-
-                for (let i = 0; i < formatted.length; i++) {
-                    if (digitsEncountered === digitsBeforeCursor) {
-                        break;
-                    }
-                    if (/\d/.test(formatted[i])) {
-                        digitsEncountered++;
-                    }
-                    newPos++;
-                }
-
-                // Special handling: If the calculated position lands exactly on a slash
-                // (e.g. typing the 4th digit automatically adds a slash),
-                // move the cursor *after* the slash so the user can keep typing.
-                if (formatted[newPos] === '/') {
-                    newPos++;
-                }
-
-                input.setSelectionRange(newPos, newPos);
-            }
-        });
-    }
-
     document.addEventListener('DOMContentLoaded', function () {
         initDatePicker();
+
+        // Attach masks to main form
         document.querySelectorAll('.currency-input').forEach(input => attachCurrencyListeners(input));
+        document.querySelectorAll('.simple-number').forEach(input => attachSimpleNumberMask(input));
         document.querySelectorAll('.has-date-picker').forEach(input => {
             attachDatePicker(input);
             attachDateMask(input);
         });
+
+        // Simulate loading briefly
+        setTimeout(hideLoading, 500);
     });
 
     // --- APP LOGIC ---
     function calculateNextJalaliDate(dateStr, count, unit) {
         dateStr = dateStr.replace(/-/g, '/');
+        // dateStr comes in as Persian from inputs now, need to be English for calculation
         dateStr = toEnglishDigits(dateStr);
+
         const parts = dateStr.split('/').map(Number);
         if (parts.length !== 3) return dateStr;
         let y = parts[0], m = parts[1], d = parts[2];
@@ -900,9 +946,9 @@
     const btnGoToInstallments = document.getElementById('btnGoToInstallments');
 
     btnGoToInstallments.addEventListener('click', () => {
-        // Validate date before proceeding
         const dateInput = document.getElementById('received_date');
-        if (!isValidJalaliDateString(dateInput.value)) {
+        // Validate English version of date
+        if (!isValidJalaliDateString(toEnglishDigits(dateInput.value))) {
             tg.showAlert('لطفا تاریخ دریافت را صحیح وارد کنید');
             return;
         }
@@ -926,12 +972,13 @@
     });
 
     document.getElementById('btnGenerate').addEventListener('click', () => {
-        const count = parseInt(document.getElementById('gen_count').value);
+        const count = parseInt(toEnglishDigits(document.getElementById('gen_count').value));
         let startDateVal = document.getElementById('gen_start_date').value;
-        const periodQty = parseInt(document.getElementById('gen_period_qty').value);
+        const periodQty = parseInt(toEnglishDigits(document.getElementById('gen_period_qty').value));
         const periodUnit = document.getElementById('gen_period_unit').value;
         const rawAmount = document.getElementById('gen_amount').value;
         const amount = removeCommas(toEnglishDigits(rawAmount));
+
         startDateVal = toEnglishDigits(startDateVal);
 
         if (!count || !periodQty || !amount) {
@@ -948,15 +995,20 @@
         for (let i = 0; i < count; i++) {
             let totalUnitsToAdd = i * periodQty;
             let dateStr = calculateNextJalaliDate(startDateVal, totalUnitsToAdd, periodUnit);
+
+            // Prepare strings for display (Persian)
+            const displayDate = toPersianDigits(dateStr);
+            const displayAmount = toPersianDigits(addCommas(amount));
+            const displayIndex = toPersianDigits(i + 1);
+
             const row = document.createElement('div');
             row.className = 'installment-row';
-            // Added 'input-with-icon' and 'has-date-picker' (removed readonly)
             row.innerHTML = `
-                <span>${i + 1}</span>
+                <span>${displayIndex}</span>
                 <div class="input-with-icon">
-                    <input type="text" class="row-date has-date-picker" value="${dateStr}">
+                    <input type="text" class="row-date has-date-picker" value="${displayDate}">
                 </div>
-                <input type="text" class="row-amount currency-input" value="${addCommas(amount)}">
+                <input type="text" class="row-amount currency-input" value="${displayAmount}">
             `;
             container.appendChild(row);
             const newDateInput = row.querySelector('.row-date');
@@ -989,7 +1041,8 @@
         finalInstallments = tempInstallments;
         let summaryText = "";
         finalInstallments.forEach((item, index) => {
-            summaryText += `${index + 1}. ${item.due_date} -- ${addCommas(item.amount)} ریال\n`;
+            // Summary using Persian digits
+            summaryText += `${toPersianDigits(index + 1)}. ${toPersianDigits(item.due_date)} -- ${toPersianDigits(addCommas(item.amount))} ریال\n`;
         });
         summaryTextarea.value = summaryText;
         btnGoToInstallments.innerText = 'ویرایش اقساط';
@@ -1012,6 +1065,7 @@
             return;
         }
 
+        // We ensure data sent to server is pure English/Number
         const payload = {
             "loans": {
                 "name": name,
@@ -1019,7 +1073,7 @@
                 "received_date": receivedDate,
                 "total_installments": finalInstallments.length
             },
-            "installments": finalInstallments
+            "installments": finalInstallments // These were already cleaned in btnConfirmInstallments
         };
         tg.sendData(JSON.stringify(payload));
     });
