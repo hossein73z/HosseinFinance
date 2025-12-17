@@ -248,6 +248,7 @@ class DatabaseManager
 
     /**
      * @param string|array $join Can be a raw string or an array of join definitions
+     * @param string|array $groupBy Field(s) to group by (Required for aggregation/JSON queries)
      */
     public function read(
         string       $table,
@@ -255,7 +256,8 @@ class DatabaseManager
         bool         $single = false,
         string       $selectColumns = '*',
         bool         $distinct = false,
-        string|array $join = [], // Changed from string to string|array
+        string|array $join = [],
+        string|array $groupBy = [],
         array        $orderBy = [],
         ?int         $limit = null,
         int          $offset = 0,
@@ -266,15 +268,12 @@ class DatabaseManager
         $distinctClause = $distinct ? 'DISTINCT ' : '';
 
         // --- 1. Handle Table Name & Alias ---
-        // If table string has a space (e.g., "loans l"), don't wrap in backticks.
-        // Otherwise, wrap it for safety.
         $tableClause = (!str_contains($table, ' ')) ? "`$table`" : $table;
 
-        // --- 2. Handle Joins (String or Array) ---
+        // --- 2. Handle Joins ---
         $joinClause = '';
         if (is_array($join) && !empty($join)) {
             foreach ($join as $j) {
-                // Default to LEFT JOIN if type not specified
                 $type = isset($j['type']) ? strtoupper($j['type']) : 'LEFT';
                 $joinTable = $j['table'];
                 $onCondition = $j['on'];
@@ -284,7 +283,15 @@ class DatabaseManager
             $joinClause = " $join";
         }
 
-        // --- Handle Ordering ---
+        // --- 3. Handle Group By (NEW) ---
+        // SQL Order: WHERE -> GROUP BY -> HAVING -> ORDER BY
+        $groupByClause = '';
+        if (!empty($groupBy)) {
+            $groupStr = is_array($groupBy) ? implode(', ', $groupBy) : $groupBy;
+            $groupByClause = " GROUP BY $groupStr";
+        }
+
+        // --- 4. Handle Ordering ---
         $orderParts = [];
         if (!empty($orderBy)) {
             foreach ($orderBy as $column => $direction) {
@@ -295,16 +302,20 @@ class DatabaseManager
         $orderByClause = !empty($orderParts) ? " ORDER BY " . implode(', ', $orderParts) : "";
 
         // --- Construct Main Query Part ---
-        // Notice we use $tableClause and $joinClause variable now
+        // Added $groupByClause between WHERE and ORDER BY
         $baseSql = "SELECT $distinctClause $selectColumns FROM $tableClause $joinClause";
-        if (!empty($where['clause'])) $baseSql .= " WHERE " . $where['clause'];
+
+        if (!empty($where['clause'])) {
+            $baseSql .= " WHERE " . $where['clause'];
+        }
+
+        $baseSql .= $groupByClause; // <--- Inserted Here
         $baseSql .= $orderByClause;
 
         // --- Handle Chunking ---
         if ($chunkSize !== null && $chunkSize > 0) {
             $sql = $baseSql;
 
-            // Limit logic for chunks
             if ($limit !== null && $limit > 0) {
                 $sql .= ($offset > 0) ? " LIMIT $offset, $limit" : " LIMIT $limit";
             } elseif ($offset > 0) {
@@ -314,7 +325,7 @@ class DatabaseManager
             try {
                 $stmt = $this->pdo->prepare($sql);
                 $stmt->execute($where['params']);
-                $allData = $stmt->fetchAll(PDO::FETCH_ASSOC); // Enforce Assoc for better handling
+                $allData = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
                 if (empty($allData)) return [];
 
