@@ -90,13 +90,13 @@ $db = DatabaseManager::getInstance();
 // Process 'message' updates (Text, Commands, Buttons).
 if (isset($update['message'])) {
 
-    $global_message = $update['message'];
-    $user = $global_message['chat']; // Sender information
+    $message = $update['message'];
+    $user = $message['chat']; // Sender information
 
     // Check/Register User
-    $global_person = $db->read('persons', ['chat_id' => $user['id']], true);
+    $person = $db->read('persons', ['chat_id' => $user['id']], true);
 
-    if ($global_person === false) {
+    if (!$person) {
         // --- New User Registration ---
         $admins = $db->read('persons', ['is_admin' => 1]);
 
@@ -115,7 +115,7 @@ if (isset($update['message'])) {
         );
 
         if ($new_user_id) {
-            $global_person = $db->read('persons', ['chat_id' => $user['id']], true);
+            $person = $db->read('persons', ['chat_id' => $user['id']], true);
         } else {
             error_log("[ERROR] Failed to create new user: " . $user['id']);
             return;
@@ -126,33 +126,32 @@ if (isset($update['message'])) {
     // ----- The core bot logic -----
     // ------------------------------
 
-    if (isset($global_message['web_app_data'])) {
+    if (isset($message['web_app_data'])) {
 
         choosePath(
-            pressed_button: false,
-            message: $global_message,
-            person: $global_person
+            message: $message,
+            person: $person
         );
 
     } else {
-        $global_pressed_button = getPressedButton(
-            text: $global_message['text'],
-            parent_btn_id: $global_person['last_btn'],
-            admin: $global_person['is_admin'],
+        $pressed_button = getPressedButton(
+            text: $message['text'],
+            parent_btn_id: $person['last_btn'],
+            admin: $person['is_admin'],
             db: $db
         );
 
         // Global Command Routing
-        if ($global_message['text'] == '/holdings') {
-            level_1($global_person);
-        } elseif ($global_message['text'] == '/prices') {
-            level_4($global_person);
+        if ($message['text'] == '/holdings') {
+            level_1($person);
+        } elseif ($message['text'] == '/prices') {
+            level_4($person);
         } else {
             // Route based on button/state
             choosePath(
-                pressed_button: $global_pressed_button,
-                message: $global_message,
-                person: $global_person
+                pressed_button: $pressed_button,
+                message: $message,
+                person: $person
             );
         }
     }
@@ -161,23 +160,17 @@ if (isset($update['message'])) {
 
     $callback_query = $update['callback_query'];
 
-    // Acknowledge callback to stop the loading animation.
-    sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
-
     $message = $callback_query['message'];
     $user = $callback_query['from'];
 
     $person = $db->read('persons', ['chat_id' => $user['id']], true);
 
     if ($person !== false) {
-        // Normalize JSON quotes and decode
-        $callback_data = json_decode(str_replace("'", '"', $callback_query['data']), true);
 
         choosePath(
-            pressed_button: false,
             message: $message,
             person: $person,
-            query_data: $callback_data
+            callback_query: $callback_query
         );
     }
     exit();
@@ -199,20 +192,13 @@ DatabaseManager::closeConnection();
 function choosePath(
     array|null|false $pressed_button = null,
     array|null|false $message = null,
-    array|null       $person = null,
-    array|null|false $query_data = null
+    array|null $person = null,
+    array|null $callback_query = null
 ): void
 {
-    global $global_pressed_button;
-    global $global_message;
-    global $global_person;
     global $db;
 
-    if ($pressed_button === null) $pressed_button = $global_pressed_button;
-    if ($message === null) $message = $global_message;
-    if ($person === null) $person = $global_person;
-
-    if ($query_data) {
+    if ($callback_query) {
         // Handle Callback Queries
         $data = [
             'text' => 'درخواست نامفهوم بود!',
@@ -221,8 +207,8 @@ function choosePath(
         ];
 
         $text = null;
-        if ($person['last_btn'] == 1) $text = level_1(person: $person, message: $message, query_data: $query_data);
-        if ($person['last_btn'] == 4) $text = level_4(person: $person, message: $message, query_data: $query_data);
+        if ($person['last_btn'] == 1) $text = level_1(person: $person, message: $message, callback_query: $callback_query);
+        if ($person['last_btn'] == 4) $text = level_4(person: $person, message: $message, callback_query: $callback_query);
 
         if ($text) $data['text'] = $text;
         sendToTelegram('editMessageText', $data);
@@ -232,21 +218,22 @@ function choosePath(
         if (!$pressed_button) {
             // No button matched: Handle as free text input or error
             $data = [
-                'text' => $custom_text ?? 'پیام نامفهوم است!',
+                'text' => 'پیام نامفهوم است!',
                 'chat_id' => $person['chat_id'],
                 'reply_markup' => [
                     'keyboard' => createKeyboardsArray($person['last_btn'], $person['is_admin'], $db),
                     'resize_keyboard' => true,
                 ]];
 
+            $text = null;
             // Route to active level handler (Input Step)
-            if ($person['last_btn'] == "1") level_1($person, $message); // View Holdings
-            if ($person['last_btn'] == "2") level_2($person, $message); // Add Holding
-            if ($person['last_btn'] == "4") level_4($person, $message); // View Prices
-            if ($person['last_btn'] == "5") level_5($person, $message); // Add Loan
+            if ($person['last_btn'] == "1") $text = level_1($person, $message); // View Holdings
+            if ($person['last_btn'] == "2") $text = level_2($person, $message); // Add Holding
+            if ($person['last_btn'] == "4") $text = level_4($person, $message); // View Prices
+            if ($person['last_btn'] == "5") $text = level_5($person, $message); // Add Loan
 
-            $response = sendToTelegram('sendMessage', $data);
-            if ($response) exit(json_encode(['status' => 'OK', 'telegram_response' => $response]));
+            if ($text) $data['text'] = $text;
+            sendToTelegram('sendMessage', $data);
 
         } else {
             // Button matched
@@ -338,9 +325,10 @@ function cancelButton(array $person): void
  * Level 1: My Holdings
  */
 #[NoReturn]
-function level_1(array $person, array|null $message = null, array|null $query_data = null): string|null
+function level_1(array $person, array|null $message = null, array|null $callback_query = null): string|null
 {
     global $db;
+    $telegram_method = 'sendMessage';
     $data = [
         'chat_id' => $person['chat_id'],
         'reply_markup' => [
@@ -351,17 +339,20 @@ function level_1(array $person, array|null $message = null, array|null $query_da
     ];
 
     $holdings = $db->read(
-        table: 'holdings',
+        table: 'holdings h',
         conditions: ['person_id' => $person['id']],
         selectColumns: '
-        holdings.*,
-        a.name as asset_name,
-        a.price as current_price,
-        a.base_currency,
-        a.exchange_rate as base_rate',
-        join: 'INNER JOIN assets a ON holdings.asset_id = a.id');
+            h.*,
+            a.name as asset_name,
+            a.price as current_price,
+            a.base_currency,
+            a.exchange_rate as base_rate',
+        join: 'INNER JOIN assets a ON h.asset_id = a.id');
 
-    if ($query_data) {
+    if ($callback_query) {
+
+        sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
+        $query_data = json_decode($callback_query['data'], true);
 
         if (array_key_first($query_data) === 'show_chart') {
             sendToTelegram('deleteMessage', [
@@ -392,9 +383,9 @@ function level_1(array $person, array|null $message = null, array|null $query_da
 
                 } catch (Exception $e) {
                     error_log("[ERROR] Chart generation failed: " . $e->getMessage());
+                    return 'خطا در ساخت نمودار!';
                 }
-            }
-            exit();
+            } else return 'قیمتی یافت نشد!';
         }
         if (array_key_first($query_data) === 'edit_holding') {
 
@@ -411,54 +402,54 @@ function level_1(array $person, array|null $message = null, array|null $query_da
                         [
                             [
                                 'text' => '🏷️ نوع دارایی',
-                                'callback_data' => str_replace('"', "'", json_encode([
+                                'callback_data' => json_encode([
                                     'edit_asset_id' => [
                                         'holding_id' => $query_data['edit_holding']['holding_id']
-                                    ]]))
+                                    ]])
                             ],
                             [
                                 'text' => '💲 قیمت خرید',
-                                'callback_data' => str_replace('"', "'", json_encode([
+                                'callback_data' => json_encode([
                                     'edit_price' => [
                                         'holding_id' => $query_data['edit_holding']['holding_id']
-                                    ]]))
+                                    ]])
                             ]
                         ], [
                             [
                                 'text' => '💰 مقدار خرید',
-                                'callback_data' => str_replace('"', "'", json_encode([
+                                'callback_data' => json_encode([
                                     'edit_amount' => [
                                         'holding_id' => $query_data['edit_holding']['holding_id']
-                                    ]]))
+                                    ]])
                             ],
                             [
                                 'text' => '📅 تاریخ و زمان خرید',
-                                'callback_data' => str_replace('"', "'", json_encode([
+                                'callback_data' => json_encode([
                                     'edit_date' => [
                                         'holding_id' => $query_data['edit_holding']['holding_id']
-                                    ]]))
+                                    ]])
                             ]
                         ], [
                             [
                                 'text' => '🗑️ حذف دارایی',
-                                'callback_data' => str_replace('"', "'", json_encode([
+                                'callback_data' => json_encode([
                                     'delete_holding' => ['holding_id' => $query_data['edit_holding']['holding_id']]
-                                ]))
+                                ])
                             ]
                         ], [
                             [
                                 'text' => '🔙 برگشت 🔙',
-                                'callback_data' => str_replace('"', "'", json_encode([
+                                'callback_data' => json_encode([
                                     'view_holding' => ['holding_id' => $query_data['edit_holding']['holding_id']]
-                                ]))
+                                ])
                             ]
                         ]
                     ]
                 ];
-            } else return null;
+            } else return 'دارایی با ای مشخصه یافت نشد!';
 
-            $response = sendToTelegram('editMessageText', $data);
-            exit(json_encode(['status' => 'OK', 'telegram_response' => $response]));
+            $telegram_method = 'editMessageText';
+
         }
         {
             if (array_key_first($query_data) === 'delete_holding') {
@@ -470,7 +461,7 @@ function level_1(array $person, array|null $message = null, array|null $query_da
                     if ($holding) {
 
                         $data['text'] = createHoldingDetailText(holding: $holding);
-                        $data['text'] = $data['text'] . "\n\n" . "*آیا از حذف این دارایی اطمینان دارید؟*";
+                        $data['text'] .= "\n\n" . "*آیا از حذف این دارایی اطمینان دارید؟*";
                         $data['text'] = str_replace(["(", ")", ".", "-"], ["\(", "\)", "\.", "\-"], $data['text']);
                         $data['parse_mode'] = "MarkdownV2";
                         $data['message_id'] = $message['message_id'];
@@ -479,23 +470,25 @@ function level_1(array $person, array|null $message = null, array|null $query_da
                                 [
                                     [
                                         'text' => '✅ بله',
-                                        'callback_data' => str_replace('"', "'", json_encode([
+                                        'callback_data' => json_encode([
                                             'delete_holding' => [
                                                 'holding_id' => $query_data['delete_holding']['holding_id'],
                                                 'confirmed' => true
                                             ]
-                                        ]))
+                                        ])
                                     ],
                                     [
                                         'text' => '❌ لغو',
-                                        'callback_data' => str_replace('"', "'", json_encode([
+                                        'callback_data' => json_encode([
                                             'edit_holding' => [
                                                 'holding_id' => $query_data['delete_holding']['holding_id']
-                                            ]]))
+                                            ]])
                                     ]
                                 ]
                             ]
                         ];
+
+                        $telegram_method = 'editMessageText';
 
                     } else return 'دارایی با این مشخصه یافت نشد!';
 
@@ -509,11 +502,8 @@ function level_1(array $person, array|null $message = null, array|null $query_da
                             'message_id' => $message['message_id'],
                         ]);
                         level_1($person);
-                    } else $data['text'] = 'خطا!';
+                    } else return 'دارایی با این مشخصه یافت نشد!';
                 }
-
-                $response = sendToTelegram('editMessageText', $data);
-                exit(json_encode(['status' => 'OK', 'telegram_response' => $response]));
 
             }
             if (array_key_first($query_data) === 'edit_asset_id') {
@@ -535,24 +525,24 @@ function level_1(array $person, array|null $message = null, array|null $query_da
                             [
                                 [
                                     'text' => $asset_type,
-                                    'callback_data' => str_replace('"', "'", json_encode([
+                                    'callback_data' => json_encode([
                                             'edit_asset_type' => [
                                                 'holding_id' => $query_data['edit_asset_id']['holding_id'],
                                                 'type_index' => $index,
                                             ]
                                         ]
-                                    ))
+                                    )
                                 ]
                             ]
                         );
                         $data['reply_markup']['inline_keyboard'][] = [
                             [
                                 'text' => '🔙 برگشت 🔙',
-                                'callback_data' => str_replace('"', "'", json_encode(['edit_holding' => ['holding_id' => $query_data['edit_asset_id']['holding_id']]]))
+                                'callback_data' => json_encode(['edit_holding' => ['holding_id' => $query_data['edit_asset_id']['holding_id']]])
                             ],
                         ];
-                        $response = sendToTelegram('editMessageText', $data);
-                        exit(json_encode(['status' => 'OK', 'telegram_response' => $response]));
+
+                        $telegram_method = 'editMessageText';
 
                     } else return 'دارایی با این مشخصه یافت نشد!';
                 } else return 'دسته‌بندی‌ای در دیتابیس یافت نشد!';
@@ -578,28 +568,27 @@ function level_1(array $person, array|null $message = null, array|null $query_da
                                 [
                                     [
                                         'text' => $asset['name'],
-                                        'callback_data' => str_replace('"', "'", json_encode([
+                                        'callback_data' => json_encode([
                                                 'edit_asset' => [
                                                     'holding_id' => $query_data['edit_asset_type']['holding_id'],
                                                     'asset_id' => $asset['id'],
                                                 ]
                                             ]
-                                        ))
+                                        )
                                     ]
                                 ]
                             );
                             $data['reply_markup']['inline_keyboard'][] = [
                                 [
                                     'text' => '🔙 برگشت 🔙',
-                                    'callback_data' => str_replace('"', "'", json_encode([
+                                    'callback_data' => json_encode([
                                         'edit_asset_id' => [
                                             'holding_id' => $query_data['edit_asset_type']['holding_id']
-                                        ]]))
+                                        ]])
                                 ],
                             ];
 
-                            $response = sendToTelegram('editMessageText', $data);
-                            exit(json_encode(['status' => 'OK', 'telegram_response' => $response]));
+                            $telegram_method = 'editMessageText';
 
                         } else return 'دارایی‌ای برای این دسته یافت نشد!';
                     } else return 'دسته‌بندی‌ای در دیتابیس یافت نشد!';
@@ -634,7 +623,7 @@ function level_1(array $person, array|null $message = null, array|null $query_da
                         [
                             [
                                 'text' => '🔙 برگشت 🔙',
-                                'callback_data' => str_replace('"', "'", json_encode(['edit_holding' => ['holding_id' => $query_data['edit_price']['holding_id']]]))
+                                'callback_data' => json_encode(['edit_holding' => ['holding_id' => $query_data['edit_price']['holding_id']]])
                             ]
                         ],
                     ]];
@@ -663,7 +652,7 @@ function level_1(array $person, array|null $message = null, array|null $query_da
                         [
                             [
                                 'text' => '🔙 برگشت 🔙',
-                                'callback_data' => str_replace('"', "'", json_encode(['edit_holding' => ['holding_id' => $query_data['edit_amount']['holding_id']]]))
+                                'callback_data' => json_encode(['edit_holding' => ['holding_id' => $query_data['edit_amount']['holding_id']]])
                             ]
                         ],
                     ]];
@@ -692,7 +681,7 @@ function level_1(array $person, array|null $message = null, array|null $query_da
                         [
                             [
                                 'text' => '🔙 برگشت 🔙',
-                                'callback_data' => str_replace('"', "'", json_encode(['edit_holding' => ['holding_id' => $query_data['edit_date']['holding_id']]]))
+                                'callback_data' => json_encode(['edit_holding' => ['holding_id' => $query_data['edit_date']['holding_id']]])
                             ]
                         ],
                     ]];
@@ -721,30 +710,28 @@ function level_1(array $person, array|null $message = null, array|null $query_da
                             [
                                 [
                                     'text' => '📊 نمایش نمودار',
-                                    'callback_data' => str_replace('"', "'", json_encode(['show_chart' => ['asset_id' => $holding['asset_id']]]))
+                                    'callback_data' => json_encode(['show_chart' => ['asset_id' => $holding['asset_id']]])
                                 ],
                             ], [
                                 [
                                     'text' => '✏ ویرایش',
-                                    'callback_data' => str_replace('"', "'", json_encode(['edit_holding' => ['holding_id' => $holding['id']]]))
+                                    'callback_data' => json_encode(['edit_holding' => ['holding_id' => $holding['id']]])
                                 ],
                             ]
                         ]
                     ];
-                    $response = sendToTelegram('editMessageText', $data);
-                    exit(json_encode(['status' => 'OK', 'telegram_response' => $response]));
+
+                    $telegram_method = 'editMessageText';
 
                 } else return 'دارایی با این مشخصه یافت نشد!';
 
             }
         }
 
-        return null;
-
     } elseif ($message) {
 
         // Check deep-link: /start <holding_id>
-        $matched = preg_match("/^\/start (\d*)$/m", $message['text'], $matches);
+        $matched = preg_match("/^\/start hoding_(\d*)$/m", $message['text'], $matches);
         if ($matched) {
 
             if ($matches[1]) {
@@ -759,52 +746,56 @@ function level_1(array $person, array|null $message = null, array|null $query_da
                             [
                                 [
                                     'text' => '📊 نمایش نمودار',
-                                    'callback_data' => str_replace('"', "'", json_encode(['show_chart' => ['asset_id' => $holding['asset_id']]]))
+                                    'callback_data' => json_encode(['show_chart' => ['asset_id' => $holding['asset_id']]])
                                 ],
                             ], [
                                 [
                                     'text' => '✏ ویرایش',
-                                    'callback_data' => str_replace('"', "'", json_encode(['edit_holding' => ['holding_id' => $holding['id']]]))
+                                    'callback_data' => json_encode(['edit_holding' => ['holding_id' => $holding['id']]])
                                 ],
                             ]
                         ]
                     ];
-                } else $data['text'] = 'دارایی با این مشخصه یافت نشد!';
 
-            } else $data['text'] = 'الگوی پیام اشتباه است!';
+                } else return 'دارایی با این مشخصه یافت نشد!';
+            } else return 'الگوی پیام اشتباه است!';
 
         } else {
-            $progress = json_decode($person['progress'], true);
 
+            $progress = json_decode($person['progress'], true);
             if ($progress) {
                 if (array_key_last($progress) == 'edit_holding_price') {
 
                     $cleaned_number = cleanAndValidateNumber($message['text']);
                     if ($cleaned_number) {
+
                         $result = $db->update('holdings', ['avg_price' => $cleaned_number], ['id' => $progress["edit_holding_price"]["holding_id"]]);
-                        if ($result) {
-                            sendToTelegram('sendMessage', [
-                                'chat_id' => $message['chat']['id'],
-                                'text' => '✅ دارایی با موفقیت ویرایش شد!',
-                            ]);
-                            $db->update('persons', ['progress' => null], ['id' => $person['id']]);
-                            level_1($person);
-                        }
-                    } else $data['text'] = 'لطفاً قیمت را تنها با استفاده از اعداد ارسال کنید!';
+
+                        if ($result) $text = '✅ دارایی با موفقیت ویرایش شد!';
+                        else $text = 'خطا در ویرایش دارایی!';
+
+                        sendToTelegram('sendMessage', ['chat_id' => $person['chat_id'], 'text' => $text,]);
+
+                        $db->update('persons', ['progress' => null], ['id' => $person['id']]);
+                        level_1($person);
+
+                    } else return 'لطفاً قیمت را تنها با استفاده از اعداد ارسال کنید!';
                 }
                 if (array_key_last($progress) == 'edit_holding_amount') {
 
                     $cleaned_number = cleanAndValidateNumber($message['text']);
                     if ($cleaned_number) {
+
                         $result = $db->update('holdings', ['amount' => $cleaned_number], ['id' => $progress["edit_holding_amount"]["holding_id"]]);
-                        if ($result) {
-                            sendToTelegram('sendMessage', [
-                                'chat_id' => $message['chat']['id'],
-                                'text' => '✅ دارایی با موفقیت ویرایش شد!',
-                            ]);
-                            $db->update('persons', ['progress' => null], ['id' => $person['id']]);
-                            level_1($person);
-                        }
+
+                        if ($result) $text = '✅ دارایی با موفقیت ویرایش شد!';
+                        else $text = 'خطا در ویرایش دارایی!';
+
+                        sendToTelegram('sendMessage', ['chat_id' => $person['chat_id'], 'text' => $text,]);
+
+                        $db->update('persons', ['progress' => null], ['id' => $person['id']]);
+                        level_1($person);
+
                     } else $data['text'] = 'لطفاً مقدار دارایی را تنها با استفاده از اعداد ارسال کنید!';
                 }
                 if (array_key_last($progress) == 'edit_holding_date') {
@@ -843,7 +834,10 @@ function level_1(array $person, array|null $message = null, array|null $query_da
                             'message_id' => $waiting_response['result']['message_id']
                         ]);
 
-                        if (!$majidAPI_response) error_log("[ERROR] MajidAPI failed to return a response.");
+                        if (!$majidAPI_response) {
+                            error_log("[ERROR] MajidAPI failed to return a response.");
+                            return '[ERROR] MajidAPI failed to return a response.';
+                        }
                         elseif ($majidAPI_response['status'] === 200) {
                             preg_match_all("/^```json\s(.*?)\s```$/m", $majidAPI_response['result'], $matches);
                             $ai_response = json_decode($matches[1][0], true);
@@ -871,7 +865,10 @@ function level_1(array $person, array|null $message = null, array|null $query_da
                             } elseif ($ai_response['status'] === 'Error') sendToTelegram('sendMessage', ['chat_id' => $person['chat_id'], 'text' => 'هوش مصنوعی قادر به استخراج اطلاعات تاریخ و زمان از پیام شما نبود. لطفاً دوباره تلاش کنید.']);
                             else error_log("[ERROR] AI No date found: " . json_encode($majidAPI_response));
 
-                        } else error_log("[ERROR] AI Unknown Error: " . json_encode($majidAPI_response));
+                        } else {
+                            error_log("[ERROR] AI Unknown Error: " . json_encode($majidAPI_response));
+                            return "[ERROR] AI Unknown Error: " . json_encode($majidAPI_response);
+                        }
 
                         $db->update('persons', ['progress' => null], ['id' => $person['id']]);
                         exit();
@@ -881,7 +878,8 @@ function level_1(array $person, array|null $message = null, array|null $query_da
                         exit("❌ An exception occurred: " . $e->getMessage());
                     }
                 }
-            }
+
+            } else return null;
         }
 
     } else {
@@ -904,22 +902,22 @@ function level_1(array $person, array|null $message = null, array|null $query_da
 
         } else $data['text'] = 'شما هیچ دارایی‌ای ثبت نکرده‌اید.';
 
+        $db->update('persons', ['last_btn' => 1], ['id' => $person['id']]);
     }
-
-    $person['last_btn'] = 1;
-    $db->update('persons', $person, ['id' => $person['id']]);
-
-    $response = sendToTelegram('sendMessage', $data);
+    $response = sendToTelegram($telegram_method, $data);
     exit(json_encode(['status' => 'OK', 'telegram_response' => $response]));
 }
 
 /**
  * Level 2: Add New Holding (Multi-step form)
+ * Setting `$message` to false activates 'back' mode
+ * and automatically fills message['text']
  */
 #[NoReturn]
 function level_2(array $person, array|null|bool $message = null): string|null
 {
     global $db;
+    $telegram_method = 'sendMessage';
     $data = [
         'chat_id' => $person['chat_id'],
         'reply_markup' => [
@@ -1177,7 +1175,7 @@ function level_2(array $person, array|null|bool $message = null): string|null
         error_log("[CRITICAL] No progress in Level 2. User: " . $person['id']);
     }
 
-    $response = sendToTelegram('sendMessage', $data);
+    $response = sendToTelegram($telegram_method, $data);
     exit(json_encode(['status' => 'OK', 'telegram_response' => $response]));
 }
 
@@ -1185,7 +1183,7 @@ function level_2(array $person, array|null|bool $message = null): string|null
  * Level 4: View Prices
  */
 #[NoReturn]
-function level_4(array $person, array|null $message = null, array|null $query_data = null): null|string
+function level_4(array $person, array|null $message = null, array|null $callback_query = null): null|string
 {
     global $db;
     $data = [
@@ -1197,7 +1195,10 @@ function level_4(array $person, array|null $message = null, array|null $query_da
         ]
     ];
 
-    if ($query_data) {
+    if ($callback_query) {
+
+        sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
+        $query_data = json_decode($callback_query['data'], true);
 
         $query_key = array_key_first($query_data);
         if ($query_key == 'view_asset') {
@@ -1212,12 +1213,12 @@ function level_4(array $person, array|null $message = null, array|null $query_da
                         [
                             [
                                 'text' => '📊 نمایش نمودار',
-                                'callback_data' => str_replace('"', "'", json_encode(['show_chart' => ['id' => $asset['id']]]))
+                                'callback_data' => json_encode(['show_chart' => ['id' => $asset['id']]])
                             ],
                         ], [
                             [
                                 'text' => '🔔 هشدار قیمت',
-                                'callback_data' => str_replace('"', "'", json_encode(['price_alert' => ['id' => $asset['id']]]))
+                                'callback_data' => json_encode(['price_alert' => ['id' => $asset['id']]])
                             ],
                         ]
                     ]
@@ -1274,12 +1275,12 @@ function level_4(array $person, array|null $message = null, array|null $query_da
                     [
                         [
                             'text' => 'ثبت هشدار قیمت جدید',
-                            'callback_data' => str_replace('"', "'", json_encode(['new_alert' => ['id' => $asset_id]]))
+                            'callback_data' => json_encode(['new_alert' => ['id' => $asset_id]])
                         ]
                     ], [
                         [
                             'text' => '🔙 برگشت 🔙',
-                            'callback_data' => str_replace('"', "'", json_encode(['view_asset' => ['id' => $asset_id]]))
+                            'callback_data' => json_encode(['view_asset' => ['id' => $asset_id]])
                         ]
 
                     ]
@@ -1368,12 +1369,12 @@ function level_4(array $person, array|null $message = null, array|null $query_da
                                     [
                                         [
                                             'text' => '📊 نمایش نمودار',
-                                            'callback_data' => str_replace('"', "'", json_encode(['show_chart' => ['id' => $asset['id']]]))
+                                            'callback_data' => json_encode(['show_chart' => ['id' => $asset['id']]])
                                         ],
                                     ], [
                                         [
                                             'text' => '🔔 هشدار قیمت',
-                                            'callback_data' => str_replace('"', "'", json_encode(['price_alert' => ['id' => $asset['id']]]))
+                                            'callback_data' => json_encode(['price_alert' => ['id' => $asset['id']]])
                                         ],
                                     ]
                                 ]
