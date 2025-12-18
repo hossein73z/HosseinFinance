@@ -837,14 +837,14 @@ function level_5(array $person, array|null $message = null, array|null $callback
         if ($loans) {
             $data['text'] = 'وام‌های ثبت شده‌ی شما:';
             foreach ($loans as $loan) {
-                $data['text'] .= "\n‏    " . $loan['name'] . ":";
+                $data['text'] .= "\n\n‏    " . $loan['name'] . ":";
 
                 $installments = json_decode($loan['installments'], true);
                 foreach ($installments as $installment) {
-                    $paid_icon = ($installment['is_paid']) ? '✔' : '❌';
-                    $data['text'] .= "\n‏        " . beautifulNumber($installment['due_date'], null) . ": " . beautifulNumber($installment['amount']) . $paid_icon;
+                    $paid_icon = ($installment['is_paid']) ? '✅' : '🔄';
+                    $data['text'] .= "\n‏        " .
+                        $paid_icon . '  ' . beautifulNumber($installment['due_date'], null) . " ---> " . beautifulNumber($installment['amount']);
                 }
-                $data['text'] .= "\n";
             }
         } else $data['text'] = 'هیچ وام ثبت شده‌ای ندارید!';
 
