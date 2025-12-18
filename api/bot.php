@@ -333,18 +333,26 @@ function level_1(array $person, array|null $message = null, array|null $callback
     $progress = json_decode($person['progress'], true);
     if ($progress && array_key_first($progress) == 'view_holding') { // User is viewing a holding
         // Edit holding button
-        $data['reply_markup']['keyboard'] = array_merge([[[
-            'text' => '✏ ویرایش',
-            'web_app' => [
-                'url' => 'https://' . getenv('VERCEL_PROJECT_PRODUCTION_URL') . '/assets/add_holding.html?k=' . getenv('DB_API_SECRET') . '&edit_holding_id=' . $progress['view_holding']['holding_id']]
-        ]]], $data['reply_markup']['keyboard']);
+        $data['reply_markup']['keyboard'] = array_merge([
+            [
+                [
+                    'text' => '✏ ویرایش',
+                    'web_app' => [
+                        'url' => 'https://' . getenv('VERCEL_PROJECT_PRODUCTION_URL') . '/assets/add_holding.html?k=' . getenv('DB_API_SECRET') . '&edit_holding_id=' . $progress['view_holding']['holding_id']]
+                ]
+            ]
+        ], $data['reply_markup']['keyboard']);
     } else { // User has just entered level 1
         // Add holding button
-        $data['reply_markup']['keyboard'] = array_merge([[[
-            'text' => '➕ افزودن دارایی جدید',
-            'web_app' => [
-                'url' => 'https://' . getenv('VERCEL_PROJECT_PRODUCTION_URL') . '/assets/add_holding.html?k=' . getenv('DB_API_SECRET')]
-        ]]], $data['reply_markup']['keyboard']);
+        $data['reply_markup']['keyboard'] = array_merge([
+            [
+                [
+                    'text' => '➕ افزودن دارایی جدید',
+                    'web_app' => [
+                        'url' => 'https://' . getenv('VERCEL_PROJECT_PRODUCTION_URL') . '/assets/add_holding.html?k=' . getenv('DB_API_SECRET')]
+                ]
+            ]
+        ], $data['reply_markup']['keyboard']);
     }
 
     // Retrieve user holdings
@@ -445,11 +453,15 @@ function level_1(array $person, array|null $message = null, array|null $callback
 
                         // Add web_app button to edit the holding
                         unset($data['reply_markup']['keyboard'][0]);
-                        $data['reply_markup']['keyboard'] = array_merge([[[
-                            'text' => '✏ ویرایش',
-                            'web_app' => [
-                                'url' => 'https://' . getenv('VERCEL_PROJECT_PRODUCTION_URL') . '/assets/add_holding.html?k=' . getenv('DB_API_SECRET') . '&edit_holding_id=' . $holding['id']]
-                        ]]], $data['reply_markup']['keyboard']);
+                        $data['reply_markup']['keyboard'] = array_merge([
+                            [
+                                [
+                                    'text' => '✏ ویرایش',
+                                    'web_app' => [
+                                        'url' => 'https://' . getenv('VERCEL_PROJECT_PRODUCTION_URL') . '/assets/add_holding.html?k=' . getenv('DB_API_SECRET') . '&edit_holding_id=' . $holding['id']]
+                                ]
+                            ]
+                        ], $data['reply_markup']['keyboard']);
 
                         // Set user progress
                         $db->update('persons',
@@ -775,9 +787,21 @@ function level_5(array $person, array|null $message = null, array|null $callback
     ];
 
     // Add web_app button(s)
-    $data['reply_markup']['keyboard'] = array_merge(
-        [[['text' => '➕ ثبت وام جدید', 'web_app' => ['url' => 'https://' . getenv('VERCEL_PROJECT_PRODUCTION_URL') . '/assets/add_loan.html']]]],
-        $data['reply_markup']['keyboard']);
+    $data['reply_markup']['keyboard'] = array_merge([
+        [
+            [
+                'text' => '➕ ثبت وام جدید', 'web_app' => ['url' => 'https://' . getenv('VERCEL_PROJECT_PRODUCTION_URL') . '/assets/add_loan.html']
+            ]
+        ], [
+            [
+                'text' => '📋 لیست وام‌های من', 'web_app' => [
+                'url' =>
+                    'https://' . getenv('VERCEL_PROJECT_PRODUCTION_URL') . '/assets/list_loan.html?' .
+                    'k=' . getenv('DB_API_SECRET') . '&' .
+                    'id=' . $person['id']]
+            ]
+        ]
+    ], $data['reply_markup']['keyboard']);
 
     if ($callback_query) {
 
