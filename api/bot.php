@@ -20,8 +20,6 @@ define('DB_API_SECRET', getenv('DB_API_SECRET'));
 
 // Load the DatabaseManager class for DB operations.
 require_once 'Libraries/DatabaseManager.php';
-// Load the QuickChart library for generating charts.
-require_once 'Libraries/QuickChart.php';
 // Load functions for external APIs (Telegram, MajidAPI, etc.).
 require_once 'Functions/ExternalEndpointsFunctions.php';
 // Load functions for generating Telegram keyboards.
@@ -193,23 +191,27 @@ function choosePath(
 
     if ($callback_query) {
         // Handle Callback Queries
+
+        if ($person['last_btn'] == 1) level_1(person: $person, message: $message, callback_query: $callback_query);
+        if ($person['last_btn'] == 4) level_4(person: $person, message: $message, callback_query: $callback_query);
+
         $data = [
             'text' => 'درخواست نامفهوم بود!',
             'message_id' => $message['message_id'],
             'chat_id' => $person['chat_id'],
         ];
-
-        $text = null;
-        if ($person['last_btn'] == 1) level_1(person: $person, message: $message, callback_query: $callback_query);
-        if ($person['last_btn'] == 4) $text = level_4(person: $person, message: $message, callback_query: $callback_query);
-
-        if ($text) $data['text'] = $text;
         sendToTelegram('editMessageText', $data);
 
     } else {
         // Handle Text Messages
         if (!$pressed_button) {
             // No button matched: Handle as free text input or error
+
+            // Route to active level handler (Input Step)
+            if ($person['last_btn'] == "1") level_1($person, $message); // View Holdings
+            if ($person['last_btn'] == "4") level_4($person, $message); // View Prices
+            if ($person['last_btn'] == "5") level_5($person, $message); // Add Loan
+
             $data = [
                 'text' => 'پیام نامفهوم است!',
                 'chat_id' => $person['chat_id'],
@@ -217,14 +219,6 @@ function choosePath(
                     'keyboard' => createKeyboardsArray($person['last_btn'], $person['is_admin'], $db),
                     'resize_keyboard' => true,
                 ]];
-
-            $text = null;
-            // Route to active level handler (Input Step)
-            if ($person['last_btn'] == "1") level_1($person, $message); // View Holdings
-            if ($person['last_btn'] == "4") $text = level_4($person, $message); // View Prices
-            if ($person['last_btn'] == "5") level_5($person, $message); // Add Loan
-
-            if ($text) $data['text'] = $text;
             sendToTelegram('sendMessage', $data);
 
         } else {
@@ -252,8 +246,7 @@ function choosePath(
 
                 $response = sendToTelegram('sendMessage', $data);
                 if ($response) {
-                    $person['last_btn'] = $pressed_button['id'];
-                    $db->update('persons', $person, ['id' => $person['id']]);
+                    $db->update('persons', ['last_btn' => $pressed_button['id']], ['id' => $person['id']]);
                     echo json_encode(['status' => 'OK', 'telegram_response' => $response]);
                 }
             }
@@ -274,7 +267,7 @@ function backButton(array $person): void
     $current_level = $db->read('buttons', ['id' => $person['last_btn']], true);
 
     if ($progress && sizeof($progress) > 2) {
-        // Step back in a multi-step form
+        // Step back in a multistep form
         array_pop($progress);
         array_pop($progress);
         $person['progress'] = json_encode($progress);
@@ -482,9 +475,10 @@ function level_1(array $person, array|null $message = null, array|null $callback
  * Level 4: View Prices
  */
 #[NoReturn]
-function level_4(array $person, array|null $message = null, array|null $callback_query = null): null|string
+function level_4(array $person, array|null $message = null, array|null $callback_query = null): void
 {
     global $db;
+    $telegram_method = 'sendMessage';
     $data = [
         'chat_id' => $person['chat_id'],
         'reply_markup' => [
@@ -496,146 +490,15 @@ function level_4(array $person, array|null $message = null, array|null $callback
 
     if ($callback_query) {
 
+        // Answer the query
         sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
-        $query_data = json_decode($callback_query['data'], true);
+        // $query_data = json_decode($callback_query['data'], true);
 
-        $query_key = array_key_first($query_data);
-        if ($query_key == 'view_asset') {
-            $asset_id = $query_data[$query_key]['id'];
-            $asset = $db->read('assets', ['id' => $asset_id], single: true);
-
-            if ($asset) {
-                $data['text'] = $asset['name'] . ': ' . beautifulNumber($asset['price']);
-                $data['message_id'] = $message['message_id'];
-                $data['reply_markup'] = [
-                    'inline_keyboard' => [
-                        [
-                            [
-                                'text' => '📊 نمایش نمودار',
-                                'callback_data' => json_encode(['show_chart' => ['id' => $asset['id']]])
-                            ],
-                        ], [
-                            [
-                                'text' => '🔔 هشدار قیمت',
-                                'callback_data' => json_encode(['price_alert' => ['id' => $asset['id']]])
-                            ],
-                        ]
-                    ]
-                ];
-                $db->update('persons', ['progress' => null], ['id' => $person['id']]);
-            } else $data['text'] = 'دارایی‌ای با این مشخصه یافت نشد!';
-
-            $response = sendToTelegram('editMessageText', $data);
-            exit(json_encode(['status' => 'OK', 'telegram_response' => $response]));
-
-        }
-        if ($query_key == 'show_chart') {
-
-            sendToTelegram('deleteMessage', [
-                'chat_id' => $person['chat_id'],
-                'message_id' => $message['message_id']
-            ]);
-
-            $asset_id = $query_data[$query_key]['id'];
-
-            $price_chunks = $db->read(
-                table: 'prices',
-                conditions: ['asset_id' => $asset_id],
-                selectColumns: 'prices.*, a.name as asset_name',
-                join: 'INNER JOIN assets a ON prices.asset_id = a.id',
-                orderBy: ['prices.date' => "DESC"],
-                limit: 100,
-                chunkSize: 5);
-
-            if ($price_chunks) {
-
-                $chart_config = pricesToChartConfig($price_chunks);
-                try {
-                    $url = generateQuickChartUrl($chart_config, height: 700);
-                    $data['photo'] = $url;
-                    $data['caption'] = 'قیمت «' . $price_chunks[0][0]['asset_name'] . '»';
-                    $response = sendToTelegram('sendPhoto', $data);
-                    exit(json_encode(['status' => 'OK', 'telegram_response' => $response]));
-
-                } catch (Exception $e) {
-                    error_log("[ERROR] Chart Gen Error: " . $e->getMessage());
-                    exit(json_encode(['status' => 'OK']));
-                }
-
-            } else return 'داده‌ی قیمتی یافت نشد!';
-
-        }
-        if ($query_key == 'price_alert') {
-
-            $asset_id = $query_data[$query_key]['id'];
-
-            $data['reply_markup'] = [
-                'inline_keyboard' => [
-                    [
-                        [
-                            'text' => 'ثبت هشدار قیمت جدید',
-                            'callback_data' => json_encode(['new_alert' => ['id' => $asset_id]])
-                        ]
-                    ], [
-                        [
-                            'text' => '🔙 برگشت 🔙',
-                            'callback_data' => json_encode(['view_asset' => ['id' => $asset_id]])
-                        ]
-
-                    ]
-                ]
-            ];
-
-            $data['text'] = 'شما هیچ هشدار ثبت‌شده‌ای ندارید!';
-            $data['message_id'] = $message['message_id'];
-
-            $alerts = $db->read(
-                table: 'alerts',
-                conditions: ['alerts.person_id' => $person['id'], 'alerts.asset_id' => $asset_id],
-                selectColumns: 'alerts.*, assets.name as asset_name, assets.base_currency',
-                join: 'JOIN assets ON alerts.asset_id=assets.id'
-            );
-
-            if ($alerts) {
-                $data['text'] = "هشدارهای ثبت شده‌ی شما برای «" . $alerts[0]['asset_name'] . "»:\n";
-                foreach ($alerts as $alert) {
-                    $alert_icon = '↕';
-                    if ($alert['trigger_type'] == 'up') $alert_icon = '⬆';
-                    if ($alert['trigger_type'] == 'down') $alert_icon = '⬇';
-
-                    $status_icon = '⚪';
-                    if (!$alert['is_active']) $status_icon = ($alert['triggered_date']) ? '🟢' : '🟤';
-
-                    $data['text'] .= "\n" . $status_icon . "    " . beautifulNumber($alert['target_price']) . ' ' . $alert['base_currency'] . ' ' . $alert_icon;
-                }
-            }
-
-            $response = sendToTelegram('editMessageText', $data);
-            exit(json_encode(['status' => 'OK', 'telegram_response' => $response]));
-        }
-        if ($query_key == 'new_alert') {
-            $asset_id = $query_data[$query_key]['id'];
-
-            $asset = $db->read('assets', ['id' => $asset_id], single: true);
-            if ($asset) {
-
-                $data['message_id'] = $message['message_id'];
-                unset($data['reply_markup']);
-                $data['text'] = 'قیمت مورد نظر برای ثبت این هشدار را وارد کنید.' .
-                    "\n\n" . 'قیمت کنونی ' . beautifulNumber($asset['name'], null) . ': ' . beautifulNumber($asset['price']);
-
-                $progress = ['new_alert' => ['asset_id' => $asset_id]];
-
-                $response = sendToTelegram('editMessageText', $data);
-                if ($response) $db->update('persons', ['progress' => json_encode($progress)], ['id' => $person['id']]);
-                else exit();
-            } else {
-                error_log("[ERROR] New Alert Error. Asset ID: " . $asset_id);
-                return 'خطا!';
-            }
-        }
-
-        return null;
+        // Delete the message generating the callback
+        $telegram_method = 'editMessageText';
+        unset($data['reply_markup']);
+        $data['text'] = 'این پیام منقضی شده است.';
+        $data['message_id'] = $message['message_id'];
 
     } else {
         $asset_types = $db->read('assets', selectColumns: 'asset_type', distinct: true);
@@ -654,35 +517,7 @@ function level_4(array $person, array|null $message = null, array|null $callback
 
             } else {
 
-                $matched = preg_match("/^\/start (\d*)$/m", $message['text'], $matches);
-
-                if ($matched) {
-                    if (!empty($matches[1])) {
-
-                        $asset = $db->read('assets', ['id' => $matches[1]], single: true);
-
-                        if ($asset) {
-                            $data['text'] = $asset['name'] . ': ' . beautifulNumber($asset['price']);
-                            $data['reply_markup'] = [
-                                'inline_keyboard' => [
-                                    [
-                                        [
-                                            'text' => '📊 نمایش نمودار',
-                                            'callback_data' => json_encode(['show_chart' => ['id' => $asset['id']]])
-                                        ],
-                                    ], [
-                                        [
-                                            'text' => '🔔 هشدار قیمت',
-                                            'callback_data' => json_encode(['price_alert' => ['id' => $asset['id']]])
-                                        ],
-                                    ]
-                                ]
-                            ];
-                            $db->update('persons', ['progress' => null], ['id' => $person['id']]);
-                        } else $data['text'] = 'دارایی‌ای با این مشخصه یافت نشد!';
-
-                    }
-                } elseif (in_array($message['text'], $asset_types)) {
+                if (in_array($message['text'], $asset_types)) {
 
                     $assets = $db->read('assets', ['asset_type' => $message['text']]);
                     if ($assets) {
@@ -698,20 +533,20 @@ function level_4(array $person, array|null $message = null, array|null $callback
 
                         foreach ($assets as $asset) {
                             $asset['price'] = beautifulNumber($asset['price']);
-                            $asset = str_replace(['.', "(", ")", "="], ['\.', "\(", "\)", "\="], $asset);
-                            $asset_text = "[$asset[name]](https://t.me/" . BOT_ID . "?start=$asset[id]) : " . $asset['price'] . " $asset[base_currency]";
+                            $asset_text = "$asset[name] : $asset[price] $asset[base_currency]";
 
                             $text = $text . "\n" . $asset_text;
                         }
 
                         $data['text'] = $text;
                         $data['reply_to_message_id'] = $message['message_id'];
-                        $data['parse_mode'] = "MarkdownV2";
 
                         $db->update('persons', ['progress' => null], ['id' => $person['id']]);
 
-                    } else $data['text'] = 'قیمتی یافت نشد!';
+                    } else $data['text'] = 'این دسته بندی خالی‌ست!';
+
                 } elseif ($message['text'] == 'علاقه‌مندی‌ها') {
+
                     $favorites = $db->read(
                         table: 'favorites',
                         conditions: ['person_id' => $person['id']],
@@ -729,43 +564,14 @@ function level_4(array $person, array|null $message = null, array|null $callback
                         }
                     }
 
-                } elseif ($person['progress']) {
-                    $progress = json_decode($person['progress'], true);
-
-                    if ($progress) {
-                        $asset_id = $progress['new_alert']['asset_id'];
-
-                        $cleaned_number = cleanAndValidateNumber($message['text']);
-                        if ($cleaned_number) {
-
-                            $date_time = majidAPI_date_time();
-                            if ($date_time) {
-                                $result = $db->upsert('alerts', [
-                                    'person_id' => $person['id'],
-                                    'asset_id' => $asset_id,
-                                    'target_price' => $message['text'],
-                                    'is_active' => true,
-                                    'created_date' => $date_time['result']['jalali']['date'],
-                                    'created_time' => $date_time['result']['jalali']['time'],
-                                ]);
-
-                                if ($result) $data['text'] = 'هشدار جدید با موفقیت ثبت شد!';
-                                else $data['text'] = 'خطا در ثبت هشدار جدید!';
-                            } else $data['text'] = 'خطا در دریافت تاریخ و زمان کنونی. دوباره امتحان کنید!';
-
-                        } else $data['text'] = "پیام نامفهوم بود.\nلطفاً قیمت را تنها با استفاده از اعداد وارد کنید!";
-
-                    } else $data['text'] = "پیام نامفهموم بود!\nلطفاً یکی از دسته‌بندی‌های زیر را انتخاب کنید:";
                 } else $data['text'] = "پیام نامفهموم بود!\nلطفاً یکی از دسته‌بندی‌های زیر را انتخاب کنید:";
             }
 
-        } else {
-            $data['text'] = "دسته‌بندی‌ای در سیستم یافت نشد!";
-        }
-
-        $response = sendToTelegram('sendMessage', $data);
-        exit(json_encode(['status' => 'OK', 'telegram_response' => $response]));
+        } else $data['text'] = "دسته‌بندی‌ای در سیستم یافت نشد!";
     }
+
+    $response = sendToTelegram($telegram_method, $data);
+    exit(json_encode(['status' => 'OK', 'telegram_response' => $response]));
 
 }
 
@@ -782,7 +588,7 @@ function level_5(array $person, array|null $message = null, array|null $callback
         'reply_markup' => [
             'keyboard' => createKeyboardsArray(5, $person['is_admin'], $db),
             'resize_keyboard' => true,
-            'input_field_placeholder' => '➕ ثبت وام جدید',
+            'input_field_placeholder' => '🏦 وام و اقساط',
         ]
     ];
 
@@ -895,42 +701,6 @@ function level_5(array $person, array|null $message = null, array|null $callback
 
     $response = sendToTelegram($telegram_method, $data);
     exit(json_encode(['status' => 'OK', 'telegram_response' => $response]));
-}
-
-/**
- * Helper to process price chunks for QuickChart.
- */
-function pricesToChartConfig(array $price_chunks): array
-{
-
-    $averages = [];
-    foreach ($price_chunks as $price_chunk) {
-        $price_sum = 0;
-        foreach ($price_chunk as $price) {
-            $price_sum = $price_sum + floatval($price['price']);
-        }
-
-        $middle_index = (int)floor(count($price_chunk) / 2);
-        $middle_price = $price_chunk[$middle_index];
-
-        $averages[$middle_price['date']] = $price_sum / sizeof($price_chunk);
-    }
-
-    $labels[] = [];
-    $datasets[0]['label'] = "قیمت " . $price_chunks[0][0]['asset_name'];
-    $datasets[0]['borderColor'] = 'rgb(75, 192, 192)';
-
-    $averages = array_reverse($averages);
-    foreach ($averages as $key => $average) {
-        $labels[] = $key; // Date
-        $datasets[0]['data'][] = $average; // Average Price
-    }
-
-    return buildQuickChartConfig(
-        type: 'line',
-        labels: $labels,
-        datasets: $datasets
-    );
 }
 
 function createHoldingDetailText(array $holding, string|null $markdown = null, array $attributes = [

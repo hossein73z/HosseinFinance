@@ -48,18 +48,6 @@ CREATE TABLE IF NOT EXISTS `test`.`assets`
     time          VARCHAR(8)              DEFAULT NULL
 ) DEFAULT CHARSET = utf8mb4;
 
-CREATE TABLE IF NOT EXISTS `test`.`prices`
-(
-    id       BIGINT AUTO_INCREMENT PRIMARY KEY,
-    asset_id INT            NOT NULL,
-    price    NUMERIC(18, 8) NOT NULL,
-    date     VARCHAR(10) DEFAULT NULL,
-    time     VARCHAR(8)  DEFAULT NULL,
-
-    UNIQUE INDEX idx_unique_price (asset_id, date),
-    FOREIGN KEY (asset_id) REFERENCES assets (id) ON DELETE CASCADE
-) DEFAULT CHARSET = utf8mb4;
-
 CREATE TABLE IF NOT EXISTS `test`.`holdings`
 (
     id        INT AUTO_INCREMENT PRIMARY KEY,
@@ -157,8 +145,6 @@ alter table `test`.buttons
 alter table `test`.assets
     auto_increment 0;
 alter table `test`.holdings
-    auto_increment 0;
-alter table `test`.prices
     auto_increment 0;
 alter table `test`.favorites
     auto_increment 0;
