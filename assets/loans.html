@@ -1,0 +1,1424 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>مدیریت وام‌ها</title>
+
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css" rel="stylesheet"
+          type="text/css"/>
+
+    <style>
+        :root {
+            --bg-color: var(--tg-theme-bg-color, #fff);
+            --secondary-bg-color: var(--tg-theme-secondary-bg-color, #f4f4f9);
+            --text-color: var(--tg-theme-text-color, #222);
+            --hint-color: var(--tg-theme-hint-color, #999);
+            --button-color: var(--tg-theme-button-color, #4a90e2);
+            --button-text-color: var(--tg-theme-button-text-color, #ffffff);
+            --green-color: #28a745;
+            --red-color: #dc3545;
+            --error-color: #dc3545;
+            --card-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        }
+
+        html, body {
+            min-height: 100%;
+            margin: 0;
+            padding: 0;
+            background-color: var(--secondary-bg-color);
+            color: var(--text-color);
+            font-family: 'Vazirmatn', sans-serif;
+            overflow-x: hidden;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            padding: 15px;
+            padding-bottom: 80px;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        h2, h3, h4 {
+            margin-top: 0;
+            color: var(--text-color);
+        }
+
+        /* --- CARD STYLES (LIST) --- */
+        .card {
+            background-color: var(--bg-color);
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 15px;
+            box-shadow: var(--card-shadow);
+            cursor: pointer;
+            position: relative;
+        }
+
+        .card:active {
+            transform: scale(0.98);
+            transition: transform 0.1s;
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .card-title {
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+
+        .card-amount {
+            font-weight: 700;
+            color: var(--button-color);
+            font-size: 1rem;
+        }
+
+        .card-details {
+            font-size: 0.85rem;
+            color: var(--text-color);
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+
+        .text-hint {
+            color: var(--hint-color);
+        }
+
+        .text-danger {
+            color: var(--red-color);
+        }
+
+        .text-success {
+            color: var(--green-color);
+        }
+
+        .progress-wrapper {
+            height: 6px;
+            background-color: var(--secondary-bg-color);
+            border-radius: 3px;
+            overflow: hidden;
+            margin-top: 10px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background-color: var(--green-color);
+            width: 0%;
+            transition: width 0.5s ease;
+        }
+
+        /* --- INSTALLMENT LIST --- */
+        .installment-list {
+            background: var(--bg-color);
+            border-radius: 12px;
+            box-shadow: var(--card-shadow);
+            overflow: hidden;
+        }
+
+        .installment-item {
+            display: flex;
+            align-items: center;
+            padding: 12px 15px;
+            border-bottom: 1px solid var(--secondary-bg-color);
+        }
+
+        .installment-item:last-child {
+            border-bottom: none;
+        }
+
+        .inst-index {
+            width: 30px;
+            color: var(--hint-color);
+            font-size: 0.9rem;
+        }
+
+        .inst-info {
+            flex: 1;
+        }
+
+        .inst-date {
+            font-weight: bold;
+            font-size: 1rem;
+            display: block;
+        }
+
+        .inst-amount {
+            font-size: 0.85rem;
+            color: var(--hint-color);
+        }
+
+        .inst-action {
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            background-color: var(--secondary-bg-color);
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .installment-item.is-paid .inst-action {
+            background-color: var(--green-color);
+            color: white;
+        }
+
+        .installment-item.is-paid .inst-date {
+            color: var(--hint-color);
+            text-decoration: line-through;
+        }
+
+        .inst-action.error {
+            border: 2px solid var(--red-color);
+        }
+
+        /* --- FORM STYLES (ADD) --- */
+        .form-container {
+            background-color: var(--bg-color);
+            padding: 15px;
+            border-radius: 12px;
+            box-shadow: var(--card-shadow);
+        }
+
+        .form-group {
+            margin-bottom: 12px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: var(--hint-color);
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        .input-with-icon {
+            position: relative;
+            width: 100%;
+        }
+
+        input, select, textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-family: 'Vazirmatn', sans-serif;
+            box-sizing: border-box;
+            font-size: 0.95rem;
+            background: var(--bg-color);
+            color: var(--text-color);
+            text-align: right;
+        }
+
+        input.input-error {
+            border-color: var(--error-color) !important;
+            background-color: rgba(220, 53, 69, 0.05);
+        }
+
+        input.has-date-picker {
+            padding-left: 40px;
+        }
+
+        .date-picker-trigger {
+            position: absolute;
+            left: 5px;
+            top: 50%;
+            transform: translateY(-50%);
+            cursor: pointer;
+            padding: 5px;
+            color: var(--button-color);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2;
+        }
+
+        .date-picker-trigger svg {
+            width: 20px;
+            height: 20px;
+            fill: currentColor;
+        }
+
+        textarea.summary-box {
+            resize: vertical;
+            min-height: 120px;
+            font-size: 0.85rem;
+            line-height: 1.6;
+            white-space: pre;
+            background-color: var(--secondary-bg-color);
+            direction: ltr;
+            text-align: right;
+            border: 1px solid var(--hint-color);
+        }
+
+        input:focus, select:focus, textarea:focus {
+            border-color: var(--button-color);
+            outline: none;
+        }
+
+        /* --- BUTTONS --- */
+        button {
+            width: 100%;
+            padding: 12px;
+            background-color: var(--button-color);
+            color: var(--button-text-color);
+            border: none;
+            border-radius: 8px;
+            font-family: 'Vazirmatn', sans-serif;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+
+        button:active {
+            transform: translateY(1px);
+        }
+
+        button.secondary-btn {
+            background-color: #6c757d;
+            color: white;
+        }
+
+        button.danger-btn {
+            background-color: #dc3545;
+            color: white;
+        }
+
+        .btn-delete-loan {
+            width: 100%;
+            padding: 12px;
+            margin-top: 20px;
+            background-color: transparent;
+            border: 1px solid var(--red-color);
+            color: var(--red-color);
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .btn-delete-loan:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 8px;
+            margin-top: 15px;
+        }
+
+        /* --- SPINNERS --- */
+        .mini-spinner {
+            width: 18px;
+            height: 18px;
+            border: 2px solid rgba(0, 0, 0, 0.1);
+            border-top: 2px solid var(--button-color);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        .btn-spinner {
+            width: 20px;
+            height: 20px;
+            border: 2px solid rgba(220, 53, 69, 0.2);
+            border-top: 2px solid var(--red-color);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto;
+        }
+
+        .installment-item.is-paid .mini-spinner {
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-top: 2px solid white;
+        }
+
+        /* --- FAB --- */
+        .fab {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            width: 56px;
+            height: 56px;
+            background-color: var(--button-color);
+            border-radius: 50%;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            cursor: pointer;
+            z-index: 99;
+        }
+
+        .fab svg {
+            width: 28px;
+            height: 28px;
+            fill: currentColor;
+        }
+
+        /* --- LOADING OVERLAY --- */
+        #loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: var(--bg-color);
+            z-index: 2000;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 0.3s ease-out;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid var(--secondary-bg-color);
+            border-top: 4px solid var(--button-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 15px;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* --- INSTALLMENT GENERATOR TABLE --- */
+        .row-group {
+            display: flex;
+            gap: 8px;
+            align-items: flex-end;
+        }
+
+        .row-group > div {
+            flex: 1;
+        }
+
+        .installment-row {
+            display: flex;
+            gap: 5px;
+            margin-bottom: 8px;
+            align-items: center;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 8px;
+        }
+
+        .installment-row span {
+            width: 25px;
+            text-align: center;
+            color: var(--hint-color);
+            font-size: 0.8rem;
+            flex-shrink: 0;
+        }
+
+        /* --- DATE PICKER --- */
+        #date-picker-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 3000;
+            display: none;
+            flex-direction: column;
+            justify-content: flex-end;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        #date-picker-overlay.active {
+            opacity: 1;
+        }
+
+        .picker-container {
+            background: var(--bg-color);
+            border-top-left-radius: 20px;
+            border-top-right-radius: 20px;
+            padding: 20px 10px;
+            transform: translateY(100%);
+            transition: transform 0.3s cubic-bezier(0.1, 0.7, 0.1, 1);
+            box-shadow: 0 -5px 25px rgba(0, 0, 0, 0.1);
+        }
+
+        #date-picker-overlay.active .picker-container {
+            transform: translateY(0);
+        }
+
+        .picker-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 15px;
+            padding: 0 10px;
+        }
+
+        .picker-btn {
+            background: none;
+            border: none;
+            color: var(--button-color);
+            font-size: 1rem;
+            cursor: pointer;
+            padding: 5px 15px;
+        }
+
+        .picker-btn.cancel {
+            color: var(--hint-color);
+        }
+
+        .wheels-wrapper {
+            position: relative;
+            display: flex;
+            height: 200px;
+            overflow: hidden;
+            direction: ltr;
+        }
+
+        .wheel-highlight {
+            position: absolute;
+            top: 50%;
+            left: 0;
+            width: 100%;
+            height: 40px;
+            margin-top: -20px;
+            background: var(--secondary-bg-color);
+            border-top: 1px solid #ddd;
+            border-bottom: 1px solid #ddd;
+            pointer-events: none;
+            z-index: 1;
+            opacity: 0.5;
+        }
+
+        .wheel-col {
+            flex: 1;
+            height: 100%;
+            overflow-y: scroll;
+            scroll-snap-type: y mandatory;
+            text-align: center;
+            z-index: 2;
+            padding: 0;
+            margin: 0;
+            list-style: none;
+            scrollbar-width: none;
+            cursor: grab;
+        }
+
+        .wheel-col::-webkit-scrollbar {
+            display: none;
+        }
+
+        .wheel-col li {
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.1rem;
+            color: var(--hint-color);
+            scroll-snap-align: center;
+            scroll-snap-stop: always;
+            transition: color 0.1s, transform 0.1s;
+        }
+
+        .wheel-col li.active {
+            color: var(--text-color);
+            font-weight: bold;
+            transform: scale(1.1);
+        }
+
+        .wheel-spacer {
+            height: 80px !important;
+            flex-shrink: 0;
+            pointer-events: none;
+        }
+
+        .wheel-title {
+            text-align: center;
+            font-size: 0.75rem;
+            color: var(--hint-color);
+            margin-bottom: 5px;
+        }
+    </style>
+</head>
+<body>
+
+<div id="loading-overlay">
+    <div class="spinner"></div>
+    <div class="loading-text">در حال دریافت اطلاعات...</div>
+</div>
+
+<div class="container">
+
+    <!-- ================= VIEW 1: LIST ================= -->
+    <div id="view-list">
+        <h2>لیست وام‌ها</h2>
+        <div id="loans-container"></div>
+        <div id="empty-state" class="hidden" style="text-align:center; margin-top:50px; color:var(--hint-color);">
+            <p>هیچ وامی ثبت نشده است.</p>
+        </div>
+    </div>
+
+    <!-- ================= VIEW 2: DETAILS ================= -->
+    <div id="view-detail" class="hidden">
+        <div class="detail-header" style="margin-bottom:15px">
+            <div>
+                <h3 id="detail-title" style="margin:0">عنوان وام</h3>
+                <span id="detail-subtitle" class="text-hint" style="font-size:0.8rem;">جزئیات</span>
+            </div>
+        </div>
+
+        <div class="card" style="margin-bottom: 20px; cursor: default;">
+            <div class="card-details">
+                <span>مبلغ کل:</span>
+                <span id="detail-total-amount" style="font-weight:bold"></span>
+            </div>
+            <div class="card-details">
+                <span>باقی‌مانده:</span>
+                <span id="detail-remaining" class="text-danger" style="font-weight:bold"></span>
+            </div>
+            <div class="progress-wrapper">
+                <div id="detail-progress" class="progress-fill"></div>
+            </div>
+            <div style="text-align: center; margin-top: 5px; font-size: 0.8rem; color: var(--hint-color);">
+                <span id="detail-paid-count">0</span> قسط پرداخت شده
+            </div>
+        </div>
+
+        <h4>لیست اقساط</h4>
+        <div id="installments-container" class="installment-list"></div>
+
+        <button id="btn-delete" class="btn-delete-loan" onclick="deleteCurrentLoan()">حذف کامل این وام</button>
+    </div>
+
+    <!-- ================= VIEW 3: ADD LOAN FORM ================= -->
+    <div id="view-add" class="hidden form-container">
+        <h2>افزودن وام جدید</h2>
+        <form id="loanForm">
+            <div class="form-group">
+                <label for="name">عنوان وام</label>
+                <input type="text" id="name" placeholder="مثلا: وام مسکن" required>
+            </div>
+
+            <div class="form-group">
+                <label for="total_amount">مبلغ کل (ریال)</label>
+                <input type="text" id="total_amount" class="currency-input" placeholder="۲۰۰,۰۰۰,۰۰۰"
+                       inputmode="numeric" required>
+            </div>
+
+            <div class="form-group">
+                <label for="received_date">تاریخ دریافت</label>
+                <div class="input-with-icon">
+                    <input type="text" id="received_date" class="has-date-picker" placeholder="۱۴۰۳/۰۱/۰۱" required>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>اطلاعات اقساط</label>
+                <button type="button" id="btnGoToInstallments" class="secondary-btn" style="margin-bottom: 10px;">تعریف
+                    اقساط
+                </button>
+                <textarea id="add_installments_summary" class="summary-box"
+                          placeholder="لیست اقساط اینجا نمایش داده می‌شود..." readonly></textarea>
+            </div>
+
+            <button type="submit" id="submitBtn">ثبت و ارسال به ربات</button>
+        </form>
+    </div>
+
+    <!-- ================= VIEW 4: GENERATE INSTALLMENTS ================= -->
+    <div id="view-add-installments" class="hidden form-container">
+        <div id="step-generator">
+            <h3>تولید خودکار اقساط</h3>
+            <div class="form-group">
+                <label for="gen_count">تعداد اقساط</label>
+                <input type="text" id="gen_count" class="simple-number" inputmode="numeric" placeholder="مثلا: ۱۲">
+            </div>
+            <div class="form-group">
+                <label for="gen_start_date">تاریخ اولین قسط</label>
+                <div class="input-with-icon">
+                    <input type="text" id="gen_start_date" class="has-date-picker" placeholder="۱۴۰۳/۰۲/۰۱">
+                </div>
+            </div>
+            <div class="row-group form-group">
+                <div>
+                    <label for="gen_period_qty">هر چند...</label>
+                    <input type="text" id="gen_period_qty" class="simple-number" inputmode="numeric" value="۱">
+                </div>
+                <div>
+                    <label for="gen_period_unit">دوره زمانی</label>
+                    <select id="gen_period_unit">
+                        <option value="month" selected>ماه</option>
+                        <option value="week">هفته</option>
+                        <option value="day">روز</option>
+                        <option value="year">سال</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="gen_amount">مبلغ هر قسط (ریال)</label>
+                <input type="text" id="gen_amount" class="currency-input" inputmode="numeric"
+                       placeholder="مثلا: ۱۰۷,۰۰۰,۰۰۰">
+            </div>
+            <button type="button" id="btnGenerate">مشاهده لیست اقساط</button>
+            <button type="button" class="danger-btn" id="btnCancelInstallments" style="margin-top:10px;">انصراف</button>
+        </div>
+
+        <div id="step-list" class="hidden">
+            <h3>لیست اقساط</h3>
+            <div id="gen_installments_container"></div>
+            <div class="btn-group">
+                <button type="button" class="secondary-btn" id="btnBackToGen">تولید مجدد</button>
+                <button type="button" id="btnConfirmInstallments">تایید و ثبت</button>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- FAB for Add -->
+<div class="fab" id="fab-add" onclick="switchView('add')">
+    <svg viewBox="0 0 24 24">
+        <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+    </svg>
+</div>
+
+<!-- Date Picker Overlay -->
+<div id="date-picker-overlay">
+    <div class="picker-container">
+        <div class="picker-header">
+            <button class="picker-btn cancel" id="picker-cancel">انصراف</button>
+            <button class="picker-btn" id="picker-done">تایید</button>
+        </div>
+        <div style="display: flex; text-align: center; direction: ltr;">
+            <div class="wheel-title" style="flex:1">سال</div>
+            <div class="wheel-title" style="flex:1">ماه</div>
+            <div class="wheel-title" style="flex:1">روز</div>
+        </div>
+        <div class="wheels-wrapper">
+            <div class="wheel-highlight"></div>
+            <ul class="wheel-col" id="col-year"></ul>
+            <ul class="wheel-col" id="col-month"></ul>
+            <ul class="wheel-col" id="col-day"></ul>
+        </div>
+    </div>
+</div>
+
+<script>
+    const tg = window.Telegram.WebApp;
+    tg.expand();
+
+    // --- CONFIG ---
+    const API_URL = 'https://hossein-development.vercel.app/api/ExternalConnections/api.php';
+    const urlParams = new URLSearchParams(window.location.search);
+    const SECRET_KEY = urlParams.get('k');
+    const PERSON_ID = urlParams.get('id');
+
+    let allLoans = [];
+    let currentLoanId = null;
+    let currentView = 'list'; // list, detail, add, add-installments
+    let finalInstallments = []; // For the Add Form
+
+    // --- UTILS ---
+    function toEnglishDigits(str) {
+        if (!str) return '';
+        str = String(str);
+        const persianNumbers = [/۰/g, /۱/g, /۲/g, /۳/g, /۴/g, /۵/g, /۶/g, /۷/g, /۸/g, /۹/g];
+        const arabicNumbers = [/٠/g, /١/g, /٢/g, /٣/g, /٤/g, /٥/g, /٦/g, /٧/g, /٨/g, /٩/g];
+        for (let i = 0; i < 10; i++) {
+            str = str.replace(persianNumbers[i], i).replace(arabicNumbers[i], i);
+        }
+        return str;
+    }
+
+    function toPersianDigits(str) {
+        if (str == null) return '';
+        const id = ['۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹'];
+        return String(str).replace(/[0-9]/g, w => id[+w]);
+    }
+
+    function addCommas(nStr) {
+        nStr += '';
+        const x = nStr.split('.');
+        let x1 = x[0];
+        const x2 = x.length > 1 ? '.' + x[1] : '';
+        const rgx = /(\d+)(\d{3})/;
+        while (rgx.test(x1)) x1 = x1.replace(rgx, '$1' + ',' + '$2');
+        return x1 + x2;
+    }
+
+    function removeCommas(str) {
+        if (!str) return '';
+        return str.replace(/,/g, '');
+    }
+
+    function showLoading() {
+        document.getElementById('loading-overlay').style.display = 'flex';
+        document.getElementById('loading-overlay').style.opacity = '1';
+    }
+
+    function hideLoading() {
+        const overlay = document.getElementById('loading-overlay');
+        overlay.style.opacity = '0';
+        setTimeout(() => {
+            overlay.style.display = 'none';
+        }, 300);
+    }
+
+    // --- DATE VALIDATION ---
+    function isValidJalaliDateString(str) {
+        if (!str) return false;
+        str = toEnglishDigits(str);
+        const regex = /^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/;
+        const match = str.match(regex);
+        if (!match) return false;
+        const y = parseInt(match[1]), m = parseInt(match[2]), d = parseInt(match[3]);
+        if (y < 1300 || y > 1500 || m < 1 || m > 12 || d < 1 || d > 31) return false;
+        if (m > 6 && d === 31) return false;
+        return {y, m, d};
+    }
+
+    function getTodayJalali() {
+        try {
+            const d = new Date();
+            const formatter = new Intl.DateTimeFormat('fa-IR-u-nu-latn', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit'
+            });
+            const parts = formatter.formatToParts(d);
+            const y = parseInt(parts.find(p => p.type === 'year').value);
+            const m = parseInt(parts.find(p => p.type === 'month').value);
+            const dVal = parseInt(parts.find(p => p.type === 'day').value);
+            return {y, m, d: dVal};
+        } catch (e) {
+            return {y: 1403, m: 1, d: 1};
+        }
+    }
+
+    // --- NAVIGATION LOGIC ---
+    function switchView(viewName) {
+        currentView = viewName;
+
+        // Hide all
+        ['view-list', 'view-detail', 'view-add', 'view-add-installments'].forEach(id => {
+            document.getElementById(id).classList.add('hidden');
+        });
+
+        // Toggle elements based on view
+        const fab = document.getElementById('fab-add');
+
+        if (viewName === 'list') {
+            document.getElementById('view-list').classList.remove('hidden');
+            tg.BackButton.hide();
+            fab.classList.remove('hidden');
+            renderLoanList();
+        } else if (viewName === 'detail') {
+            document.getElementById('view-detail').classList.remove('hidden');
+            tg.BackButton.show();
+            fab.classList.add('hidden');
+            window.scrollTo(0, 0);
+        } else if (viewName === 'add') {
+            document.getElementById('view-add').classList.remove('hidden');
+            tg.BackButton.show();
+            fab.classList.add('hidden');
+            window.scrollTo(0, 0);
+        } else if (viewName === 'add-installments') {
+            document.getElementById('view-add-installments').classList.remove('hidden');
+            tg.BackButton.show();
+            fab.classList.add('hidden');
+        }
+    }
+
+    tg.BackButton.onClick(() => {
+        if (currentView === 'detail') {
+            currentLoanId = null;
+            switchView('list');
+        } else if (currentView === 'add') {
+            switchView('list');
+        } else if (currentView === 'add-installments') {
+            switchView('add');
+        } else {
+            tg.close();
+        }
+    });
+
+    // --- API & LIST LOGIC ---
+    async function apiRequest(payload) {
+        if (!SECRET_KEY) {
+            tg.showAlert('کلید امنیتی یافت نشد.');
+            return null;
+        }
+        try {
+            const response = await fetch(API_URL, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json', 'x-api-key': SECRET_KEY},
+                body: JSON.stringify(payload)
+            });
+            return await response.json();
+        } catch (error) {
+            tg.showAlert('خطا در ارتباط: ' + error.message);
+            return null;
+        }
+    }
+
+    async function fetchData() {
+        if (!PERSON_ID) {
+            tg.showAlert("شناسه شخص یافت نشد.");
+            hideLoading();
+            return;
+        }
+        showLoading();
+
+        const payload = {
+            "operation": "read", "table": "loans",
+            "conditions": {"person_id": PERSON_ID},
+            "selectColumns": "loans.*, JSON_ARRAYAGG(JSON_OBJECT('id', installments.id, 'amount', installments.amount, 'due_date', installments.due_date, 'is_paid', installments.is_paid)) as installments",
+            "join": "LEFT JOIN installments ON loans.id=installments.loan_id",
+            "groupBy": "loans.id"
+        };
+
+        const req = await apiRequest(payload);
+        if (req && req.data) {
+            allLoans = req.data.map(loan => {
+                let parsedInstallments = [];
+                try {
+                    if (typeof loan.installments === 'string') parsedInstallments = JSON.parse(loan.installments);
+                    else if (Array.isArray(loan.installments)) parsedInstallments = loan.installments;
+                    if (parsedInstallments.length === 1 && parsedInstallments[0].id === null) parsedInstallments = [];
+                } catch (e) {
+                    parsedInstallments = [];
+                }
+                return {...loan, installments: parsedInstallments};
+            });
+        } else {
+            allLoans = [];
+        }
+        renderLoanList();
+        hideLoading();
+    }
+
+    function renderLoanList() {
+        const container = document.getElementById('loans-container');
+        container.innerHTML = '';
+        if (allLoans.length === 0) document.getElementById('empty-state').classList.remove('hidden');
+        else document.getElementById('empty-state').classList.add('hidden');
+
+        allLoans.forEach(loan => {
+            const loanInstallments = loan.installments || [];
+            const paidInst = loanInstallments.filter(i => i.is_paid == 1).length;
+            const paidAmount = loanInstallments.filter(i => i.is_paid == 1).reduce((sum, i) => sum + parseFloat(i.amount), 0);
+            const totalAmount = parseFloat(loan.total_amount);
+            const remaining = totalAmount - paidAmount;
+            const progress = totalAmount > 0 ? (paidAmount / totalAmount) * 100 : 0;
+            const unpaidInsts = loanInstallments.filter(i => i.is_paid == 0).sort((a, b) => a.due_date.localeCompare(b.due_date));
+            let nextDate = unpaidInsts.length > 0 ? unpaidInsts[0].due_date : "تسویه شده";
+
+            const card = document.createElement('div');
+            card.className = 'card';
+            card.onclick = () => openDetail(loan.id);
+            card.innerHTML = `
+                <div class="card-header">
+                    <span class="card-title">${loan.name}</span>
+                    <span class="card-amount">${toPersianDigits(addCommas(totalAmount))} <small>ریال</small></span>
+                </div>
+                <div class="card-details">
+                    <span class="text-hint">قسط بعدی:</span>
+                    <span>${toPersianDigits(nextDate)}</span>
+                </div>
+                <div class="card-details">
+                    <span class="text-hint">مانده:</span>
+                    <span class="${remaining > 0 ? 'text-danger' : 'text-success'}">${toPersianDigits(addCommas(remaining))}</span>
+                </div>
+                <div class="progress-wrapper"><div class="progress-fill" style="width: ${progress}%"></div></div>
+            `;
+            container.appendChild(card);
+        });
+    }
+
+    function openDetail(loanId) {
+        currentLoanId = loanId;
+        const loan = allLoans.find(l => l.id == loanId);
+        if (!loan) return;
+
+        switchView('detail'); // Handles back button logic
+
+        document.getElementById('detail-title').innerText = loan.name;
+        document.getElementById('detail-subtitle').innerText = toPersianDigits(loan.received_date);
+        document.getElementById('detail-total-amount').innerText = toPersianDigits(addCommas(loan.total_amount)) + ' ریال';
+
+        const btnDelete = document.getElementById('btn-delete');
+        btnDelete.innerHTML = 'حذف کامل این وام';
+        btnDelete.disabled = false;
+        renderInstallmentsList();
+    }
+
+    function renderInstallmentsList() {
+        if (!currentLoanId) return;
+        const loan = allLoans.find(l => l.id == currentLoanId);
+        if (!loan) return;
+        const loanInsts = loan.installments || [];
+        loanInsts.sort((a, b) => a.due_date.localeCompare(b.due_date));
+
+        const container = document.getElementById('installments-container');
+        container.innerHTML = '';
+
+        const totalAmount = parseFloat(loan.total_amount);
+        const paidAmount = loanInsts.filter(i => i.is_paid == 1).reduce((sum, i) => sum + parseFloat(i.amount), 0);
+        const remaining = totalAmount - paidAmount;
+        const progress = totalAmount > 0 ? (paidAmount / totalAmount) * 100 : 0;
+
+        document.getElementById('detail-remaining').innerText = toPersianDigits(addCommas(remaining)) + ' ریال';
+        document.getElementById('detail-progress').style.width = `${progress}%`;
+        document.getElementById('detail-paid-count').innerText = toPersianDigits(loanInsts.filter(i => i.is_paid == 1).length);
+
+        loanInsts.forEach((inst, index) => {
+            const isPaid = inst.is_paid == 1;
+            const div = document.createElement('div');
+            div.className = `installment-item ${isPaid ? 'is-paid' : ''}`;
+            div.id = `row-${inst.id}`;
+            const checkIcon = '<svg viewBox="0 0 24 24" fill="white" width="20" height="20"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>';
+            const emptyCircle = '<div style="width:16px; height:16px; border:2px solid var(--hint-color); border-radius:50%"></div>';
+            div.innerHTML = `
+                <div class="inst-index">${toPersianDigits(index + 1)}</div>
+                <div class="inst-info"><span class="inst-date">${toPersianDigits(inst.due_date)}</span><span class="inst-amount">${toPersianDigits(addCommas(inst.amount))} ریال</span></div>
+                <div class="inst-action" id="btn-${inst.id}" onclick="togglePayment(${inst.id}, ${isPaid ? 0 : 1})">${isPaid ? checkIcon : emptyCircle}</div>
+            `;
+            container.appendChild(div);
+        });
+    }
+
+    async function togglePayment(instId, newStatus) {
+        const btn = document.getElementById(`btn-${instId}`);
+        const row = document.getElementById(`row-${instId}`);
+        const originalContent = btn.innerHTML;
+        const originalClass = row.className;
+
+        btn.innerHTML = '<div class="mini-spinner"></div>';
+        const payload = {
+            "operation": "update",
+            "table": "installments",
+            "data": {"is_paid": newStatus},
+            "conditions": {"id": instId}
+        };
+        const res = await apiRequest(payload);
+
+        if (res && res.success) {
+            if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
+            const loan = allLoans.find(l => l.id == currentLoanId);
+            if (loan) {
+                const inst = loan.installments.find(i => i.id == instId);
+                if (inst) inst.is_paid = newStatus;
+            }
+            renderInstallmentsList();
+        } else {
+            if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('error');
+            btn.innerHTML = originalContent;
+            row.className = originalClass;
+            btn.classList.add('error');
+            setTimeout(() => btn.classList.remove('error'), 1000);
+        }
+    }
+
+    function deleteCurrentLoan() {
+        tg.showConfirm("آیا از حذف کامل این وام و تمام اقساط آن اطمینان دارید؟", async (confirmed) => {
+            if (confirmed) {
+                const btnDelete = document.getElementById('btn-delete');
+                const originalText = btnDelete.innerText;
+                btnDelete.innerHTML = '<div class="btn-spinner"></div>';
+                btnDelete.disabled = true;
+
+                const payload = {"operation": "delete", "table": "loans", "conditions": {"id": currentLoanId}};
+                const res = await apiRequest(payload);
+
+                if (res && res.success) {
+                    allLoans = allLoans.filter(l => l.id != currentLoanId);
+                    currentLoanId = null;
+                    switchView('list');
+                } else {
+                    tg.showAlert('خطا در حذف وام');
+                    btnDelete.innerHTML = originalText;
+                    btnDelete.disabled = false;
+                }
+            }
+        });
+    }
+
+    // --- ADD LOAN & INSTALLMENT GENERATOR LOGIC ---
+
+    // INPUT MASKS
+    function attachCurrencyListeners(element) {
+        element.addEventListener('input', function (e) {
+            const input = e.target;
+            let rawValue = removeCommas(input.value);
+            rawValue = toEnglishDigits(rawValue);
+            let englishVal = rawValue.replace(/[^0-9.]/g, '');
+            const dots = englishVal.split('.');
+            if (dots.length > 2) englishVal = dots[0] + '.' + dots.slice(1).join('');
+            let formattedEnglish = '';
+            if (englishVal) {
+                const parts = englishVal.split('.');
+                parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+                formattedEnglish = parts.join('.');
+            }
+            input.value = toPersianDigits(formattedEnglish);
+        });
+    }
+
+    function attachSimpleNumberMask(element) {
+        element.addEventListener('input', function (e) {
+            let val = toEnglishDigits(e.target.value).replace(/\D/g, '');
+            e.target.value = toPersianDigits(val);
+        });
+    }
+
+    function attachDateMask(element) {
+        element.addEventListener('input', function (e) {
+            let val = toEnglishDigits(e.target.value).replace(/\D/g, '');
+            if (val.length > 8) val = val.substring(0, 8);
+            let formatted = '';
+            if (val.length > 0) formatted += val.substring(0, 4);
+            if (val.length >= 5) formatted += '/' + val.substring(4, 6);
+            if (val.length >= 7) formatted += '/' + val.substring(6, 8);
+            e.target.value = toPersianDigits(formatted);
+        });
+    }
+
+    // DATE PICKER
+    const pickerOverlay = document.getElementById('date-picker-overlay');
+    const colYear = document.getElementById('col-year');
+    const colMonth = document.getElementById('col-month');
+    const colDay = document.getElementById('col-day');
+    const btnDone = document.getElementById('picker-done');
+    const btnCancel = document.getElementById('picker-cancel');
+    let activeInput = null;
+    const ITEM_HEIGHT = 40;
+
+    function initDatePicker() {
+        const spacer = '<li class="wheel-spacer"></li>';
+        let yearsHTML = spacer;
+        for (let i = 1380; i <= 1450; i++) yearsHTML += `<li data-val="${i}">${toPersianDigits(i)}</li>`;
+        yearsHTML += spacer;
+        colYear.innerHTML = yearsHTML;
+        let monthsHTML = spacer;
+        for (let i = 1; i <= 12; i++) monthsHTML += `<li data-val="${i}">${toPersianDigits(String(i).padStart(2, '0'))}</li>`;
+        monthsHTML += spacer;
+        colMonth.innerHTML = monthsHTML;
+        updateDays(31);
+
+        [colYear, colMonth, colDay].forEach(col => {
+            col.addEventListener('scroll', () => highlightActive(col));
+            col.addEventListener('scrollend', () => {
+                if (col === colMonth) validateDays();
+            });
+            enableDragToScroll(col);
+        });
+        btnCancel.addEventListener('click', closePicker);
+        btnDone.addEventListener('click', confirmDate);
+    }
+
+    function enableDragToScroll(slider) {
+        let isDown = false, startY, scrollTop;
+        slider.addEventListener('mousedown', (e) => {
+            isDown = true;
+            startY = e.pageY - slider.offsetTop;
+            scrollTop = slider.scrollTop;
+            slider.style.scrollSnapType = 'none';
+        });
+        slider.addEventListener('mouseup', () => {
+            isDown = false;
+            slider.style.scrollSnapType = 'y mandatory';
+        });
+        slider.addEventListener('mouseleave', () => {
+            if (isDown) {
+                isDown = false;
+                slider.style.scrollSnapType = 'y mandatory';
+            }
+        });
+        slider.addEventListener('mousemove', (e) => {
+            if (!isDown) return;
+            e.preventDefault();
+            const y = e.pageY - slider.offsetTop;
+            const walk = (y - startY) * 1.5;
+            slider.scrollTop = scrollTop - walk;
+        });
+    }
+
+    function updateDays(count) {
+        const spacer = '<li class="wheel-spacer"></li>';
+        let daysHTML = spacer;
+        for (let i = 1; i <= count; i++) daysHTML += `<li data-val="${i}">${toPersianDigits(String(i).padStart(2, '0'))}</li>`;
+        daysHTML += spacer;
+        colDay.innerHTML = daysHTML;
+        enableDragToScroll(colDay);
+        highlightActive(colDay);
+    }
+
+    function validateDays() {
+        const m = getSelectedValue(colMonth);
+        let max = 31;
+        if (m > 6 && m <= 11) max = 30;
+        if (m == 12) max = 30; // Esfand typically 29 but let's say 30 for simplicity in generic picker
+        const currentSelection = getSelectedValue(colDay);
+        if (colDay.querySelectorAll('li[data-val]').length !== max) {
+            updateDays(max);
+            scrollToValue(colDay, Math.min(currentSelection, max));
+        }
+    }
+
+    function getSelectedValue(col) {
+        const index = Math.round(col.scrollTop / ITEM_HEIGHT);
+        const items = col.querySelectorAll('li[data-val]');
+        return items[index] ? parseInt(items[index].getAttribute('data-val')) : 1;
+    }
+
+    function highlightActive(col) {
+        const index = Math.round(col.scrollTop / ITEM_HEIGHT);
+        col.querySelectorAll('li[data-val]').forEach((li, i) => {
+            if (i === index) li.classList.add('active'); else li.classList.remove('active');
+        });
+    }
+
+    function scrollToValue(col, val) {
+        const items = Array.from(col.querySelectorAll('li[data-val]'));
+        const index = items.findIndex(li => parseInt(li.getAttribute('data-val')) == val);
+        if (index !== -1) {
+            col.scrollTop = index * ITEM_HEIGHT;
+            highlightActive(col);
+        }
+    }
+
+    function openPicker(input) {
+        activeInput = input;
+        let parsed = isValidJalaliDateString(input.value) || getTodayJalali();
+        pickerOverlay.style.display = 'flex';
+        setTimeout(() => {
+            pickerOverlay.classList.add('active');
+            scrollToValue(colYear, parsed.y);
+            scrollToValue(colMonth, parsed.m);
+            validateDays();
+            scrollToValue(colDay, parsed.d);
+        }, 10);
+    }
+
+    function closePicker() {
+        pickerOverlay.classList.remove('active');
+        setTimeout(() => {
+            pickerOverlay.style.display = 'none';
+        }, 300);
+    }
+
+    function confirmDate() {
+        if (!activeInput) return;
+        const y = getSelectedValue(colYear), m = String(getSelectedValue(colMonth)).padStart(2, '0'),
+            d = String(getSelectedValue(colDay)).padStart(2, '0');
+        activeInput.value = toPersianDigits(`${y}/${m}/${d}`);
+        activeInput.classList.remove('input-error');
+        closePicker();
+    }
+
+    function attachDatePicker(inputElement) {
+        const wrapper = inputElement.closest('.input-with-icon');
+        inputElement.addEventListener('input', (e) => {
+            if (e.target.value.length > 0 && !isValidJalaliDateString(e.target.value)) inputElement.classList.add('input-error');
+            else inputElement.classList.remove('input-error');
+        });
+        if (wrapper.querySelector('.date-picker-trigger')) return;
+        const icon = document.createElement('span');
+        icon.className = 'date-picker-trigger';
+        icon.innerHTML = `<svg viewBox="0 0 24 24"><path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20a2 2 0 0 0 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zM9 14H7v-2h2v2zm4 0h-2v-2h2v2zm4 0h-2v-2h2v2zm-8 4H7v-2h2v2zm4 0h-2v-2h2v2zm4 0h-2v-2h2v2z"/></svg>`;
+        inputElement.parentNode.insertBefore(icon, inputElement);
+        icon.addEventListener('click', (e) => {
+            e.stopPropagation();
+            openPicker(inputElement);
+        });
+    }
+
+    // GENERATOR CALCULATION
+    function calculateNextJalaliDate(dateStr, count, unit) {
+        dateStr = toEnglishDigits(dateStr.replace(/-/g, '/'));
+        const parts = dateStr.split('/').map(Number);
+        let y = parts[0], m = parts[1], d = parts[2];
+        for (let i = 0; i < count; i++) {
+            if (unit === 'year') y++;
+            else if (unit === 'month') {
+                m++;
+                if (m > 12) {
+                    m = 1;
+                    y++;
+                }
+                let max = (m <= 6) ? 31 : (m <= 11) ? 30 : 29;
+                if (d > max) d = max;
+            } else if (unit === 'week') addDays(7);
+            else if (unit === 'day') addDays(1);
+        }
+
+        function addDays(n) {
+            d += n;
+            while (true) {
+                let max = (m <= 6) ? 31 : (m <= 11) ? 30 : 29;
+                if (d <= max) break;
+                d -= max;
+                m++;
+                if (m > 12) {
+                    m = 1;
+                    y++;
+                }
+            }
+        }
+
+        return `${y}/${String(m).padStart(2, '0')}/${String(d).padStart(2, '0')}`;
+    }
+
+    // EVENTS
+    document.getElementById('btnGoToInstallments').addEventListener('click', () => {
+        const dateInput = document.getElementById('received_date');
+        if (!isValidJalaliDateString(dateInput.value)) {
+            tg.showAlert('لطفا تاریخ دریافت را صحیح وارد کنید');
+            return;
+        }
+        switchView('add-installments');
+
+        // Show generator by default if no list
+        if (finalInstallments.length === 0) {
+            document.getElementById('step-generator').classList.remove('hidden');
+            document.getElementById('step-list').classList.add('hidden');
+        } else {
+            document.getElementById('step-generator').classList.add('hidden');
+            document.getElementById('step-list').classList.remove('hidden');
+        }
+    });
+
+    document.getElementById('btnCancelInstallments').addEventListener('click', () => switchView('add'));
+    document.getElementById('btnBackToGen').addEventListener('click', () => {
+        document.getElementById('step-list').classList.add('hidden');
+        document.getElementById('step-generator').classList.remove('hidden');
+    });
+
+    document.getElementById('btnGenerate').addEventListener('click', () => {
+        const count = parseInt(toEnglishDigits(document.getElementById('gen_count').value));
+        const startDateVal = toEnglishDigits(document.getElementById('gen_start_date').value);
+        const periodQty = parseInt(toEnglishDigits(document.getElementById('gen_period_qty').value));
+        const periodUnit = document.getElementById('gen_period_unit').value;
+        const amount = removeCommas(toEnglishDigits(document.getElementById('gen_amount').value));
+
+        if (!count || !periodQty || !amount) {
+            tg.showAlert('لطفا تمام فیلدها را پر کنید');
+            return;
+        }
+        if (!isValidJalaliDateString(startDateVal)) {
+            tg.showAlert('تاریخ اولین قسط معتبر نیست');
+            return;
+        }
+
+        const container = document.getElementById('gen_installments_container');
+        container.innerHTML = '';
+        for (let i = 0; i < count; i++) {
+            let dateStr = calculateNextJalaliDate(startDateVal, i * periodQty, periodUnit);
+            const row = document.createElement('div');
+            row.className = 'installment-row';
+            row.innerHTML = `
+                <span>${toPersianDigits(i + 1)}</span>
+                <div class="input-with-icon"><input type="text" class="row-date has-date-picker" value="${toPersianDigits(dateStr)}"></div>
+                <input type="text" class="row-amount currency-input" value="${toPersianDigits(addCommas(amount))}">
+            `;
+            container.appendChild(row);
+            const dInput = row.querySelector('.row-date');
+            attachDatePicker(dInput);
+            attachDateMask(dInput);
+            attachCurrencyListeners(row.querySelector('.row-amount'));
+        }
+        document.getElementById('step-generator').classList.add('hidden');
+        document.getElementById('step-list').classList.remove('hidden');
+    });
+
+    document.getElementById('btnConfirmInstallments').addEventListener('click', () => {
+        const rows = document.querySelectorAll('.installment-row');
+        const temp = [];
+        let isValid = true;
+        rows.forEach(row => {
+            let d = toEnglishDigits(row.querySelector('.row-date').value);
+            let a = removeCommas(toEnglishDigits(row.querySelector('.row-amount').value));
+            if (!isValidJalaliDateString(d) || !a) isValid = false;
+            temp.push({due_date: d, amount: Number(a), is_paid: false});
+        });
+        if (!isValid) {
+            tg.showAlert('لطفا تاریخ‌ها و مبالغ را اصلاح کنید');
+            return;
+        }
+        finalInstallments = temp;
+        let summary = "";
+        finalInstallments.forEach((item, i) => summary += `${toPersianDigits(i + 1)}. ${toPersianDigits(item.due_date)} -- ${toPersianDigits(addCommas(item.amount))} ریال\n`);
+        document.getElementById('add_installments_summary').value = summary;
+        document.getElementById('btnGoToInstallments').innerText = 'ویرایش اقساط';
+        switchView('add');
+    });
+
+    document.getElementById('loanForm').addEventListener('submit', function (e) {
+        e.preventDefault();
+        if (finalInstallments.length === 0) {
+            tg.showAlert('لطفا ابتدا اقساط را تعریف کنید');
+            return;
+        }
+        const name = document.getElementById('name').value;
+        const totalAmount = removeCommas(toEnglishDigits(document.getElementById('total_amount').value));
+        const receivedDate = toEnglishDigits(document.getElementById('received_date').value);
+
+        if (!isValidJalaliDateString(receivedDate)) {
+            tg.showAlert('تاریخ دریافت وام معتبر نیست');
+            return;
+        }
+
+        const payload = {
+            "loans": {
+                "name": name, "total_amount": Number(totalAmount),
+                "received_date": receivedDate, "total_installments": finalInstallments.length
+            },
+            "installments": finalInstallments
+        };
+        tg.sendData(JSON.stringify(payload));
+    });
+
+    // INITIALIZATION
+    document.addEventListener('DOMContentLoaded', () => {
+        initDatePicker();
+        document.querySelectorAll('.currency-input').forEach(attachCurrencyListeners);
+        document.querySelectorAll('.simple-number').forEach(attachSimpleNumberMask);
+        document.querySelectorAll('.has-date-picker').forEach(input => {
+            attachDatePicker(input);
+            attachDateMask(input);
+        });
+
+        switchView('list'); // Default view
+        fetchData(); // Load data
+    });
+
+</script>
+</body>
+</html>

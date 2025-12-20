@@ -89,7 +89,7 @@ $db = DatabaseManager::getInstance();
 if (isset($update['message'])) {
 
     $message = $update['message'];
-    $user = $message['chat']; // Sender information
+    $user = $message['from']; // Sender information
 
     // Check/Register User
     $person = $db->read('persons', ['chat_id' => $user['id']], true);
@@ -136,9 +136,8 @@ if (isset($update['message'])) {
         level_1($person);
     } elseif ($message['text'] == '/prices') {
         level_4($person);
-    } elseif ($message['text'] == '/loans') {
-        level_5($person);
     } else {
+        error_log('Pressed Button: ' . json_encode($pressed_button));
         // Route based on button/state
         choosePath(
             pressed_button: $pressed_button,
@@ -208,9 +207,9 @@ function choosePath(
             // No button matched: Handle as free text input or error
 
             // Route to active level handler (Input Step)
+            if ($person['last_btn'] == "0") level_0($person, $message); // View Holdings
             if ($person['last_btn'] == "1") level_1($person, $message); // View Holdings
             if ($person['last_btn'] == "4") level_4($person, $message); // View Prices
-            if ($person['last_btn'] == "5") level_5($person, $message); // Add Loan
 
             $data = [
                 'text' => 'پیام نامفهوم است!',
@@ -218,6 +217,7 @@ function choosePath(
                 'reply_markup' => [
                     'keyboard' => createKeyboardsArray($person['last_btn'], $person['is_admin'], $db),
                     'resize_keyboard' => true,
+                    'is_persistent' => true,
                 ]];
             sendToTelegram('sendMessage', $data);
 
@@ -230,17 +230,18 @@ function choosePath(
 
             } else {
                 // Menu Navigation
+                if ($pressed_button['id'] == "0") level_0($person);
                 if ($pressed_button['id'] == "1") level_1($person);
                 if ($pressed_button['id'] == "4") level_4($person);
-                if ($pressed_button['id'] == "5") level_5($person);
 
                 $data = [
-                    'text' => json_decode($pressed_button['attrs'], true)['text'],
+                    'text' => $message['text'],
                     'chat_id' => $person['chat_id'],
                     'reply_markup' => [
                         'keyboard' => createKeyboardsArray($pressed_button['id'], $person['is_admin'], $db),
                         'resize_keyboard' => true,
-                        'input_field_placeholder' => json_decode($pressed_button['attrs'], true)['text'],
+                        'is_persistent' => true,
+                        'input_field_placeholder' => $message['text'],
                     ]
                 ];
 
@@ -279,14 +280,7 @@ function backButton(array $person): void
         choosePath(pressed_button: $current_level, message: false, person: $person);
     } else {
         // Go to parent menu
-        $last_level = $db->read('buttons', ['id' => $current_level['belong_to']], true);
-
-        $last_button['id'] = $last_level['id'];
-        $last_button['attrs'] = $last_level['attrs'];
-        $last_button['adminKey'] = $last_level['admin_key'];
-        $last_button['messages'] = $last_level['messages'];
-        $last_button['belongsTo'] = $last_level['belongs_to'];
-        $last_button['keyboards'] = $last_level['keyboards'];
+        $last_button = $db->read('buttons', ['id' => $current_level['belong_to']], true);
 
         $person['progress'] = null;
         choosePath(pressed_button: $last_button, person: $person);
@@ -318,6 +312,7 @@ function level_1(array $person, array|null $message = null, array|null $callback
         'reply_markup' => [
             'keyboard' => createKeyboardsArray(1, $person['is_admin'], $db),
             'resize_keyboard' => true,
+            'is_persistent' => true,
             'input_field_placeholder' => 'دارایی‌ها',
         ]
     ];
@@ -484,6 +479,7 @@ function level_4(array $person, array|null $message = null, array|null $callback
         'reply_markup' => [
             'keyboard' => createKeyboardsArray(4, $person['is_admin'], $db),
             'resize_keyboard' => true,
+            'is_persistent' => true,
             'input_field_placeholder' => 'قیمت‌ها',
         ]
     ];
@@ -576,38 +572,23 @@ function level_4(array $person, array|null $message = null, array|null $callback
 }
 
 /**
- * Level 7: Add New Loan
+ * Level 0: Main menu
  */
 #[NoReturn]
-function level_5(array $person, array|null $message = null, array|null $callback_query = null): void
+function level_0(array $person, array|null $message = null, array|null $callback_query = null): void
 {
     global $db;
     $telegram_method = 'sendMessage';
     $data = [
+        'text' => 'صفحه اصلی',
         'chat_id' => $person['chat_id'],
         'reply_markup' => [
-            'keyboard' => createKeyboardsArray(5, $person['is_admin'], $db),
+            'keyboard' => createKeyboardsArray(0, $person['is_admin'], $db),
             'resize_keyboard' => true,
-            'input_field_placeholder' => '🏦 وام و اقساط',
+            'is_persistent' => true,
+            'input_field_placeholder' => 'صفحه اصلی',
         ]
     ];
-
-    // Add web_app button(s)
-    $data['reply_markup']['keyboard'] = array_merge([
-        [
-            [
-                'text' => '➕ ثبت وام جدید', 'web_app' => ['url' => 'https://' . getenv('VERCEL_PROJECT_PRODUCTION_URL') . '/assets/add_loan.html']
-            ]
-        ], [
-            [
-                'text' => '📋 لیست وام‌های من', 'web_app' => [
-                'url' =>
-                    'https://' . getenv('VERCEL_PROJECT_PRODUCTION_URL') . '/assets/list_loan.html?' .
-                    'k=' . getenv('DB_API_SECRET') . '&' .
-                    'id=' . $person['id']]
-            ]
-        ]
-    ], $data['reply_markup']['keyboard']);
 
     if ($callback_query) {
 
@@ -621,86 +602,64 @@ function level_5(array $person, array|null $message = null, array|null $callback
         $data['text'] = 'این پیام منقضی شده است.';
         $data['message_id'] = $message['message_id'];
 
-    } elseif (!$message) {
-        $loans = $db->read(
-            'loans l',
-            conditions: ['person_id' => $person['id']],
-            selectColumns: "
-                l.*, 
-                JSON_ARRAYAGG(
-                    JSON_OBJECT(
-                        'id', i.id,
-                        'amount', i.amount,
-                        'due_date', i.due_date,
-                        'is_paid', i.is_paid
-                    )
-                ) as installments
-                ",
-            join: "LEFT JOIN installments i ON l.id=i.loan_id",
-            groupBy: 'l.id',
-        );
-
-        if ($loans) {
-            $data['text'] = 'وام‌های ثبت شده‌ی شما:';
-            foreach ($loans as $loan) {
-                $data['text'] .= "\n\n‏    " . $loan['name'] . ":";
-
-                $installments = json_decode($loan['installments'], true);
-                foreach ($installments as $installment) {
-                    $paid_icon = ($installment['is_paid']) ? '✅' : '🔄';
-                    $data['text'] .= "\n‏        " .
-                        $paid_icon . '  ' . beautifulNumber($installment['due_date'], null) . " ---> " . beautifulNumber($installment['amount']);
-                }
-            }
-        } else $data['text'] = 'هیچ وام ثبت شده‌ای ندارید!';
-
-        $db->update('persons', ['last_btn' => 5], ['id' => $person['id']]);
-
     } else {
+        if (!$message) {
 
-        if (isset($message['web_app_data'])) {
-            $web_app_data = json_decode($message['web_app_data']['data'], true);
+            $data['reply_markup']['keyboard'][0][sizeof($data['reply_markup']['keyboard'][0])] = [
+                'text' => '🏦 وام و اقساط',
+                'web_app' => [
+                    'url' =>
+                        'https://' . getenv('VERCEL_PROJECT_PRODUCTION_URL') . '/assets/loans.html?' .
+                        'k=' . getenv('DB_API_SECRET') . '&' .
+                        'id=' . $person['id']]
+            ];
 
-            if ($web_app_data && isset($web_app_data['loans']) & isset($web_app_data['installments'])) {
+            $db->update('persons', ['last_btn' => 0], ['id' => $person['id']]);
 
-                $loanData = $web_app_data['loans'];
-                $loan_insert_data = [
-                    'person_id' => $person['id'],
-                    'name' => $loanData['name'],
-                    'total_amount' => $loanData['total_amount'],
-                    'received_date' => $loanData['received_date'],
-                    'total_installments' => $loanData['total_installments']
-                ];
+        } else {
+            if (isset($message['web_app_data'])) {
+                $web_app_data = json_decode($message['web_app_data']['data'], true);
 
-                $loan_id = $db->create('loans', $loan_insert_data);
+                if ($web_app_data && isset($web_app_data['loans']) & isset($web_app_data['installments'])) {
 
-                if ($loan_id) {
-                    $installments = $web_app_data['installments'];
-                    $count = 0;
+                    $loanData = $web_app_data['loans'];
+                    $loan_insert_data = [
+                        'person_id' => $person['id'],
+                        'name' => $loanData['name'],
+                        'total_amount' => $loanData['total_amount'],
+                        'received_date' => $loanData['received_date'],
+                        'total_installments' => $loanData['total_installments']
+                    ];
 
-                    foreach ($installments as $inst) {
-                        $inst_insert_data = [
-                            'loan_id' => $loan_id,
-                            'amount' => $inst['amount'],
-                            'due_date' => $inst['due_date'],
-                            'is_paid' => $inst['is_paid'] ? 1 : 0
-                        ];
-                        $db->create('installments', $inst_insert_data);
-                        $count++;
-                    }
+                    $loan_id = $db->create('loans', $loan_insert_data);
 
-                    $data['text'] = "✅ وام «{$loanData['name']}» با موفقیت ثبت شد.\n📊 تعداد اقساط: $count";
+                    if ($loan_id) {
+                        $installments = $web_app_data['installments'];
+                        $count = 0;
 
-                    sendToTelegram($telegram_method, $data); // Send success message to the user
-                    level_5($person); // Call the level to send user the new list of their holdings
+                        foreach ($installments as $inst) {
+                            $inst_insert_data = [
+                                'loan_id' => $loan_id,
+                                'amount' => $inst['amount'],
+                                'due_date' => $inst['due_date'],
+                                'is_paid' => $inst['is_paid'] ? 1 : 0
+                            ];
+                            $db->create('installments', $inst_insert_data);
+                            $count++;
+                        }
 
-                } else $data['text'] = '❌ خطای پایگاه داده در ثبت وام.';
-            } else $data['text'] = '❌ خط در دریافت اطلاعات. داده‌ها معتبر نیستند.';
-        } else $data['text'] = 'پیام نامفهوم است!';
+                        $data['text'] = "✅ وام «{$loanData['name']}» با موفقیت ثبت شد.\n📊 تعداد اقساط: $count";
+
+                    } else $data['text'] = '❌ خطای پایگاه داده در ثبت وام.';
+                } else $data['text'] = '❌ خط در دریافت اطلاعات. داده‌ها معتبر نیستند.';
+            } else $data['text'] = "پیام نامفهوم است!";
+
+        }
     }
 
     $response = sendToTelegram($telegram_method, $data);
     exit(json_encode(['status' => 'OK', 'telegram_response' => $response]));
+
 }
 
 function createHoldingDetailText(array $holding, string|null $markdown = null, array $attributes = [
