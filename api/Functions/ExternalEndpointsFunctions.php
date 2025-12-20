@@ -40,6 +40,7 @@ function sendToTelegram(string $method, array $data = [], string $token = ''): b
 
         // Vercel Log: Appears in "Runtime Logs"
         error_log("Telegram API Error [$errorCode]: $description");
+        error_log("Sent request: " . json_encode($data, JSON_PRETTY_PRINT));
         return false;
     }
 }

@@ -137,7 +137,6 @@ if (isset($update['message'])) {
     } elseif ($message['text'] == '/prices') {
         level_4($person);
     } else {
-        error_log('Pressed Button: ' . json_encode($pressed_button));
         // Route based on button/state
         choosePath(
             pressed_button: $pressed_button,
@@ -222,6 +221,7 @@ function choosePath(
             sendToTelegram('sendMessage', $data);
 
         } else {
+
             // Button matched
             if (str_starts_with($pressed_button['id'], "s")) {
                 // Special system buttons
@@ -235,13 +235,13 @@ function choosePath(
                 if ($pressed_button['id'] == "4") level_4($person);
 
                 $data = [
-                    'text' => $message['text'],
+                    'text' => json_decode($pressed_button['attrs'], true)['text'],
                     'chat_id' => $person['chat_id'],
                     'reply_markup' => [
                         'keyboard' => createKeyboardsArray($pressed_button['id'], $person['is_admin'], $db),
                         'resize_keyboard' => true,
                         'is_persistent' => true,
-                        'input_field_placeholder' => $message['text'],
+                        'input_field_placeholder' => json_decode($pressed_button['attrs'], true)['text'],
                     ]
                 ];
 

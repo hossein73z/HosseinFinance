@@ -19,6 +19,7 @@
             --button-text-color: var(--tg-theme-button-text-color, #ffffff);
             --green-color: #28a745;
             --red-color: #dc3545;
+            --orange-color: #fd7e14;
             --error-color: #dc3545;
             --card-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
         }
@@ -108,19 +109,28 @@
             color: var(--green-color);
         }
 
+        /* Multi-Color Progress Bar */
         .progress-wrapper {
-            height: 6px;
+            height: 8px;
             background-color: var(--secondary-bg-color);
-            border-radius: 3px;
+            border-radius: 4px;
             overflow: hidden;
             margin-top: 10px;
+            display: flex;
+            direction: ltr; /* To fill from left to right (visual preference) or rtl for right to left */
         }
 
-        .progress-fill {
+        .progress-section {
             height: 100%;
-            background-color: var(--green-color);
-            width: 0%;
             transition: width 0.5s ease;
+        }
+
+        .prog-paid {
+            background-color: var(--green-color);
+        }
+
+        .prog-overdue {
+            background-color: var(--orange-color);
         }
 
         /* --- INSTALLMENT LIST --- */
@@ -189,7 +199,7 @@
             border: 2px solid var(--red-color);
         }
 
-        /* --- FORM STYLES (ADD) --- */
+        /* --- FORM STYLES (ADD/EDIT) --- */
         .form-container {
             background-color: var(--bg-color);
             padding: 15px;
@@ -300,6 +310,14 @@
         button.danger-btn {
             background-color: #dc3545;
             color: white;
+        }
+
+        button.icon-btn {
+            width: auto;
+            padding: 8px;
+            margin: 0;
+            background: transparent;
+            color: var(--button-color);
         }
 
         .btn-delete-loan {
@@ -587,24 +605,37 @@
 
     <!-- ================= VIEW 2: DETAILS ================= -->
     <div id="view-detail" class="hidden">
-        <div class="detail-header" style="margin-bottom:15px">
+        <div class="detail-header"
+             style="margin-bottom:15px; display: flex; justify-content: space-between; align-items: flex-start;">
             <div>
                 <h3 id="detail-title" style="margin:0">عنوان وام</h3>
                 <span id="detail-subtitle" class="text-hint" style="font-size:0.8rem;">جزئیات</span>
             </div>
+            <button class="icon-btn" onclick="openEditLoan()">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                </svg>
+            </button>
         </div>
 
         <div class="card" style="margin-bottom: 20px; cursor: default;">
             <div class="card-details">
-                <span>مبلغ کل:</span>
+                <span>مبلغ اصل وام:</span>
                 <span id="detail-total-amount" style="font-weight:bold"></span>
+            </div>
+            <div class="card-details">
+                <span>جمع کل بازپرداخت:</span>
+                <span id="detail-total-installment" style="font-weight:bold; color: var(--button-color);"></span>
             </div>
             <div class="card-details">
                 <span>باقی‌مانده:</span>
                 <span id="detail-remaining" class="text-danger" style="font-weight:bold"></span>
             </div>
-            <div class="progress-wrapper">
-                <div id="detail-progress" class="progress-fill"></div>
+            <!-- Dual Color Progress -->
+            <div class="progress-wrapper" style="direction: ltr;">
+                <div id="prog-paid" class="progress-section prog-paid" style="width: 0%"></div>
+                <div id="prog-overdue" class="progress-section prog-overdue" style="width: 0%"></div>
             </div>
             <div style="text-align: center; margin-top: 5px; font-size: 0.8rem; color: var(--hint-color);">
                 <span id="detail-paid-count">0</span> قسط پرداخت شده
@@ -617,9 +648,9 @@
         <button id="btn-delete" class="btn-delete-loan" onclick="deleteCurrentLoan()">حذف کامل این وام</button>
     </div>
 
-    <!-- ================= VIEW 3: ADD LOAN FORM ================= -->
+    <!-- ================= VIEW 3: ADD/EDIT LOAN FORM ================= -->
     <div id="view-add" class="hidden form-container">
-        <h2>افزودن وام جدید</h2>
+        <h2 id="form-title">افزودن وام جدید</h2>
         <form id="loanForm">
             <div class="form-group">
                 <label for="name">عنوان وام</label>
@@ -627,7 +658,7 @@
             </div>
 
             <div class="form-group">
-                <label for="total_amount">مبلغ کل (ریال)</label>
+                <label for="total_amount">مبلغ اصل وام (ریال)</label>
                 <input type="text" id="total_amount" class="currency-input" placeholder="۲۰۰,۰۰۰,۰۰۰"
                        inputmode="numeric" required>
             </div>
@@ -652,8 +683,9 @@
         </form>
     </div>
 
-    <!-- ================= VIEW 4: GENERATE INSTALLMENTS ================= -->
+    <!-- ================= VIEW 4: GENERATE/EDIT INSTALLMENTS ================= -->
     <div id="view-add-installments" class="hidden form-container">
+        <!-- GENERATOR MODE -->
         <div id="step-generator">
             <h3>تولید خودکار اقساط</h3>
             <div class="form-group">
@@ -690,6 +722,7 @@
             <button type="button" class="danger-btn" id="btnCancelInstallments" style="margin-top:10px;">انصراف</button>
         </div>
 
+        <!-- LIST MODE (FOR EDIT OR AFTER GENERATION) -->
         <div id="step-list" class="hidden">
             <h3>لیست اقساط</h3>
             <div id="gen_installments_container"></div>
@@ -735,15 +768,16 @@
     tg.expand();
 
     // --- CONFIG ---
-    const API_URL = 'https://hossein-development.vercel.app/api/ExternalConnections/api.php';
+    const API_URL = 'https://hossein-finance.vercel.app/api/ExternalConnections/api.php';
     const urlParams = new URLSearchParams(window.location.search);
     const SECRET_KEY = urlParams.get('k');
     const PERSON_ID = urlParams.get('id');
 
     let allLoans = [];
     let currentLoanId = null;
-    let currentView = 'list'; // list, detail, add, add-installments
-    let finalInstallments = []; // For the Add Form
+    let currentView = 'list';
+    let finalInstallments = [];
+    let isEditing = false; // Flag for Edit Mode
 
     // --- UTILS ---
     function toEnglishDigits(str) {
@@ -822,16 +856,19 @@
         }
     }
 
+    function getTodayString() {
+        const t = getTodayJalali();
+        return `${t.y}/${String(t.m).padStart(2, '0')}/${String(t.d).padStart(2, '0')}`;
+    }
+
     // --- NAVIGATION LOGIC ---
     function switchView(viewName) {
         currentView = viewName;
 
-        // Hide all
         ['view-list', 'view-detail', 'view-add', 'view-add-installments'].forEach(id => {
             document.getElementById(id).classList.add('hidden');
         });
 
-        // Toggle elements based on view
         const fab = document.getElementById('fab-add');
 
         if (viewName === 'list') {
@@ -849,6 +886,22 @@
             tg.BackButton.show();
             fab.classList.add('hidden');
             window.scrollTo(0, 0);
+
+            // Set Form Title
+            if (isEditing) {
+                document.getElementById('form-title').innerText = 'ویرایش وام';
+                document.getElementById('submitBtn').innerText = 'ذخیره تغییرات';
+                document.getElementById('btnGoToInstallments').innerText = 'اصلاح اقساط';
+            } else {
+                // Reset form if adding new
+                if (document.getElementById('name').value !== '') {
+                    // Only reset if we are coming from FAB, not Back button from installments
+                    if (finalInstallments.length === 0) resetForm();
+                }
+                document.getElementById('form-title').innerText = 'افزودن وام جدید';
+                document.getElementById('submitBtn').innerText = 'ثبت و ارسال به ربات';
+                document.getElementById('btnGoToInstallments').innerText = 'تعریف اقساط';
+            }
         } else if (viewName === 'add-installments') {
             document.getElementById('view-add-installments').classList.remove('hidden');
             tg.BackButton.show();
@@ -856,12 +909,22 @@
         }
     }
 
+    function resetForm() {
+        document.getElementById('name').value = '';
+        document.getElementById('total_amount').value = '';
+        document.getElementById('received_date').value = '';
+        document.getElementById('add_installments_summary').value = '';
+        finalInstallments = [];
+        isEditing = false;
+    }
+
     tg.BackButton.onClick(() => {
         if (currentView === 'detail') {
             currentLoanId = null;
             switchView('list');
         } else if (currentView === 'add') {
-            switchView('list');
+            if (isEditing) switchView('detail'); // Back to detail if editing
+            else switchView('list');
         } else if (currentView === 'add-installments') {
             switchView('add');
         } else {
@@ -930,13 +993,26 @@
         if (allLoans.length === 0) document.getElementById('empty-state').classList.remove('hidden');
         else document.getElementById('empty-state').classList.add('hidden');
 
+        const todayStr = getTodayString();
+
         allLoans.forEach(loan => {
             const loanInstallments = loan.installments || [];
-            const paidInst = loanInstallments.filter(i => i.is_paid == 1).length;
+
+            // Logic using total_installment (Sum of repayments)
+            // Use 'total_installment' from DB if available, else sum installments manually as fallback
+            const totalRepayment = parseFloat(loan.total_installment) || loanInstallments.reduce((sum, i) => sum + parseFloat(i.amount), 0) || parseFloat(loan.total_amount);
+
             const paidAmount = loanInstallments.filter(i => i.is_paid == 1).reduce((sum, i) => sum + parseFloat(i.amount), 0);
-            const totalAmount = parseFloat(loan.total_amount);
-            const remaining = totalAmount - paidAmount;
-            const progress = totalAmount > 0 ? (paidAmount / totalAmount) * 100 : 0;
+
+            const remaining = totalRepayment - paidAmount;
+
+            const overdueAmount = loanInstallments
+                .filter(i => i.is_paid == 0 && i.due_date < todayStr)
+                .reduce((sum, i) => sum + parseFloat(i.amount), 0);
+
+            const pctPaid = totalRepayment > 0 ? (paidAmount / totalRepayment) * 100 : 0;
+            const pctOverdue = totalRepayment > 0 ? (overdueAmount / totalRepayment) * 100 : 0;
+
             const unpaidInsts = loanInstallments.filter(i => i.is_paid == 0).sort((a, b) => a.due_date.localeCompare(b.due_date));
             let nextDate = unpaidInsts.length > 0 ? unpaidInsts[0].due_date : "تسویه شده";
 
@@ -946,7 +1022,7 @@
             card.innerHTML = `
                 <div class="card-header">
                     <span class="card-title">${loan.name}</span>
-                    <span class="card-amount">${toPersianDigits(addCommas(totalAmount))} <small>ریال</small></span>
+                    <span class="card-amount">${toPersianDigits(addCommas(loan.total_amount))} <small>ریال</small></span>
                 </div>
                 <div class="card-details">
                     <span class="text-hint">قسط بعدی:</span>
@@ -956,7 +1032,11 @@
                     <span class="text-hint">مانده:</span>
                     <span class="${remaining > 0 ? 'text-danger' : 'text-success'}">${toPersianDigits(addCommas(remaining))}</span>
                 </div>
-                <div class="progress-wrapper"><div class="progress-fill" style="width: ${progress}%"></div></div>
+                <!-- Dual Color Bar -->
+                <div class="progress-wrapper" style="direction: ltr;">
+                    <div class="progress-section prog-paid" style="width: ${pctPaid}%"></div>
+                    <div class="progress-section prog-overdue" style="width: ${pctOverdue}%"></div>
+                </div>
             `;
             container.appendChild(card);
         });
@@ -967,7 +1047,7 @@
         const loan = allLoans.find(l => l.id == loanId);
         if (!loan) return;
 
-        switchView('detail'); // Handles back button logic
+        switchView('detail');
 
         document.getElementById('detail-title').innerText = loan.name;
         document.getElementById('detail-subtitle').innerText = toPersianDigits(loan.received_date);
@@ -989,13 +1069,20 @@
         const container = document.getElementById('installments-container');
         container.innerHTML = '';
 
-        const totalAmount = parseFloat(loan.total_amount);
+        // Recalculate Stats
+        const todayStr = getTodayString();
+        const totalRepayment = parseFloat(loan.total_installment) || loanInsts.reduce((sum, i) => sum + parseFloat(i.amount), 0) || parseFloat(loan.total_amount);
         const paidAmount = loanInsts.filter(i => i.is_paid == 1).reduce((sum, i) => sum + parseFloat(i.amount), 0);
-        const remaining = totalAmount - paidAmount;
-        const progress = totalAmount > 0 ? (paidAmount / totalAmount) * 100 : 0;
+        const remaining = totalRepayment - paidAmount;
+        const overdueAmount = loanInsts.filter(i => i.is_paid == 0 && i.due_date < todayStr).reduce((sum, i) => sum + parseFloat(i.amount), 0);
 
+        const pctPaid = totalRepayment > 0 ? (paidAmount / totalRepayment) * 100 : 0;
+        const pctOverdue = totalRepayment > 0 ? (overdueAmount / totalRepayment) * 100 : 0;
+
+        document.getElementById('detail-total-installment').innerText = toPersianDigits(addCommas(totalRepayment)) + ' ریال';
         document.getElementById('detail-remaining').innerText = toPersianDigits(addCommas(remaining)) + ' ریال';
-        document.getElementById('detail-progress').style.width = `${progress}%`;
+        document.getElementById('prog-paid').style.width = `${pctPaid}%`;
+        document.getElementById('prog-overdue').style.width = `${pctOverdue}%`;
         document.getElementById('detail-paid-count').innerText = toPersianDigits(loanInsts.filter(i => i.is_paid == 1).length);
 
         loanInsts.forEach((inst, index) => {
@@ -1015,12 +1102,14 @@
     }
 
     async function togglePayment(instId, newStatus) {
+        // Bug Fix: Don't re-render list. Update specific DOM elements.
         const btn = document.getElementById(`btn-${instId}`);
         const row = document.getElementById(`row-${instId}`);
         const originalContent = btn.innerHTML;
         const originalClass = row.className;
 
         btn.innerHTML = '<div class="mini-spinner"></div>';
+
         const payload = {
             "operation": "update",
             "table": "installments",
@@ -1031,12 +1120,29 @@
 
         if (res && res.success) {
             if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
+
+            // Update Local Data Model
             const loan = allLoans.find(l => l.id == currentLoanId);
             if (loan) {
                 const inst = loan.installments.find(i => i.id == instId);
                 if (inst) inst.is_paid = newStatus;
             }
-            renderInstallmentsList();
+
+            // Update UI Manually (No Full Re-render)
+            const checkIcon = '<svg viewBox="0 0 24 24" fill="white" width="20" height="20"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>';
+            const emptyCircle = '<div style="width:16px; height:16px; border:2px solid var(--hint-color); border-radius:50%"></div>';
+
+            if (newStatus == 1) {
+                row.classList.add('is-paid');
+                btn.innerHTML = checkIcon;
+            } else {
+                row.classList.remove('is-paid');
+                btn.innerHTML = emptyCircle;
+            }
+
+            // Update Header Stats Only
+            updateDetailHeaderStats(loan);
+
         } else {
             if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('error');
             btn.innerHTML = originalContent;
@@ -1046,33 +1152,54 @@
         }
     }
 
-    function deleteCurrentLoan() {
-        tg.showConfirm("آیا از حذف کامل این وام و تمام اقساط آن اطمینان دارید؟", async (confirmed) => {
-            if (confirmed) {
-                const btnDelete = document.getElementById('btn-delete');
-                const originalText = btnDelete.innerText;
-                btnDelete.innerHTML = '<div class="btn-spinner"></div>';
-                btnDelete.disabled = true;
+    function updateDetailHeaderStats(loan) {
+        if (!loan) return;
+        const loanInsts = loan.installments || [];
+        const todayStr = getTodayString();
 
-                const payload = {"operation": "delete", "table": "loans", "conditions": {"id": currentLoanId}};
-                const res = await apiRequest(payload);
+        const totalRepayment = parseFloat(loan.total_installment) || loanInsts.reduce((sum, i) => sum + parseFloat(i.amount), 0) || parseFloat(loan.total_amount);
+        const paidAmount = loanInsts.filter(i => i.is_paid == 1).reduce((sum, i) => sum + parseFloat(i.amount), 0);
+        const remaining = totalRepayment - paidAmount;
+        const overdueAmount = loanInsts.filter(i => i.is_paid == 0 && i.due_date < todayStr).reduce((sum, i) => sum + parseFloat(i.amount), 0);
 
-                if (res && res.success) {
-                    allLoans = allLoans.filter(l => l.id != currentLoanId);
-                    currentLoanId = null;
-                    switchView('list');
-                } else {
-                    tg.showAlert('خطا در حذف وام');
-                    btnDelete.innerHTML = originalText;
-                    btnDelete.disabled = false;
-                }
-            }
-        });
+        const pctPaid = totalRepayment > 0 ? (paidAmount / totalRepayment) * 100 : 0;
+        const pctOverdue = totalRepayment > 0 ? (overdueAmount / totalRepayment) * 100 : 0;
+
+        document.getElementById('detail-remaining').innerText = toPersianDigits(addCommas(remaining)) + ' ریال';
+        document.getElementById('prog-paid').style.width = `${pctPaid}%`;
+        document.getElementById('prog-overdue').style.width = `${pctOverdue}%`;
+        document.getElementById('detail-paid-count').innerText = toPersianDigits(loanInsts.filter(i => i.is_paid == 1).length);
+    }
+
+    // --- EDIT LOAN LOGIC ---
+    function openEditLoan() {
+        if (!currentLoanId) return;
+        const loan = allLoans.find(l => l.id == currentLoanId);
+        if (!loan) return;
+
+        isEditing = true;
+        resetForm();
+
+        // Pre-fill form
+        document.getElementById('name').value = loan.name;
+        document.getElementById('total_amount').value = toPersianDigits(addCommas(loan.total_amount));
+        document.getElementById('received_date').value = toPersianDigits(loan.received_date);
+
+        // Deep copy installments
+        finalInstallments = JSON.parse(JSON.stringify(loan.installments || [])).map(i => ({
+            ...i,
+            due_date: i.due_date,
+            amount: i.amount,
+            is_paid: i.is_paid // Preserve status
+        }));
+
+        updateSummary();
+        switchView('add');
     }
 
     // --- ADD LOAN & INSTALLMENT GENERATOR LOGIC ---
 
-    // INPUT MASKS
+    // INPUT MASKS & DATE PICKER (Same as before)
     function attachCurrencyListeners(element) {
         element.addEventListener('input', function (e) {
             const input = e.target;
@@ -1110,7 +1237,7 @@
         });
     }
 
-    // DATE PICKER
+    // DATE PICKER LOGIC (Simplified for brevity, assuming existing logic)
     const pickerOverlay = document.getElementById('date-picker-overlay');
     const colYear = document.getElementById('col-year');
     const colMonth = document.getElementById('col-month');
@@ -1184,7 +1311,7 @@
         const m = getSelectedValue(colMonth);
         let max = 31;
         if (m > 6 && m <= 11) max = 30;
-        if (m == 12) max = 30; // Esfand typically 29 but let's say 30 for simplicity in generic picker
+        if (m == 12) max = 30;
         const currentSelection = getSelectedValue(colDay);
         if (colDay.querySelectorAll('li[data-val]').length !== max) {
             updateDays(max);
@@ -1296,29 +1423,79 @@
         return `${y}/${String(m).padStart(2, '0')}/${String(d).padStart(2, '0')}`;
     }
 
-    // EVENTS
+    // --- EVENTS & HANDLERS ---
+
+    // Switch to Installments View (List or Generator)
     document.getElementById('btnGoToInstallments').addEventListener('click', () => {
         const dateInput = document.getElementById('received_date');
         if (!isValidJalaliDateString(dateInput.value)) {
             tg.showAlert('لطفا تاریخ دریافت را صحیح وارد کنید');
             return;
         }
+
         switchView('add-installments');
 
-        // Show generator by default if no list
-        if (finalInstallments.length === 0) {
-            document.getElementById('step-generator').classList.remove('hidden');
-            document.getElementById('step-list').classList.add('hidden');
-        } else {
+        if (finalInstallments.length > 0) {
+            // If data exists (Edit mode or already generated) -> Show List first
+            renderGenList(finalInstallments);
             document.getElementById('step-generator').classList.add('hidden');
             document.getElementById('step-list').classList.remove('hidden');
+        } else {
+            // New -> Show Generator
+            document.getElementById('step-generator').classList.remove('hidden');
+            document.getElementById('step-list').classList.add('hidden');
         }
     });
 
+    function renderGenList(list) {
+        const container = document.getElementById('gen_installments_container');
+        container.innerHTML = '';
+        list.forEach((item, i) => {
+            const row = document.createElement('div');
+            row.className = 'installment-row';
+            row.innerHTML = `
+                <span>${toPersianDigits(i + 1)}</span>
+                <div class="input-with-icon"><input type="text" class="row-date has-date-picker" value="${toPersianDigits(item.due_date)}"></div>
+                <input type="text" class="row-amount currency-input" value="${toPersianDigits(addCommas(item.amount))}">
+            `;
+            container.appendChild(row);
+            const dInput = row.querySelector('.row-date');
+            attachDatePicker(dInput);
+            attachDateMask(dInput);
+            attachCurrencyListeners(row.querySelector('.row-amount'));
+        });
+    }
+
     document.getElementById('btnCancelInstallments').addEventListener('click', () => switchView('add'));
+
+    // "Regenerate" button: Clears list and shows generator
     document.getElementById('btnBackToGen').addEventListener('click', () => {
-        document.getElementById('step-list').classList.add('hidden');
-        document.getElementById('step-generator').classList.remove('hidden');
+        // Define the action to take after confirmation
+        const performRegenerate = () => {
+            // 1. Clear the existing installments data
+            finalInstallments = [];
+            document.getElementById('add_installments_summary').value = '';
+
+            // 2. Toggle the views (Hide List, Show Generator)
+            document.getElementById('step-list').classList.add('hidden');
+            document.getElementById('step-generator').classList.remove('hidden');
+
+            // 3. (Optional) Reset generator fields for a fresh start
+            document.getElementById('gen_count').value = '';
+            document.getElementById('gen_amount').value = '';
+        };
+
+        // Check if we are in a valid Telegram environment for the native popup
+        if (tg && tg.showConfirm) {
+            tg.showConfirm("لیست فعلی اقساط پاک خواهد شد. ادامه می‌دهید؟", (ok) => {
+                if (ok) performRegenerate();
+            });
+        } else {
+            // Fallback for browser testing or Telegram Desktop if native confirm fails
+            if (confirm("لیست فعلی اقساط پاک خواهد شد. ادامه می‌دهید؟")) {
+                performRegenerate();
+            }
+        }
     });
 
     document.getElementById('btnGenerate').addEventListener('click', () => {
@@ -1337,23 +1514,12 @@
             return;
         }
 
-        const container = document.getElementById('gen_installments_container');
-        container.innerHTML = '';
+        const generatedList = [];
         for (let i = 0; i < count; i++) {
             let dateStr = calculateNextJalaliDate(startDateVal, i * periodQty, periodUnit);
-            const row = document.createElement('div');
-            row.className = 'installment-row';
-            row.innerHTML = `
-                <span>${toPersianDigits(i + 1)}</span>
-                <div class="input-with-icon"><input type="text" class="row-date has-date-picker" value="${toPersianDigits(dateStr)}"></div>
-                <input type="text" class="row-amount currency-input" value="${toPersianDigits(addCommas(amount))}">
-            `;
-            container.appendChild(row);
-            const dInput = row.querySelector('.row-date');
-            attachDatePicker(dInput);
-            attachDateMask(dInput);
-            attachCurrencyListeners(row.querySelector('.row-amount'));
+            generatedList.push({due_date: dateStr, amount: amount, is_paid: 0});
         }
+        renderGenList(generatedList);
         document.getElementById('step-generator').classList.add('hidden');
         document.getElementById('step-list').classList.remove('hidden');
     });
@@ -1366,19 +1532,34 @@
             let d = toEnglishDigits(row.querySelector('.row-date').value);
             let a = removeCommas(toEnglishDigits(row.querySelector('.row-amount').value));
             if (!isValidJalaliDateString(d) || !a) isValid = false;
-            temp.push({due_date: d, amount: Number(a), is_paid: false});
+            // Preserve is_paid status if editing existing installments (though row doesn't have ID, logic assumes reset on massive changes, but let's default to 0)
+            // Ideally we could map back to original IDs if row order didn't change, but simpler to reset or assume 0 for new gen.
+            // If we came from Edit -> List, the rows were generated from finalInstallments which has status.
+            // But DOM inputs don't store status. Simple approach: assume 0 if changed, or map by index if count matches.
+            // For now, let's keep it simple: 0 (Unpaid) for regenerated stuff.
+            // Wait! If I'm just editing dates in the list view, I lose is_paid status?
+            // Fix: Store original status in a data attribute or array index mapping.
+            let status = 0;
+            if (finalInstallments[temp.length]) status = finalInstallments[temp.length].is_paid || 0;
+
+            temp.push({due_date: d, amount: Number(a), is_paid: status});
         });
+
         if (!isValid) {
             tg.showAlert('لطفا تاریخ‌ها و مبالغ را اصلاح کنید');
             return;
         }
         finalInstallments = temp;
+        updateSummary();
+        document.getElementById('btnGoToInstallments').innerText = 'اصلاح اقساط';
+        switchView('add');
+    });
+
+    function updateSummary() {
         let summary = "";
         finalInstallments.forEach((item, i) => summary += `${toPersianDigits(i + 1)}. ${toPersianDigits(item.due_date)} -- ${toPersianDigits(addCommas(item.amount))} ریال\n`);
         document.getElementById('add_installments_summary').value = summary;
-        document.getElementById('btnGoToInstallments').innerText = 'ویرایش اقساط';
-        switchView('add');
-    });
+    }
 
     document.getElementById('loanForm').addEventListener('submit', function (e) {
         e.preventDefault();
@@ -1386,6 +1567,7 @@
             tg.showAlert('لطفا ابتدا اقساط را تعریف کنید');
             return;
         }
+
         const name = document.getElementById('name').value;
         const totalAmount = removeCommas(toEnglishDigits(document.getElementById('total_amount').value));
         const receivedDate = toEnglishDigits(document.getElementById('received_date').value);
@@ -1395,15 +1577,47 @@
             return;
         }
 
+        // Calculate total_installment (Sum of all installment amounts)
+        const totalInstallmentSum = finalInstallments.reduce((sum, item) => sum + parseFloat(item.amount), 0);
+
         const payload = {
+            "action": isEditing ? "edit" : "add", // Signal to bot
+            "loan_id": isEditing ? currentLoanId : null,
             "loans": {
-                "name": name, "total_amount": Number(totalAmount),
-                "received_date": receivedDate, "total_installments": finalInstallments.length
+                "name": name,
+                "total_amount": Number(totalAmount),
+                "received_date": receivedDate,
+                "total_installments": finalInstallments.length,
+                "total_installment": totalInstallmentSum // New column
             },
             "installments": finalInstallments
         };
         tg.sendData(JSON.stringify(payload));
     });
+
+    function deleteCurrentLoan() {
+        tg.showConfirm("آیا از حذف کامل این وام و تمام اقساط آن اطمینان دارید؟", async (confirmed) => {
+            if (confirmed) {
+                const btnDelete = document.getElementById('btn-delete');
+                const originalText = btnDelete.innerText;
+                btnDelete.innerHTML = '<div class="btn-spinner"></div>';
+                btnDelete.disabled = true;
+
+                const payload = {"operation": "delete", "table": "loans", "conditions": {"id": currentLoanId}};
+                const res = await apiRequest(payload);
+
+                if (res && res.success) {
+                    allLoans = allLoans.filter(l => l.id != currentLoanId);
+                    currentLoanId = null;
+                    switchView('list');
+                } else {
+                    tg.showAlert('خطا در حذف وام');
+                    btnDelete.innerHTML = originalText;
+                    btnDelete.disabled = false;
+                }
+            }
+        });
+    }
 
     // INITIALIZATION
     document.addEventListener('DOMContentLoaded', () => {
@@ -1415,8 +1629,8 @@
             attachDateMask(input);
         });
 
-        switchView('list'); // Default view
-        fetchData(); // Load data
+        switchView('list');
+        fetchData();
     });
 
 </script>
