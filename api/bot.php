@@ -68,7 +68,7 @@ http_response_code(200);
 // Exit if no input data was received.
 if (empty($input)) {
     error_log("[WARN] No input data received via Webhook.");
-    exit(json_encode(['status' => 'ok', 'message' => 'No input']));
+    exit();
 }
 
 // Decode the JSON Telegram update.
@@ -463,7 +463,8 @@ function level_1(array $person, array|null $message = null, array|null $callback
     }
 
     $response = sendToTelegram($telegram_method, $data);
-    exit(json_encode(['status' => 'OK', 'telegram_response' => $response]));
+    if ($response && !$message && !$callback_query) $db->update('persons', ['last_btn' => 1, 'progress' => null], ['id' => $person['id']]);
+    exit();
 }
 
 /**
@@ -475,7 +476,6 @@ function level_2(array $person, array|null $message = null, array|null $callback
     global $db;
     $telegram_method = 'sendMessage';
     $data = [
-        'text' => '🏦 وام و اقساط',
         'chat_id' => $person['chat_id'],
         'reply_markup' => [
             'keyboard' => createKeyboardsArray(2, $person['is_admin'], $db),
@@ -532,16 +532,44 @@ function level_2(array $person, array|null $message = null, array|null $callback
 
                 $data['text'] = 'وام‌های ثبت شده‌ی شما: ' . "\n";
 
-                foreach ($loans as $loan) {
+                $currentDate = getCurrentJalaliDate();
 
+                foreach ($loans as $loan) {
                     $installments = json_decode($loan['installments'], true);
+
+                    // Initialize counters
+                    $paidCount = 0;
+                    $overdueCount = 0;
+                    $remainingCount = 0;
+
+                    // Loop through installments to calculate counts
+                    foreach ($installments as $inst) {
+                        if ($inst['is_paid'] == 1) {
+                            $paidCount++;
+                        } else {
+                            // If not paid, check if the due date has passed
+                            // String comparison works for YYYY/MM/DD format
+                            if ($inst['due_date'] < $currentDate) {
+                                $overdueCount++;
+                            } else {
+                                $remainingCount++;
+                            }
+                        }
+                    }
 
                     $data['text'] .= "\n- " . beautifulNumber($loan['name'], null);
                     $data['text'] .= "\n   │  " . "‏";
                     $data['text'] .= "\n   ┤─ " . "مبلغ وام: " . beautifulNumber($loan['total_amount']);
                     $data['text'] .= "\n   ┤─ " . "تاریخ دریافت: " . beautifulNumber($loan['received_date'], null);
+
+                    // Total Installments block
                     $data['text'] .= "\n   ┘─ " . "تعداد اقساط: " . beautifulNumber(sizeof($installments));
-                    $data['text'] .= "\n       ┘── " . "پرداخت شده: " . beautifulNumber(12);
+
+                    // Details of Installments (Sub-tree)
+                    $data['text'] .= "\n       ┤─ " . "پرداخت شده: " . beautifulNumber($paidCount);
+                    $data['text'] .= "\n       ┤─ " . "معوقه: " . beautifulNumber($overdueCount);
+                    $data['text'] .= "\n       ┘─ " . "باقی‌مانده: " . beautifulNumber($remainingCount);
+
                     $data['text'] .= "\n";
                 }
 
@@ -580,6 +608,8 @@ function level_2(array $person, array|null $message = null, array|null $callback
                         }
 
                         $data['text'] = "✅ وام «{$loanData['name']}» با موفقیت ثبت شد.\n📊 تعداد اقساط: $count";
+                        sendToTelegram($telegram_method, $data);
+                        level_2($person);
 
                     } else $data['text'] = '❌ خطای پایگاه داده در ثبت وام.';
                 } else $data['text'] = '❌ خط در دریافت اطلاعات. داده‌ها معتبر نیستند.';
@@ -590,7 +620,7 @@ function level_2(array $person, array|null $message = null, array|null $callback
 
     $response = sendToTelegram($telegram_method, $data);
     if ($response && !$message && !$callback_query) $db->update('persons', ['last_btn' => 2, 'progress' => null], ['id' => $person['id']]);
-    exit(json_encode(['status' => 'OK', 'telegram_response' => $response]));
+    exit();
 
 }
 
@@ -695,7 +725,8 @@ function level_5(array $person, array|null $message = null, array|null $callback
     }
 
     $response = sendToTelegram($telegram_method, $data);
-    exit(json_encode(['status' => 'OK', 'telegram_response' => $response]));
+    if ($response && !$message && !$callback_query) $db->update('persons', ['last_btn' => 5, 'progress' => null], ['id' => $person['id']]);
+    exit();
 
 }
 
@@ -741,4 +772,49 @@ function createHoldingDetailText(array $holding, string|null $markdown = null, a
     if ($markdown === 'MarkdownV2') $price_tree = str_replace(["(", ")", ".", "-"], ["\(", "\)", "\.", "\-"], $price_tree);
 
     return $text . $holding['asset_name'] . $price_tree;
+}
+
+function getCurrentJalaliDate(): string
+{
+    // Get current Gregorian Date
+    $g_y = date('Y');
+    $g_m = date('m');
+    $g_d = date('d');
+
+    $g_days_in_month = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    $j_days_in_month = [31, 31, 31, 31, 31, 31, 30, 30, 30, 30, 30, 29];
+
+    // Check for leap year
+    $gy = $g_y - 1600;
+    $gm = $g_m - 1;
+    $gd = $g_d - 1;
+
+    $g_day_no = 365 * $gy + floor(($gy + 3) / 4) - floor(($gy + 99) / 100) + floor(($gy + 399) / 400);
+
+    for ($i = 0; $i < $gm; ++$i)
+        $g_day_no += $g_days_in_month[$i];
+
+    if ($gm > 1 && (($g_y % 4 == 0 && $g_y % 100 != 0) || ($g_y % 400 == 0)))
+        $g_day_no++; // leap and after Feb
+
+    $g_day_no += $gd;
+    $j_day_no = $g_day_no - 79;
+    $j_np = floor($j_day_no / 12053);
+    $j_day_no = $j_day_no % 12053;
+    $jy = 979 + 33 * $j_np + 4 * floor($j_day_no / 1461);
+    $j_day_no %= 1461;
+
+    if ($j_day_no >= 366) {
+        $jy += floor(($j_day_no - 1) / 365);
+        $j_day_no = ($j_day_no - 1) % 365;
+    }
+
+    for ($i = 0; $i < 11 && $j_day_no >= $j_days_in_month[$i]; ++$i)
+        $j_day_no -= $j_days_in_month[$i];
+
+    $jm = $i + 1;
+    $jd = $j_day_no + 1;
+
+    // Return formatted as YYYY/MM/DD
+    return sprintf('%04d/%02d/%02d', $jy, $jm, $jd);
 }
