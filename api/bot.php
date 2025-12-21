@@ -135,7 +135,7 @@ if (isset($update['message'])) {
     if ($message['text'] == '/holdings') {
         level_1($person);
     } elseif ($message['text'] == '/prices') {
-        level_4($person);
+        level_5($person);
     } else {
         // Route based on button/state
         choosePath(
@@ -191,7 +191,7 @@ function choosePath(
         // Handle Callback Queries
 
         if ($person['last_btn'] == 1) level_1(person: $person, message: $message, callback_query: $callback_query);
-        if ($person['last_btn'] == 4) level_4(person: $person, message: $message, callback_query: $callback_query);
+        if ($person['last_btn'] == 4) level_5(person: $person, message: $message, callback_query: $callback_query);
 
         $data = [
             'text' => 'درخواست نامفهوم بود!',
@@ -206,9 +206,9 @@ function choosePath(
             // No button matched: Handle as free text input or error
 
             // Route to active level handler (Input Step)
-            if ($person['last_btn'] == "0") level_0($person, $message); // View Holdings
             if ($person['last_btn'] == "1") level_1($person, $message); // View Holdings
-            if ($person['last_btn'] == "4") level_4($person, $message); // View Prices
+            if ($person['last_btn'] == "2") level_2($person, $message); // View Holdings
+            if ($person['last_btn'] == "5") level_5($person, $message); // View Prices
 
             $data = [
                 'text' => 'پیام نامفهوم است!',
@@ -230,9 +230,9 @@ function choosePath(
 
             } else {
                 // Menu Navigation
-                if ($pressed_button['id'] == "0") level_0($person);
                 if ($pressed_button['id'] == "1") level_1($person);
-                if ($pressed_button['id'] == "4") level_4($person);
+                if ($pressed_button['id'] == "2") level_2($person);
+                if ($pressed_button['id'] == "5") level_5($person);
 
                 $data = [
                     'text' => json_decode($pressed_button['attrs'], true)['text'],
@@ -467,17 +467,145 @@ function level_1(array $person, array|null $message = null, array|null $callback
 }
 
 /**
- * Level 4: View Prices
+ * Level 2: Loans And Installments
  */
 #[NoReturn]
-function level_4(array $person, array|null $message = null, array|null $callback_query = null): void
+function level_2(array $person, array|null $message = null, array|null $callback_query = null): void
+{
+    global $db;
+    $telegram_method = 'sendMessage';
+    $data = [
+        'text' => '🏦 وام و اقساط',
+        'chat_id' => $person['chat_id'],
+        'reply_markup' => [
+            'keyboard' => createKeyboardsArray(2, $person['is_admin'], $db),
+            'resize_keyboard' => true,
+            'is_persistent' => true,
+            'input_field_placeholder' => '🏦 وام و اقساط',
+        ]
+    ];
+
+    // Add web_app button(s)
+    array_unshift($data['reply_markup']['keyboard'], [[
+        'text' => 'مدیریت وام و اقساط',
+        'web_app' => [
+            'url' =>
+                'https://' . getenv('VERCEL_PROJECT_PRODUCTION_URL') . '/assets/loans.html?' .
+                'k=' . getenv('DB_API_SECRET') . '&' .
+                'id=' . $person['id']]
+    ]]);
+
+    if ($callback_query) {
+
+        // Answer the query
+        sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
+        // $query_data = json_decode($callback_query['data'], true);
+
+        // Delete the message generating the callback
+        $telegram_method = 'editMessageText';
+        unset($data['reply_markup']);
+        $data['text'] = 'این پیام منقضی شده است.';
+        $data['message_id'] = $message['message_id'];
+
+    } else {
+        if (!$message) {
+
+            $loans = $db->read(
+                'loans l',
+                conditions: ['person_id' => $person['id']],
+                selectColumns: "
+                l.*, 
+                JSON_ARRAYAGG(
+                    JSON_OBJECT(
+                        'id', i.id,
+                        'amount', i.amount,
+                        'due_date', i.due_date,
+                        'is_paid', i.is_paid
+                    )
+                ) as installments
+                ",
+                join: "LEFT JOIN installments i ON l.id=i.loan_id",
+                groupBy: 'l.id',
+            );
+
+            if ($loans) {
+
+                $data['text'] = 'وام‌های ثبت شده‌ی شما: ' . "\n";
+
+                foreach ($loans as $loan) {
+
+                    $installments = json_decode($loan['installments'], true);
+
+                    $data['text'] .= "\n- " . beautifulNumber($loan['name'], null);
+                    $data['text'] .= "\n   │  " . "‏";
+                    $data['text'] .= "\n   ┤─ " . "مبلغ وام: " . beautifulNumber($loan['total_amount']);
+                    $data['text'] .= "\n   ┤─ " . "تاریخ دریافت: " . beautifulNumber($loan['received_date'], null);
+                    $data['text'] .= "\n   ┘─ " . "تعداد اقساط: " . beautifulNumber(sizeof($installments));
+                    $data['text'] .= "\n       ┘── " . "پرداخت شده: " . beautifulNumber(12);
+                    $data['text'] .= "\n";
+                }
+
+            } else $data['text'] = 'هیچ وام یا قسطی برای شما ثبت نشده است!';
+
+        } else {
+            if (isset($message['web_app_data'])) {
+                $web_app_data = json_decode($message['web_app_data']['data'], true);
+
+                if ($web_app_data && isset($web_app_data['loans']) & isset($web_app_data['installments'])) {
+
+                    $loanData = $web_app_data['loans'];
+                    $loan_insert_data = [
+                        'person_id' => $person['id'],
+                        'name' => $loanData['name'],
+                        'total_amount' => $loanData['total_amount'],
+                        'received_date' => $loanData['received_date'],
+                        'total_installments' => $loanData['total_installments']
+                    ];
+
+                    $loan_id = $db->create('loans', $loan_insert_data);
+
+                    if ($loan_id) {
+                        $installments = $web_app_data['installments'];
+                        $count = 0;
+
+                        foreach ($installments as $inst) {
+                            $inst_insert_data = [
+                                'loan_id' => $loan_id,
+                                'amount' => $inst['amount'],
+                                'due_date' => $inst['due_date'],
+                                'is_paid' => $inst['is_paid'] ? 1 : 0
+                            ];
+                            $db->create('installments', $inst_insert_data);
+                            $count++;
+                        }
+
+                        $data['text'] = "✅ وام «{$loanData['name']}» با موفقیت ثبت شد.\n📊 تعداد اقساط: $count";
+
+                    } else $data['text'] = '❌ خطای پایگاه داده در ثبت وام.';
+                } else $data['text'] = '❌ خط در دریافت اطلاعات. داده‌ها معتبر نیستند.';
+            } else $data['text'] = "پیام نامفهوم است!";
+
+        }
+    }
+
+    $response = sendToTelegram($telegram_method, $data);
+    if ($response && !$message && !$callback_query) $db->update('persons', ['last_btn' => 2, 'progress' => null], ['id' => $person['id']]);
+    exit(json_encode(['status' => 'OK', 'telegram_response' => $response]));
+
+}
+
+/**
+ * Level 5: View Prices
+ */
+#[NoReturn]
+function level_5(array $person, array|null $message = null, array|null $callback_query = null): void
 {
     global $db;
     $telegram_method = 'sendMessage';
     $data = [
         'chat_id' => $person['chat_id'],
         'reply_markup' => [
-            'keyboard' => createKeyboardsArray(4, $person['is_admin'], $db),
+            'keyboard' => createKeyboardsArray(5, $person['is_admin'], $db),
             'resize_keyboard' => true,
             'is_persistent' => true,
             'input_field_placeholder' => 'قیمت‌ها',
@@ -507,7 +635,7 @@ function level_4(array $person, array|null $message = null, array|null $callback
             if (!$message) {
 
                 $data['text'] = "دسته‌بندی مورد نظر را انتخاب کنید:";
-                $person['last_btn'] = 4;
+                $person['last_btn'] = 5;
                 $person['progress'] = null;
                 $db->update('persons', $person, ['id' => $person['id']]);
 
@@ -564,95 +692,6 @@ function level_4(array $person, array|null $message = null, array|null $callback
             }
 
         } else $data['text'] = "دسته‌بندی‌ای در سیستم یافت نشد!";
-    }
-
-    $response = sendToTelegram($telegram_method, $data);
-    exit(json_encode(['status' => 'OK', 'telegram_response' => $response]));
-
-}
-
-/**
- * Level 0: Main menu
- */
-#[NoReturn]
-function level_0(array $person, array|null $message = null, array|null $callback_query = null): void
-{
-    global $db;
-    $telegram_method = 'sendMessage';
-    $data = [
-        'text' => 'صفحه اصلی',
-        'chat_id' => $person['chat_id'],
-        'reply_markup' => [
-            'keyboard' => createKeyboardsArray(0, $person['is_admin'], $db),
-            'resize_keyboard' => true,
-            'is_persistent' => true,
-            'input_field_placeholder' => 'صفحه اصلی',
-        ]
-    ];
-
-    // Add web_app button(s)
-    $data['reply_markup']['keyboard'][0][sizeof($data['reply_markup']['keyboard'][0])] = [
-        'text' => '🏦 وام و اقساط',
-        'web_app' => [
-            'url' =>
-                'https://' . getenv('VERCEL_PROJECT_PRODUCTION_URL') . '/assets/loans.html?' .
-                'k=' . getenv('DB_API_SECRET') . '&' .
-                'id=' . $person['id']]
-    ];
-
-    if ($callback_query) {
-
-        // Answer the query
-        sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
-        // $query_data = json_decode($callback_query['data'], true);
-
-        // Delete the message generating the callback
-        $telegram_method = 'editMessageText';
-        unset($data['reply_markup']);
-        $data['text'] = 'این پیام منقضی شده است.';
-        $data['message_id'] = $message['message_id'];
-
-    } else {
-        if (!$message) $db->update('persons', ['last_btn' => 0], ['id' => $person['id']]);
-        else {
-            if (isset($message['web_app_data'])) {
-                $web_app_data = json_decode($message['web_app_data']['data'], true);
-
-                if ($web_app_data && isset($web_app_data['loans']) & isset($web_app_data['installments'])) {
-
-                    $loanData = $web_app_data['loans'];
-                    $loan_insert_data = [
-                        'person_id' => $person['id'],
-                        'name' => $loanData['name'],
-                        'total_amount' => $loanData['total_amount'],
-                        'received_date' => $loanData['received_date'],
-                        'total_installments' => $loanData['total_installments']
-                    ];
-
-                    $loan_id = $db->create('loans', $loan_insert_data);
-
-                    if ($loan_id) {
-                        $installments = $web_app_data['installments'];
-                        $count = 0;
-
-                        foreach ($installments as $inst) {
-                            $inst_insert_data = [
-                                'loan_id' => $loan_id,
-                                'amount' => $inst['amount'],
-                                'due_date' => $inst['due_date'],
-                                'is_paid' => $inst['is_paid'] ? 1 : 0
-                            ];
-                            $db->create('installments', $inst_insert_data);
-                            $count++;
-                        }
-
-                        $data['text'] = "✅ وام «{$loanData['name']}» با موفقیت ثبت شد.\n📊 تعداد اقساط: $count";
-
-                    } else $data['text'] = '❌ خطای پایگاه داده در ثبت وام.';
-                } else $data['text'] = '❌ خط در دریافت اطلاعات. داده‌ها معتبر نیستند.';
-            } else $data['text'] = "پیام نامفهوم است!";
-
-        }
     }
 
     $response = sendToTelegram($telegram_method, $data);
