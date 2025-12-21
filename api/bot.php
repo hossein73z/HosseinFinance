@@ -590,6 +590,16 @@ function level_0(array $person, array|null $message = null, array|null $callback
         ]
     ];
 
+    // Add web_app button(s)
+    $data['reply_markup']['keyboard'][0][sizeof($data['reply_markup']['keyboard'][0])] = [
+        'text' => '🏦 وام و اقساط',
+        'web_app' => [
+            'url' =>
+                'https://' . getenv('VERCEL_PROJECT_PRODUCTION_URL') . '/assets/loans.html?' .
+                'k=' . getenv('DB_API_SECRET') . '&' .
+                'id=' . $person['id']]
+    ];
+
     if ($callback_query) {
 
         // Answer the query
@@ -603,20 +613,8 @@ function level_0(array $person, array|null $message = null, array|null $callback
         $data['message_id'] = $message['message_id'];
 
     } else {
-        if (!$message) {
-
-            $data['reply_markup']['keyboard'][0][sizeof($data['reply_markup']['keyboard'][0])] = [
-                'text' => '🏦 وام و اقساط',
-                'web_app' => [
-                    'url' =>
-                        'https://' . getenv('VERCEL_PROJECT_PRODUCTION_URL') . '/assets/loans.html?' .
-                        'k=' . getenv('DB_API_SECRET') . '&' .
-                        'id=' . $person['id']]
-            ];
-
-            $db->update('persons', ['last_btn' => 0], ['id' => $person['id']]);
-
-        } else {
+        if (!$message) $db->update('persons', ['last_btn' => 0], ['id' => $person['id']]);
+        else {
             if (isset($message['web_app_data'])) {
                 $web_app_data = json_decode($message['web_app_data']['data'], true);
 
