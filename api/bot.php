@@ -267,23 +267,20 @@ function backButton(array $person): void
 
     $current_level = $db->read('buttons', ['id' => $person['last_btn']], true);
 
-    if ($progress && sizeof($progress) > 2) {
-        // Step back in a multistep form
-        array_pop($progress);
-        array_pop($progress);
-        $person['progress'] = json_encode($progress);
-        choosePath(pressed_button: false, message: false, person: $person);
+    if ($progress) {
 
-    } elseif ($progress && sizeof($progress) > 1) {
         // Reset progress, stay on level
         $person['progress'] = null;
         choosePath(pressed_button: $current_level, message: false, person: $person);
+
     } else {
+
         // Go to parent menu
-        $last_button = $db->read('buttons', ['id' => $current_level['belong_to']], true);
+        $last_level = $db->read('buttons', ['id' => $current_level['belong_to']], true);
 
         $person['progress'] = null;
-        choosePath(pressed_button: $last_button, person: $person);
+        choosePath(pressed_button: $last_level, person: $person);
+
     }
 }
 
@@ -306,6 +303,7 @@ function cancelButton(array $person): void
 function level_1(array $person, array|null $message = null, array|null $callback_query = null): void
 {
     global $db;
+
     $telegram_method = 'sendMessage';
     $data = [
         'chat_id' => $person['chat_id'],
@@ -320,27 +318,23 @@ function level_1(array $person, array|null $message = null, array|null $callback
     // Add web_app button(s)
     $progress = json_decode($person['progress'], true);
     if ($progress && array_key_first($progress) == 'view_holding') { // User is viewing a holding
+
         // Edit holding button
-        $data['reply_markup']['keyboard'] = array_merge([
-            [
-                [
-                    'text' => '✏ ویرایش',
-                    'web_app' => [
-                        'url' => 'https://' . getenv('VERCEL_PROJECT_PRODUCTION_URL') . '/assets/add_holding.html?k=' . getenv('DB_API_SECRET') . '&edit_holding_id=' . $progress['view_holding']['holding_id']]
-                ]
-            ]
-        ], $data['reply_markup']['keyboard']);
+        $data['reply_markup']['keyboard'] = array_merge([[[
+            'text' => '✏ ویرایش',
+            'web_app' => [
+                'url' => 'https://' . getenv('VERCEL_PROJECT_PRODUCTION_URL') . '/assets/add_holding.html?k=' . getenv('DB_API_SECRET') . '&edit_holding_id=' . $progress['view_holding']['holding_id']]
+        ]]], $data['reply_markup']['keyboard']);
+
     } else { // User has just entered level 1
+
         // Add holding button
-        $data['reply_markup']['keyboard'] = array_merge([
-            [
-                [
-                    'text' => '➕ افزودن دارایی جدید',
-                    'web_app' => [
-                        'url' => 'https://' . getenv('VERCEL_PROJECT_PRODUCTION_URL') . '/assets/add_holding.html?k=' . getenv('DB_API_SECRET')]
-                ]
-            ]
-        ], $data['reply_markup']['keyboard']);
+        $data['reply_markup']['keyboard'] = array_merge([[[
+            'text' => '➕ افزودن دارایی جدید',
+            'web_app' => [
+                'url' => 'https://' . getenv('VERCEL_PROJECT_PRODUCTION_URL') . '/assets/add_holding.html?k=' . getenv('DB_API_SECRET')]
+        ]]], $data['reply_markup']['keyboard']);
+
     }
 
     // Retrieve user holdings
@@ -386,8 +380,6 @@ function level_1(array $person, array|null $message = null, array|null $callback
             $data['parse_mode'] = "MarkdownV2";
 
         } else $data['text'] = 'شما هیچ دارایی‌ای ثبت نکرده‌اید.';
-
-        $db->update('persons', ['last_btn' => 1], ['id' => $person['id']]);
 
     } else { // Message received in the level 1
 
@@ -441,15 +433,11 @@ function level_1(array $person, array|null $message = null, array|null $callback
 
                         // Add web_app button to edit the holding
                         unset($data['reply_markup']['keyboard'][0]);
-                        $data['reply_markup']['keyboard'] = array_merge([
-                            [
-                                [
-                                    'text' => '✏ ویرایش',
-                                    'web_app' => [
-                                        'url' => 'https://' . getenv('VERCEL_PROJECT_PRODUCTION_URL') . '/assets/add_holding.html?k=' . getenv('DB_API_SECRET') . '&edit_holding_id=' . $holding['id']]
-                                ]
-                            ]
-                        ], $data['reply_markup']['keyboard']);
+                        $data['reply_markup']['keyboard'] = array_merge([[[
+                            'text' => '✏ ویرایش',
+                            'web_app' => [
+                                'url' => 'https://' . getenv('VERCEL_PROJECT_PRODUCTION_URL') . '/assets/add_holding.html?k=' . getenv('DB_API_SECRET') . '&edit_holding_id=' . $holding['id']]
+                        ]]], $data['reply_markup']['keyboard']);
 
                         // Set user progress
                         $db->update('persons',
@@ -474,6 +462,7 @@ function level_1(array $person, array|null $message = null, array|null $callback
 function level_2(array $person, array|null $message = null, array|null $callback_query = null): void
 {
     global $db;
+
     $telegram_method = 'sendMessage';
     $data = [
         'chat_id' => $person['chat_id'],
@@ -631,6 +620,7 @@ function level_2(array $person, array|null $message = null, array|null $callback
 function level_5(array $person, array|null $message = null, array|null $callback_query = null): void
 {
     global $db;
+
     $telegram_method = 'sendMessage';
     $data = [
         'chat_id' => $person['chat_id'],
@@ -662,14 +652,8 @@ function level_5(array $person, array|null $message = null, array|null $callback
             foreach ($asset_types as $asset_type) array_unshift($data['reply_markup']['keyboard'], [['text' => $asset_type]]);
             array_unshift($data['reply_markup']['keyboard'], [['text' => 'علاقه‌مندی‌ها']]);
 
-            if (!$message) {
-
-                $data['text'] = "دسته‌بندی مورد نظر را انتخاب کنید:";
-                $person['last_btn'] = 5;
-                $person['progress'] = null;
-                $db->update('persons', $person, ['id' => $person['id']]);
-
-            } else {
+            if (!$message) $data['text'] = "دسته‌بندی مورد نظر را انتخاب کنید:";
+            else {
 
                 if (in_array($message['text'], $asset_types)) {
 
@@ -694,8 +678,6 @@ function level_5(array $person, array|null $message = null, array|null $callback
 
                         $data['text'] = $text;
                         $data['reply_to_message_id'] = $message['message_id'];
-
-                        $db->update('persons', ['progress' => null], ['id' => $person['id']]);
 
                     } else $data['text'] = 'این دسته بندی خالی‌ست!';
 
