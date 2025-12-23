@@ -89,10 +89,10 @@ $db = DatabaseManager::getInstance();
 if (isset($update['message'])) {
 
     $message = $update['message'];
-    $user = $message['from']; // Sender information
+    $chat = $message['chat']; // Sender information
 
     // Check/Register User
-    $person = $db->read('persons', ['chat_id' => $user['id']], true);
+    $person = $db->read('persons', ['chat_id' => $chat['id']], true);
 
     if (!$person) {
         // --- New User Registration ---
@@ -101,10 +101,10 @@ if (isset($update['message'])) {
         $new_user_id = $db->create(
             'persons',
             [
-                'chat_id' => $user['id'],
-                'first_name' => $user['first_name'] ?? 'N/A',
-                'last_name' => $user['last_name'] ?? null,
-                'username' => $user['username'] ?? null,
+                'chat_id' => $chat['id'],
+                'first_name' => $chat['first_name'] ?? 'N/A',
+                'last_name' => $chat['last_name'] ?? null,
+                'username' => $chat['username'] ?? null,
                 'progress' => null,
                 // First user becomes admin automatically
                 'is_admin' => ($admins) ? 0 : 1,
@@ -113,9 +113,9 @@ if (isset($update['message'])) {
         );
 
         if ($new_user_id) {
-            $person = $db->read('persons', ['chat_id' => $user['id']], true);
+            $person = $db->read('persons', ['chat_id' => $chat['id']], true);
         } else {
-            error_log("[ERROR] Failed to create new user: " . $user['id']);
+            error_log("[ERROR] Failed to create new user: " . $chat['id']);
             return;
         }
     }
@@ -150,9 +150,9 @@ if (isset($update['message'])) {
     $callback_query = $update['callback_query'];
 
     $message = $callback_query['message'];
-    $user = $callback_query['from'];
+    $chat = $message['chat'];
 
-    $person = $db->read('persons', ['chat_id' => $user['id']], true);
+    $person = $db->read('persons', ['chat_id' => $chat['id']], true);
 
     if ($person !== false) {
 
@@ -191,7 +191,7 @@ function choosePath(
         // Handle Callback Queries
 
         if ($person['last_btn'] == 1) level_1(person: $person, message: $message, callback_query: $callback_query);
-        if ($person['last_btn'] == 4) level_5(person: $person, message: $message, callback_query: $callback_query);
+        if ($person['last_btn'] == 5) level_5(person: $person, message: $message, callback_query: $callback_query);
 
         $data = [
             'text' => 'درخواست نامفهوم بود!',
@@ -615,6 +615,8 @@ function level_2(array $person, array|null $message = null, array|null $callback
 
 /**
  * Level 5: View Prices
+ * Note: In case the message is from the bot, this function
+ * edits the message instead of sending a new message
  */
 #[NoReturn]
 function level_5(array $person, array|null $message = null, array|null $callback_query = null): void
@@ -632,25 +634,100 @@ function level_5(array $person, array|null $message = null, array|null $callback
         ]
     ];
 
-    if ($callback_query) {
+    $asset_types = $db->read('assets', selectColumns: 'asset_type', distinct: true, orderBy: ['asset_type' => 'DESC']);
+    if ($asset_types) {
+        if ($callback_query) {
 
-        // Answer the query
-        sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
-        // $query_data = json_decode($callback_query['data'], true);
+            // Answer the query
+            sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
+            $query_data = json_decode($callback_query['data'], true) ?? null;
 
-        // Delete the message generating the callback
-        $telegram_method = 'editMessageText';
-        unset($data['reply_markup']);
-        $data['text'] = 'این پیام منقضی شده است.';
-        $data['message_id'] = $message['message_id'];
+            unset($data['reply_markup']);
+            $data['text'] = 'این پیام منقضی شده است.';
 
-    } else {
-        $asset_types = $db->read('assets', selectColumns: 'asset_type', distinct: true);
-        if ($asset_types) {
+            if ($query_data) {
+                if (array_key_first($query_data) == 'edit_favorites') {
 
-            $asset_types = array_reverse(array_column($asset_types, 'asset_type'));
+                    if ($query_data['edit_favorites'] == null) {
+
+                        $data['text'] = 'عملیات مورد نظر را انتخاب کنید:';
+                        $data['reply_markup']['inline_keyboard'] = [
+                            [
+                                ['text' => 'افزودن', 'callback_data' => json_encode(['edit_favorites' => 'add'])],
+                                ['text' => 'حذف', 'callback_data' => json_encode(['edit_favorites' => 'remove'])]
+                            ], [
+                                ['text' => '🔙 برگشت 🔙', 'callback_data' => json_encode(['back' => 'favorites_list'])]
+                            ],
+                        ];
+
+                    }
+                    if ($query_data['edit_favorites'] == 'add') {
+
+                        $data['text'] = 'یکی از دسته‌بندی‌های زیر را انتخاب کنید:';
+                        $data['reply_markup']['inline_keyboard'] = [
+                            [
+                                ['text' => '🔙 برگشت 🔙', 'callback_data' => json_encode(['edit_favorites' => null])]
+                            ]
+                        ];
+
+                        $asset_types = array_column($asset_types, 'asset_type');
+                        foreach ($asset_types as $index => $asset_type)
+                            $data['reply_markup']['inline_keyboard'][] = [
+                                ['text' => $asset_type, 'callback_data' => json_encode(['add_favorite' => ['asset_type' => $index]])],
+                            ];
+                    }
+                    if ($query_data['edit_favorites'] == 'remove') {
+                    }
+
+                }
+                if (array_key_first($query_data) == 'add_favorite') {
+                    if (array_key_first($query_data['add_favorite']) == 'asset_type') {
+
+                        $asset_type = array_column($asset_types, 'asset_type')[$query_data['add_favorite']['asset_type']];
+                        $assets = $db->read('assets', conditions: ['asset_type' => $asset_type], orderBy: ['asset_type' => 'DESC']);
+
+                        $data['text'] = 'گزینه‌ی مد نظر خود را از لیست زیر انتخاب کنید:';
+                        $data['reply_markup']['inline_keyboard'] = [
+                            [
+                                ['text' => '🔙 برگشت 🔙', 'callback_data' => json_encode(['edit_favorites' => 'add'])]
+                            ]
+                        ];
+
+                        foreach ($assets as $asset)
+                            $data['reply_markup']['inline_keyboard'][] = [
+                                ['text' => $asset['name'], 'callback_data' => json_encode(['add_favorite' => ['asset' => $asset['id']]])],
+                            ];
+                    }
+                    if (array_key_first($query_data['add_favorite']) == 'asset') {
+                        $result = $db->create('favorites', ['person_id' => $person['id'], 'asset_id' => $query_data['add_favorite']['asset']]);
+                        if ($result) level_5($person, $message);
+                    }
+
+                }
+
+                if (array_key_first($query_data) == 'back') {
+
+                    if ($query_data['back'] == 'favorites_list') {
+                        level_5($person, $message);
+                    }
+                }
+
+                // Edit the message generating the callback
+                $telegram_method = 'editMessageText';
+                $data['message_id'] = $message['message_id'];
+            }
+
+        } else {
+
+            // Edit the message if it is from the bot itself
+            if ($message['from']['id'] == 8418841584) {
+                $telegram_method = 'editMessageText';
+                $data['message_id'] = $message['message_id'];
+            }
+
+            $asset_types = array_column($asset_types, 'asset_type');
             foreach ($asset_types as $asset_type) array_unshift($data['reply_markup']['keyboard'], [['text' => $asset_type]]);
-            array_unshift($data['reply_markup']['keyboard'], [['text' => 'علاقه‌مندی‌ها']]);
+            array_unshift($data['reply_markup']['keyboard'], [['text' => '❤ علاقه‌مندی‌ها ❤']]);
 
             if (!$message) $data['text'] = "دسته‌بندی مورد نظر را انتخاب کنید:";
             else {
@@ -681,30 +758,26 @@ function level_5(array $person, array|null $message = null, array|null $callback
 
                     } else $data['text'] = 'این دسته بندی خالی‌ست!';
 
-                } elseif ($message['text'] == 'علاقه‌مندی‌ها') {
+                } elseif ($message['text'] == '❤ علاقه‌مندی‌ها ❤' || $message['from']['id'] == 8418841584) {
 
                     $favorites = $db->read(
-                        table: 'favorites',
+                        table: 'favorites f',
                         conditions: ['person_id' => $person['id']],
-                        selectColumns: 'favorites.id, ' .
-                        'assets.name AS asset_name, assets.asset_type, assets.price, assets.date, assets.time, ' .
-                        'CONCAT(persons.first_name, \' \', COALESCE(persons.last_name, \' \')) AS person_name ',
-                        join: 'JOIN assets ON assets.id=favorites.asset_id ' .
-                        'JOIN persons ON persons.id=favorites.person_id ',
+                        selectColumns: 'a.*',
+                        join: 'JOIN assets a ON a.id=f.asset_id',
                         orderBy: ['asset_type' => 'DESC', 'id' => 'ASC']);
 
-                    if ($favorites) {
-                        $data['text'] = '';
-                        foreach ($favorites as $favorite) {
-                            $data['text'] .= beautifulNumber($favorite['asset_name'], null) . ': ' . beautifulNumber($favorite['price']) . "\n";
-                        }
-                    }
+                    if ($favorites)
+                        foreach ($favorites as $favorite)
+                            $data['text'] .= beautifulNumber($favorite['name'], null) . ': ' . beautifulNumber($favorite['price']) . "\n";
+                    else $data['text'] = 'لیست علاقه‌مندی‌های شما خالیست!';
+
+                    $data['reply_markup'] = ['inline_keyboard' => [[['text' => 'ویرایش لیست', 'callback_data' => json_encode(['edit_favorites' => null])]]]];
 
                 } else $data['text'] = "پیام نامفهموم بود!\nلطفاً یکی از دسته‌بندی‌های زیر را انتخاب کنید:";
             }
-
-        } else $data['text'] = "دسته‌بندی‌ای در سیستم یافت نشد!";
-    }
+        }
+    } else $data['text'] = "دسته‌بندی‌ای در سیستم یافت نشد!";
 
     $response = sendToTelegram($telegram_method, $data);
     if ($response && !$message && !$callback_query) $db->update('persons', ['last_btn' => 5, 'progress' => null], ['id' => $person['id']]);
