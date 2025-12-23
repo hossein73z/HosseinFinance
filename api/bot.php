@@ -644,77 +644,113 @@ function level_5(array $person, array|null $message = null, array|null $callback
 
             unset($data['reply_markup']);
             $data['text'] = 'این پیام منقضی شده است.';
+            $telegram_method = 'editMessageText';
+            $data['message_id'] = $message['message_id'];
 
             if ($query_data) {
-                if (array_key_first($query_data) == 'edit_favorites') {
+                if (array_key_first($query_data) == 'edit_fav') {
 
-                    if ($query_data['edit_favorites'] == null) {
+                    if ($query_data['edit_fav'] == null) {
 
                         $data['text'] = 'عملیات مورد نظر را انتخاب کنید:';
                         $data['reply_markup']['inline_keyboard'] = [
                             [
-                                ['text' => 'افزودن', 'callback_data' => json_encode(['edit_favorites' => 'add'])],
-                                ['text' => 'حذف', 'callback_data' => json_encode(['edit_favorites' => 'remove'])]
+                                ['text' => 'افزودن', 'callback_data' => json_encode(['edit_fav' => 'add'])]
                             ], [
                                 ['text' => '🔙 برگشت 🔙', 'callback_data' => json_encode(['back' => 'favorites_list'])]
                             ],
                         ];
+                        $favorites = $db->read('favorites', ['person_id' => $person['id']]);
+                        if ($favorites) {
+                            $data['reply_markup']['inline_keyboard'][0][] = ['text' => 'حذف', 'callback_data' => json_encode(['edit_fav' => 'remove'])];
+                        }
 
                     }
-                    if ($query_data['edit_favorites'] == 'add') {
+                    if ($query_data['edit_fav'] == 'add') {
 
                         $data['text'] = 'یکی از دسته‌بندی‌های زیر را انتخاب کنید:';
                         $data['reply_markup']['inline_keyboard'] = [
                             [
-                                ['text' => '🔙 برگشت 🔙', 'callback_data' => json_encode(['edit_favorites' => null])]
+                                ['text' => '🔙 برگشت 🔙', 'callback_data' => json_encode(['edit_fav' => null])]
                             ]
                         ];
 
                         $asset_types = array_column($asset_types, 'asset_type');
                         foreach ($asset_types as $index => $asset_type)
                             $data['reply_markup']['inline_keyboard'][] = [
-                                ['text' => $asset_type, 'callback_data' => json_encode(['add_favorite' => ['asset_type' => $index]])],
+                                ['text' => $asset_type, 'callback_data' => json_encode(['add_fav' => ['asset_type' => $index]])],
                             ];
                     }
-                    if ($query_data['edit_favorites'] == 'remove') {
+                    if ($query_data['edit_fav'] == 'remove') {
+
+                        $favorites = $db->read(
+                            table: 'favorites f',
+                            conditions: ['person_id' => $person['id']],
+                            selectColumns: 'f.*, a.name as asset_name',
+                            join: 'JOIN assets a ON a.id = f.asset_id',
+                            orderBy: ['asset_type' => 'DESC', 'id' => 'ASC']);
+                        if ($favorites) {
+                            $data['text'] = 'کدام گزینه را می‌خواهید خذف کنید؟';
+                            $data['reply_markup']['inline_keyboard'] = [
+                                [
+                                    ['text' => '🔙 برگشت 🔙', 'callback_data' => json_encode(['edit_fav' => null])]
+                                ]
+                            ];
+
+                            foreach ($favorites as $favorite)
+                                $data['reply_markup']['inline_keyboard'][] = [
+                                    ['text' => $favorite['asset_name'], 'callback_data' => json_encode(['del_fav' => ['fav_id' => $favorite['id']]])],
+                                ];
+
+                        }
                     }
 
                 }
-                if (array_key_first($query_data) == 'add_favorite') {
-                    if (array_key_first($query_data['add_favorite']) == 'asset_type') {
+                if (array_key_first($query_data) == 'add_fav') {
 
-                        $asset_type = array_column($asset_types, 'asset_type')[$query_data['add_favorite']['asset_type']];
+                    if (array_key_first($query_data['add_fav']) == 'asset_type') {
+
+                        $asset_type = array_column($asset_types, 'asset_type')[$query_data['add_fav']['asset_type']];
                         $assets = $db->read('assets', conditions: ['asset_type' => $asset_type], orderBy: ['asset_type' => 'DESC']);
 
                         $data['text'] = 'گزینه‌ی مد نظر خود را از لیست زیر انتخاب کنید:';
                         $data['reply_markup']['inline_keyboard'] = [
                             [
-                                ['text' => '🔙 برگشت 🔙', 'callback_data' => json_encode(['edit_favorites' => 'add'])]
+                                ['text' => '🔙 برگشت 🔙', 'callback_data' => json_encode(['edit_fav' => 'add'])]
                             ]
                         ];
 
                         foreach ($assets as $asset)
                             $data['reply_markup']['inline_keyboard'][] = [
-                                ['text' => $asset['name'], 'callback_data' => json_encode(['add_favorite' => ['asset' => $asset['id']]])],
+                                ['text' => $asset['name'], 'callback_data' => json_encode(['add_fav' => ['asset' => $asset['id']]])],
                             ];
                     }
-                    if (array_key_first($query_data['add_favorite']) == 'asset') {
-                        $result = $db->create('favorites', ['person_id' => $person['id'], 'asset_id' => $query_data['add_favorite']['asset']]);
+                    if (array_key_first($query_data['add_fav']) == 'asset') {
+                        $result = $db->create('favorites', ['person_id' => $person['id'], 'asset_id' => $query_data['add_fav']['asset']]);
                         if ($result) level_5($person, $message);
                     }
 
                 }
+                if (array_key_first($query_data) == 'del_fav') {
 
-                if (array_key_first($query_data) == 'back') {
-
-                    if ($query_data['back'] == 'favorites_list') {
-                        level_5($person, $message);
+                    if (array_key_first($query_data['del_fav']) == 'fav_id') {
+                        $data['text'] = 'آیا از حذف اطمینان دارید؟';
+                        $data['reply_markup']['inline_keyboard'] = [
+                            [
+                                ['text' => 'لغو', 'callback_data' => json_encode(['edit_fav' => 'remove'])],
+                                ['text' => 'تایید', 'callback_data' => json_encode(['del_fav' => ['conf' => $query_data['del_fav']['fav_id']]])],
+                            ]
+                        ];
                     }
-                }
+                    if (array_key_first($query_data['del_fav']) == 'conf') {
+                        $result = $db->delete(table: 'favorites', conditions: ['id' => $query_data['del_fav']['conf']], resetAutoIncrement: true);
+                        if ($result) level_5($person, $message);
+                    }
 
-                // Edit the message generating the callback
-                $telegram_method = 'editMessageText';
-                $data['message_id'] = $message['message_id'];
+                }
+                if (array_key_first($query_data) == 'back') {
+                    if ($query_data['back'] == 'favorites_list') level_5($person, $message);
+                }
             }
 
         } else {
@@ -767,12 +803,23 @@ function level_5(array $person, array|null $message = null, array|null $callback
                         join: 'JOIN assets a ON a.id=f.asset_id',
                         orderBy: ['asset_type' => 'DESC', 'id' => 'ASC']);
 
-                    if ($favorites)
-                        foreach ($favorites as $favorite)
-                            $data['text'] .= beautifulNumber($favorite['name'], null) . ': ' . beautifulNumber($favorite['price']) . "\n";
-                    else $data['text'] = 'لیست علاقه‌مندی‌های شما خالیست!';
+                    if ($favorites) {
+                        $asset_type = '';
+                        foreach ($favorites as $favorite) {
+                            if ($favorite['asset_type'] != $asset_type) {
+                                $date = preg_split('/-/u', $favorite['date']);
+                                $date[1] = str_replace(
+                                    ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'],
+                                    ['فروردین', 'اردیبهشت', 'خرداد', 'تیر', 'مرداد', 'شهریور', 'مهر', 'آبان', 'آذر', 'دی', 'بهمن', 'اسفند'],
+                                    $date[1]);
+                                $data['text'] .= beautifulNumber("\nآخرین قیمت های «$favorite[asset_type]» در " . "$date[2] $date[1] $date[0]" . " ساعت " . $favorite['time'] . "\n", null);
+                            }
+                            $data['text'] .= "    " . beautifulNumber($favorite['name'], null) . ': ' . beautifulNumber($favorite['price']) . "\n";
+                        }
+                    } else
+                        $data['text'] = 'لیست علاقه‌مندی‌های شما خالیست!';
 
-                    $data['reply_markup'] = ['inline_keyboard' => [[['text' => 'ویرایش لیست', 'callback_data' => json_encode(['edit_favorites' => null])]]]];
+                    $data['reply_markup'] = ['inline_keyboard' => [[['text' => 'ویرایش لیست', 'callback_data' => json_encode(['edit_fav' => null])]]]];
 
                 } else $data['text'] = "پیام نامفهموم بود!\nلطفاً یکی از دسته‌بندی‌های زیر را انتخاب کنید:";
             }
