@@ -3,7 +3,6 @@
 use JetBrains\PhpStorm\NoReturn;
 
 // --- VERCEL CONFIGURATION ---
-// Instead of config.php, we map Environment Variables to Constants
 define('SHARED_SECRET', getenv('SHARED_SECRET'));
 define('BOT_ID', getenv('BOT_ID'));
 define('MAIN_BOT_TOKEN', getenv('MAIN_BOT_TOKEN'));
@@ -807,6 +806,7 @@ function level_5(array $person, array|null $message = null, array|null $callback
                         $asset_type = '';
                         foreach ($favorites as $favorite) {
                             if ($favorite['asset_type'] != $asset_type) {
+                                $asset_type = $favorite['asset_type'];
                                 $date = preg_split('/-/u', $favorite['date']);
                                 $date[1] = str_replace(
                                     ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'],
@@ -814,7 +814,7 @@ function level_5(array $person, array|null $message = null, array|null $callback
                                     $date[1]);
                                 $data['text'] .= beautifulNumber("\nآخرین قیمت های «$favorite[asset_type]» در " . "$date[2] $date[1] $date[0]" . " ساعت " . $favorite['time'] . "\n", null);
                             }
-                            $data['text'] .= "    " . beautifulNumber($favorite['name'], null) . ': ' . beautifulNumber($favorite['price']) . "\n";
+                            $data['text'] .= "  - " . beautifulNumber($favorite['name'], null) . ': ' . beautifulNumber($favorite['price']) . "\n";
                         }
                     } else
                         $data['text'] = 'لیست علاقه‌مندی‌های شما خالیست!';
