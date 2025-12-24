@@ -82,7 +82,7 @@ CREATE TABLE IF NOT EXISTS `test`.`alerts`
 (
     id             BIGINT AUTO_INCREMENT PRIMARY KEY,
     person_id      INT                         NOT NULL,
-    asset_id       INT                         NOT NULL,
+    asset_name     VARCHAR(191)                NOT NULL UNIQUE,
     target_price   NUMERIC(18, 8)              NOT NULL,
     trigger_type   ENUM ('up', 'down', 'both') NOT NULL DEFAULT 'both',
     is_active      BOOLEAN                     NOT NULL DEFAULT 0,
@@ -92,9 +92,9 @@ CREATE TABLE IF NOT EXISTS `test`.`alerts`
     triggered_time VARCHAR(8)                           DEFAULT NULL,
     note           TEXT,
 
-    UNIQUE INDEX idx_unique_alert (asset_id, person_id, target_price),
+    UNIQUE INDEX idx_unique_alert (asset_name, person_id, target_price),
     FOREIGN KEY (person_id) REFERENCES persons (id) ON DELETE CASCADE,
-    FOREIGN KEY (asset_id) REFERENCES assets (id) ON DELETE RESTRICT
+    FOREIGN KEY (asset_name) REFERENCES assets (name) ON DELETE RESTRICT
 ) DEFAULT CHARSET = utf8mb4;
 
 CREATE TABLE IF NOT EXISTS `test`.`transactions`

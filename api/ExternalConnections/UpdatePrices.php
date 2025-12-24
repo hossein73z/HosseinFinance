@@ -16,7 +16,6 @@ $query_secret = $_GET['secret'] ?? null;
 
 // Validate against the SHARED_SECRET constant defined above via env vars
 if (($header_secret !== SHARED_SECRET) && ($query_secret !== SHARED_SECRET)) {
-    error_log("2");
     http_response_code(403);
     error_log("SECURITY ALERT: Access denied. Invalid secret. Input size: " . strlen($input));
     die();
@@ -263,6 +262,41 @@ function addPriceToDatabase(array $matches, string $asset_type, string $date, st
                 foreach ($dollars as $i => $dollar) $dollars[$i]['exchange_rate'] = floatval($asset_price);
                 $db->upsertBatch('assets', $dollars);
             }
+        }
+
+        //Check for and send alerts
+        $alerts = $db->read(
+            table: 'alerts',
+            conditions: ['asset_name' => trim($match), 'is_active' => true],
+            selectColumns: 'alerts.*, assets.price',
+            join: 'JOIN assets ON assets.name = alerts.asset_name'
+        );
+        foreach ($alerts as $alert) {
+            error_log("Alert Price: " . $alert['price']);
+            if ($alert['trigger_type'] == 'up' &&
+                floatval($asset_price) <= floatval($alert['target_price'])) continue;
+            elseif ($alert['trigger_type'] == 'down' &&
+                floatval($asset_price) >= floatval($alert['target_price'])) continue;
+            elseif ($alert['trigger_type'] == 'both') {
+                if (floatval($alert['target_price']) > max(floatval($asset_price), floatval($alert['price'])) ||
+                    floatval($alert['target_price']) < min(floatval($asset_price), floatval($alert['price']))) continue;
+            }
+
+            $person = $db->read('persons', ['id' => $alert['person_id']], true);
+
+            $alert_icon = '';
+            if ($alert['trigger_type'] == 'up') $alert_icon = '⏫ ';
+            if ($alert['trigger_type'] == 'down') $alert_icon = '⏬ ';
+            if ($alert['trigger_type'] == 'both') $alert_icon = '↕️ ';
+            $response = sendToTelegram('sendMessage', [
+                'chat_id' => $person['chat_id'],
+                'text' =>
+                    "هشدار قیمت برای " . "«" . beautifulNumber(trim($match), null) . "»" . " فعال شد." . "\n" .
+                    "قیمت هشدار: " . $alert_icon . beautifulNumber($alert['target_price']) . "\n" .
+                    "قیمت کنونی: " . beautifulNumber(floatval($asset_price))
+            ]);
+            if ($response) $db->update('alerts', ['is_active' => false], ['id' => $alert['id']]);
+
         }
     }
     // 1. Insert/Update assets (upsert ensures the asset exists in the table).
