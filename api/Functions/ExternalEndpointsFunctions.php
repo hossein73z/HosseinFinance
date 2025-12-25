@@ -17,10 +17,10 @@ function sendToTelegram(string $method, array $data = [], string $token = ''): b
     $url = "https://api.telegram.org/bot" . $token . "/$method";
 
     // Handle Proxy Settings (Optional on Vercel as it is usually not blocked)
-    $proxy = defined('PROXY_SETTINGS') ? PROXY_SETTINGS : null;
+    $proxy = getenv('PROXY_SETTINGS');
 
     //$response = stream_request($url, "POST", $data, proxy: $proxy);
-    $response = stream_request($url, "POST", $data);
+    $response = stream_request(url: $url, method: "POST", data: $data);
     $result = json_decode($response, true);
 
     // 1. JSON Parsing Error

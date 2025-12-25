@@ -1,7 +1,7 @@
 <?php
 require_once __DIR__ . '/../Libraries/DatabaseManager.php';
 require_once __DIR__ . '/../Functions/ExternalEndpointsFunctions.php';
-require_once __DIR__ . '/../Functions/NumberHelper.php';
+require_once __DIR__ . '/../Functions/StringHelper.php';
 
 // --- CONFIGURATION ---
 define('PRICE_BOT_TOKEN', getenv('PRICE_BOT_TOKEN'));

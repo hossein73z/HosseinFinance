@@ -24,7 +24,7 @@ require_once 'Functions/ExternalEndpointsFunctions.php';
 // Load functions for generating Telegram keyboards.
 require_once 'Functions/KeyboardFunctions.php';
 // Load helper functions for number formatting and validation.
-require_once 'Functions/NumberHelper.php';
+require_once 'Functions/StringHelper.php';
 
 /**
  * Registers a shutdown function to catch fatal errors.
@@ -133,6 +133,8 @@ if (isset($update['message'])) {
     // Global Command Routing
     if ($message['text'] == '/holdings') {
         level_1($person);
+    } elseif ($message['text'] == '/loans') {
+        level_2($person);
     } elseif ($message['text'] == '/prices') {
         level_5($person);
     } else {
@@ -206,7 +208,7 @@ function choosePath(
 
             // Route to active level handler (Input Step)
             if ($person['last_btn'] == "1") level_1($person, $message); // View Holdings
-            if ($person['last_btn'] == "2") level_2($person, $message); // View Holdings
+            if ($person['last_btn'] == "2") level_2($person, $message); // View Loans
             if ($person['last_btn'] == "5") level_5($person, $message); // View Prices
 
             $data = [
@@ -520,7 +522,7 @@ function level_2(array $person, array|null $message = null, array|null $callback
 
                 $data['text'] = 'وام‌های ثبت شده‌ی شما: ' . "\n";
 
-                $currentDate = getCurrentJalaliDate();
+                $currentDate = getJalaliDate();
 
                 foreach ($loans as $loan) {
                     $installments = json_decode($loan['installments'], true);
@@ -908,49 +910,4 @@ function createFavoritesText($favorites): string
     } else $text = 'لیست علاقه‌مندی‌های شما خالیست!';
 
     return $text;
-}
-
-function getCurrentJalaliDate(): string
-{
-    // Get current Gregorian Date
-    $g_y = date('Y');
-    $g_m = date('m');
-    $g_d = date('d');
-
-    $g_days_in_month = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-    $j_days_in_month = [31, 31, 31, 31, 31, 31, 30, 30, 30, 30, 30, 29];
-
-    // Check for leap year
-    $gy = $g_y - 1600;
-    $gm = $g_m - 1;
-    $gd = $g_d - 1;
-
-    $g_day_no = 365 * $gy + floor(($gy + 3) / 4) - floor(($gy + 99) / 100) + floor(($gy + 399) / 400);
-
-    for ($i = 0; $i < $gm; ++$i)
-        $g_day_no += $g_days_in_month[$i];
-
-    if ($gm > 1 && (($g_y % 4 == 0 && $g_y % 100 != 0) || ($g_y % 400 == 0)))
-        $g_day_no++; // leap and after Feb
-
-    $g_day_no += $gd;
-    $j_day_no = $g_day_no - 79;
-    $j_np = floor($j_day_no / 12053);
-    $j_day_no = $j_day_no % 12053;
-    $jy = 979 + 33 * $j_np + 4 * floor($j_day_no / 1461);
-    $j_day_no %= 1461;
-
-    if ($j_day_no >= 366) {
-        $jy += floor(($j_day_no - 1) / 365);
-        $j_day_no = ($j_day_no - 1) % 365;
-    }
-
-    for ($i = 0; $i < 11 && $j_day_no >= $j_days_in_month[$i]; ++$i)
-        $j_day_no -= $j_days_in_month[$i];
-
-    $jm = $i + 1;
-    $jd = $j_day_no + 1;
-
-    // Return formatted as YYYY/MM/DD
-    return sprintf('%04d/%02d/%02d', $jy, $jm, $jd);
 }

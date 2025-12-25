@@ -8,6 +8,15 @@
     },
     "api/ExternalConnections/UpdatePrices.php": {
       "runtime": "vercel-php@0.7.1"
+    },
+    "api/cron/reminders.php": {
+      "runtime": "vercel-php@0.7.1"
     }
-  }
+  },
+  "crons": [
+    {
+      "path": "/api/cron/reminders.php",
+      "schedule": "0 10 * * *"
+    }
+  ]
 }
