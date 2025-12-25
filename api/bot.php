@@ -615,7 +615,6 @@ function level_2(array $person, array|null $message = null, array|null $callback
 /**
  * Level 5: View Prices
  * Note: In case the message is from the bot, this function
- * edits the message instead of sending a new message
  */
 #[NoReturn]
 function level_5(array $person, array|null $message = null, array|null $callback_query = null): void
@@ -628,7 +627,6 @@ function level_5(array $person, array|null $message = null, array|null $callback
         'reply_markup' => [
             'keyboard' => createKeyboardsArray(5, $person['is_admin'], $db),
             'resize_keyboard' => true,
-            'is_persistent' => true,
             'input_field_placeholder' => 'قیمت‌ها',
         ]
     ];
@@ -726,7 +724,19 @@ function level_5(array $person, array|null $message = null, array|null $callback
                     }
                     if (array_key_first($query_data['add_fav']) == 'asset') {
                         $result = $db->create('favorites', ['person_id' => $person['id'], 'asset_id' => $query_data['add_fav']['asset']]);
-                        if ($result) level_5($person, $message);
+                        $data['text'] = $result ? '✅ علاقه‌مندی جدید افزوده شد!' : '❌ خطای پایگاه داده!';
+                        sendToTelegram('editMessageText', $data);
+                        $favorites = $db->read(
+                            table: 'favorites f',
+                            conditions: ['person_id' => $person['id']],
+                            selectColumns: 'a.*',
+                            join: 'JOIN assets a ON a.id=f.asset_id',
+                            orderBy: ['asset_type' => 'DESC', 'id' => 'ASC']);
+
+                        $data['text'] = createFavoritesText($favorites);
+                        $data['reply_markup'] = ['inline_keyboard' => [[['text' => 'ویرایش لیست', 'callback_data' => json_encode(['edit_fav' => null])]]]];
+
+                        $telegram_method = 'sendMessage';
                     }
 
                 }
@@ -743,22 +753,38 @@ function level_5(array $person, array|null $message = null, array|null $callback
                     }
                     if (array_key_first($query_data['del_fav']) == 'conf') {
                         $result = $db->delete(table: 'favorites', conditions: ['id' => $query_data['del_fav']['conf']], resetAutoIncrement: true);
-                        if ($result) level_5($person, $message);
+                        $data['text'] = $result ? '✅ حذف موفقیت آمیز بود!' : '❌ خطای پایگاه داده!';
+                        sendToTelegram('editMessageText', $data);
+                        $favorites = $db->read(
+                            table: 'favorites f',
+                            conditions: ['person_id' => $person['id']],
+                            selectColumns: 'a.*',
+                            join: 'JOIN assets a ON a.id=f.asset_id',
+                            orderBy: ['asset_type' => 'DESC', 'id' => 'ASC']);
+
+                        $data['text'] = createFavoritesText($favorites);
+                        $data['reply_markup'] = ['inline_keyboard' => [[['text' => 'ویرایش لیست', 'callback_data' => json_encode(['edit_fav' => null])]]]];
+
+                        $telegram_method = 'sendMessage';
                     }
 
                 }
                 if (array_key_first($query_data) == 'back') {
-                    if ($query_data['back'] == 'favorites_list') level_5($person, $message);
+                    if ($query_data['back'] == 'favorites_list') {
+                        $favorites = $db->read(
+                            table: 'favorites f',
+                            conditions: ['person_id' => $person['id']],
+                            selectColumns: 'a.*',
+                            join: 'JOIN assets a ON a.id=f.asset_id',
+                            orderBy: ['asset_type' => 'DESC', 'id' => 'ASC']);
+
+                        $data['text'] = createFavoritesText($favorites);
+                        $data['reply_markup'] = ['inline_keyboard' => [[['text' => 'ویرایش لیست', 'callback_data' => json_encode(['edit_fav' => null])]]]];
+                    }
                 }
             }
 
         } else {
-
-            // Edit the message if it is from the bot itself
-            if ($message['from']['id'] == 8418841584) {
-                $telegram_method = 'editMessageText';
-                $data['message_id'] = $message['message_id'];
-            }
 
             $asset_types = array_column($asset_types, 'asset_type');
             foreach ($asset_types as $asset_type) array_unshift($data['reply_markup']['keyboard'], [['text' => $asset_type]]);
@@ -793,7 +819,8 @@ function level_5(array $person, array|null $message = null, array|null $callback
 
                     } else $data['text'] = 'این دسته بندی خالی‌ست!';
 
-                } elseif ($message['text'] == '❤ علاقه‌مندی‌ها ❤' || $message['from']['id'] == 8418841584) {
+                } elseif (
+                    $message['text'] == '❤ علاقه‌مندی‌ها ❤') {
 
                     $favorites = $db->read(
                         table: 'favorites f',
@@ -802,26 +829,11 @@ function level_5(array $person, array|null $message = null, array|null $callback
                         join: 'JOIN assets a ON a.id=f.asset_id',
                         orderBy: ['asset_type' => 'DESC', 'id' => 'ASC']);
 
-                    if ($favorites) {
-                        $asset_type = '';
-                        foreach ($favorites as $favorite) {
-                            if ($favorite['asset_type'] != $asset_type) {
-                                $asset_type = $favorite['asset_type'];
-                                $date = preg_split('/-/u', $favorite['date']);
-                                $date[1] = str_replace(
-                                    ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'],
-                                    ['فروردین', 'اردیبهشت', 'خرداد', 'تیر', 'مرداد', 'شهریور', 'مهر', 'آبان', 'آذر', 'دی', 'بهمن', 'اسفند'],
-                                    $date[1]);
-                                $data['text'] .= beautifulNumber("\nآخرین قیمت های «$favorite[asset_type]» در " . "$date[2] $date[1] $date[0]" . " ساعت " . $favorite['time'] . "\n", null);
-                            }
-                            $data['text'] .= "  - " . beautifulNumber($favorite['name'], null) . ': ' . beautifulNumber($favorite['price']) . "\n";
-                        }
-                    } else
-                        $data['text'] = 'لیست علاقه‌مندی‌های شما خالیست!';
-
+                    $data['text'] = createFavoritesText($favorites);
                     $data['reply_markup'] = ['inline_keyboard' => [[['text' => 'ویرایش لیست', 'callback_data' => json_encode(['edit_fav' => null])]]]];
 
-                } else $data['text'] = "پیام نامفهموم بود!\nلطفاً یکی از دسته‌بندی‌های زیر را انتخاب کنید:";
+                } else
+                    $data['text'] = "پیام نامفهموم بود!\nلطفاً یکی از دسته‌بندی‌های زیر را انتخاب کنید:";
             }
         }
     } else $data['text'] = "دسته‌بندی‌ای در سیستم یافت نشد!";
@@ -874,6 +886,28 @@ function createHoldingDetailText(array $holding, string|null $markdown = null, a
     if ($markdown === 'MarkdownV2') $price_tree = str_replace(["(", ")", ".", "-"], ["\(", "\)", "\.", "\-"], $price_tree);
 
     return $text . $holding['asset_name'] . $price_tree;
+}
+
+function createFavoritesText($favorites): string
+{
+    $text = '';
+    if ($favorites) {
+        $asset_type = '';
+        foreach ($favorites as $favorite) {
+            if ($favorite['asset_type'] != $asset_type) {
+                $asset_type = $favorite['asset_type'];
+                $date = preg_split('/-/u', $favorite['date']);
+                $date[1] = str_replace(
+                    ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'],
+                    ['فروردین', 'اردیبهشت', 'خرداد', 'تیر', 'مرداد', 'شهریور', 'مهر', 'آبان', 'آذر', 'دی', 'بهمن', 'اسفند'],
+                    $date[1]);
+                $text .= beautifulNumber("\nآخرین قیمت های «$favorite[asset_type]» در " . "$date[2] $date[1] $date[0]" . " ساعت " . $favorite['time'] . "\n", null);
+            }
+            $text .= "   -- " . beautifulNumber($favorite['name'], null) . ': ' . beautifulNumber($favorite['price']) . "\n";
+        }
+    } else $text = 'لیست علاقه‌مندی‌های شما خالیست!';
+
+    return $text;
 }
 
 function getCurrentJalaliDate(): string
