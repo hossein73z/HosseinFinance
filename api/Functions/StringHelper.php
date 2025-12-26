@@ -85,13 +85,24 @@ function getJalaliDate(
     int|string|null $g_y = null,
     int|string|null $g_m = null,
     int|string|null $g_d = null,
+    int             $offsetDays = 0,
     string|null     $delimiter = '/',
 ): string
 {
-    // Get current Gregorian Date
+    // 1. Set defaults to Current Gregorian Date if null
     $g_y = $g_y ?? date('Y');
     $g_m = $g_m ?? date('m');
     $g_d = $g_d ?? date('d');
+
+    // 2. Apply the offset if provided
+    // We use mktime because it automatically handles overflow/underflow
+    // (e.g., adding 5 days to Jan 30th handles the switch to Feb)
+    if ($offsetDays !== 0) {
+        $timestamp = mktime(0, 0, 0, (int)$g_m, (int)$g_d + $offsetDays, (int)$g_y);
+        $g_y = date('Y', $timestamp);
+        $g_m = date('m', $timestamp);
+        $g_d = date('d', $timestamp);
+    }
 
     $g_days_in_month = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
     $j_days_in_month = [31, 31, 31, 31, 31, 31, 30, 30, 30, 30, 30, 29];
@@ -129,4 +140,72 @@ function getJalaliDate(
 
     // Return formatted as YYYY/MM/DD
     return sprintf('%04d' . $delimiter . '%02d' . $delimiter . '%02d', $jy, $jm, $jd);
+}
+
+/**
+ * Converts a Jalali date to Gregorian.
+ * This is the mathematical inverse of your getJalaliDate function.
+ */
+function jalaliToGregorian(int $j_y, int $j_m, int $j_d): string
+{
+    $j_y = (int)$j_y;
+    $j_m = (int)$j_m;
+    $j_d = (int)$j_d;
+
+    $jy = $j_y - 979;
+    $jm = $j_m - 1;
+    $jd = $j_d - 1;
+
+    $j_days_in_month = [31, 31, 31, 31, 31, 31, 30, 30, 30, 30, 30, 29];
+    $j_day_no = 365 * $jy + floor($jy / 33) * 8 + floor(($jy % 33 + 3) / 4);
+
+    for ($i = 0; $i < $jm; ++$i) {
+        $j_day_no += $j_days_in_month[$i];
+    }
+
+    $j_day_no += $jd;
+    $g_day_no = $j_day_no + 79;
+
+    $gy = 1600 + 400 * floor($g_day_no / 146097);
+    $g_day_no = $g_day_no % 146097;
+
+    $leap = true;
+    if ($g_day_no >= 36525) {
+        $g_day_no--;
+        $gy += 100 * floor($g_day_no / 36524);
+        $g_day_no = $g_day_no % 36524;
+
+        if ($g_day_no >= 365) {
+            $g_day_no++;
+        } else {
+            $leap = false;
+        }
+    }
+
+    $gy += 4 * floor($g_day_no / 1461);
+    $g_day_no %= 1461;
+
+    if ($g_day_no >= 366) {
+        $leap = false;
+        $g_day_no--;
+        $gy += floor($g_day_no / 365);
+        $g_day_no = $g_day_no % 365;
+    }
+
+    $g_days_in_month = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    if ($leap) {
+        $g_days_in_month[1] = 29; // Feb has 29 days
+    }
+
+    $gm = 0;
+    while ($g_day_no >= $g_days_in_month[$gm]) {
+        $g_day_no -= $g_days_in_month[$gm];
+        $gm++;
+    }
+
+    $gm++; // Adjust 0-index to 1-index
+    $gd = $g_day_no + 1;
+
+    // Return as Y-m-d for DateTime compatibility
+    return sprintf('%04d-%02d-%02d', $gy, $gm, $gd);
 }

@@ -117,11 +117,12 @@ CREATE TABLE IF NOT EXISTS `test`.`transactions`
 CREATE TABLE IF NOT EXISTS `test`.`loans`
 (
     id                 INT AUTO_INCREMENT PRIMARY KEY,
-    person_id          INT            NOT NULL,
-    name               VARCHAR(191)   NOT NULL,
-    total_amount       NUMERIC(18, 8) NOT NULL,
+    person_id          INT                   NOT NULL,
+    name               VARCHAR(191)          NOT NULL,
+    total_amount       NUMERIC(18, 8)        NOT NULL,
     received_date      VARCHAR(10) DEFAULT NULL,
-    total_installments INT            NOT NULL,
+    alert_offset       INT         DEFAULT 0 NOT NULL,
+    total_installments INT                   NOT NULL,
     created_at         TIMESTAMP   DEFAULT CURRENT_TIMESTAMP,
 
     FOREIGN KEY (person_id) REFERENCES persons (id) ON DELETE CASCADE

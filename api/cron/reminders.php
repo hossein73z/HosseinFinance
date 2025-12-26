@@ -16,15 +16,12 @@ header('Content-Type: application/json');
 try {
     $db = DatabaseManager::getInstance();
 
-    $targetDate = getJalaliDate();
-
     $installments = $db->read(
         table: 'installments i',
         conditions: [
-            'i.is_paid' => false,
-            'i.due_date' => $targetDate
+            'i.is_paid' => false
         ],
-        selectColumns: 'i.*, p.chat_id, l.name as loan_name',
+        selectColumns: 'i.*, p.chat_id, l.name as loan_name, l.alert_offset',
         join: [
             [
                 'type' => 'INNER',
@@ -36,7 +33,8 @@ try {
                 'table' => 'persons p',
                 'on' => 'l.person_id = p.id'
             ]
-        ]
+        ],
+        orderBy: ['due_date' => 'ASC']
     );
 
     if (!$installments) {
@@ -48,13 +46,25 @@ try {
 
     foreach ($installments as $installment) {
 
-        $message = "📢 یادآوری\n\n";
-        $message .= "قسط وام «" . $installment['loan_name'] . "» به مبلغ " . beautifulNumber($installment['amount']);
+        $parts = explode('/', $installment['due_date']);
+        if (count($parts) == 3) {
+            $gregorianDueDate = new DateTime(jalaliToGregorian($parts[0], $parts[1], $parts[2]) . ' 00:00:00');
+            $today = new DateTime('now');
+            $today->setTime(0, 0); // Normalize today to midnight for accurate day calc
 
-        // Send request to Telegram
-        $response = sendToTelegram(method: 'sendMessage', data: ['chat_id' => $installment['chat_id'], 'text' => $message]);
-        if ($response) $count++;
-        else echo "\n\n" . json_encode($response, JSON_PRETTY_PRINT) . "\n\n";
+            $interval = $today->diff($gregorianDueDate);
+            $daysRemaining = (int)$interval->format('%r%a'); // %r gives sign (-/+), %a gives total days
+
+            if ($daysRemaining > $installment['alert_offset']) continue;
+
+            $message = "📢 یادآوری\n\n";
+            $message .= "قسط وام «" . $installment['loan_name'] . "» به مبلغ " . beautifulNumber($installment['amount']);
+
+            // Send request to Telegram
+            $response = sendToTelegram(method: 'sendMessage', data: ['chat_id' => $installment['chat_id'], 'text' => $message]);
+            if ($response) $count++;
+            else echo "\n\n" . json_encode($response, JSON_PRETTY_PRINT) . "\n\n";
+        }
     }
 
     echo json_encode(['status' => 'success', 'sent_count' => $count]);
