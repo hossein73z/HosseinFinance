@@ -55,10 +55,12 @@ try {
             $interval = $today->diff($gregorianDueDate);
             $daysRemaining = (int)$interval->format('%r%a'); // %r gives sign (-/+), %a gives total days
 
-            if ($daysRemaining > $installment['alert_offset']) continue;
+            if ($daysRemaining > $installment['alert_offset'] || $daysRemaining < 0) continue;
 
-            $message = "📢 یادآوری\n\n";
-            $message .= "قسط وام «" . $installment['loan_name'] . "» به مبلغ " . beautifulNumber($installment['amount']);
+            $message = "📢 یادآوری قسط!\n\n";
+            $message .= "وام: " . $installment['loan_name'];
+            $message .= "\nمبلغ: " . beautifulNumber($installment['amount']);
+            $message .= "\nتاریخ سررسید: " . beautifulNumber($installment['due_date'], null) . " (" . beautifulNumber($daysRemaining) . " روز دیگر)";
 
             // Send request to Telegram
             $response = sendToTelegram(method: 'sendMessage', data: ['chat_id' => $installment['chat_id'], 'text' => $message]);
