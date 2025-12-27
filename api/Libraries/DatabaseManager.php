@@ -247,8 +247,18 @@ class DatabaseManager
     }
 
     /**
+     * @param string $table Table name
+     * @param array $conditions Associative array for WHERE clause
+     * @param bool $single Return a single row?
+     * @param string $selectColumns Columns to select
+     * @param bool $distinct Use DISTINCT?
      * @param string|array $join Can be a raw string or an array of join definitions
-     * @param string|array $groupBy Field(s) to group by (Required for aggregation/JSON queries)
+     * @param string|array $groupBy Field(s) to group by (SQL Level)
+     * @param array $orderBy Order by definitions
+     * @param int|null $limit Limit results (SQL LIMIT)
+     * @param int $offset Offset results (SQL OFFSET)
+     * @param int|null $chunkSize Split the result into numerical chunks. If used with $chunkByColumn, chunks apply inside the groups.
+     * @param string|null $chunkByColumn Group the output array by the value of this column. (Converts 1/0 to "true"/"false").
      */
     public function read(
         string       $table,
@@ -261,7 +271,8 @@ class DatabaseManager
         array        $orderBy = [],
         ?int         $limit = null,
         int          $offset = 0,
-        ?int         $chunkSize = null
+        ?int         $chunkSize = null,
+        ?string      $chunkByColumn = null
     ): array|bool
     {
         $where = $this->buildWhere($conditions);
@@ -283,8 +294,7 @@ class DatabaseManager
             $joinClause = " $join";
         }
 
-        // --- 3. Handle Group By (NEW) ---
-        // SQL Order: WHERE -> GROUP BY -> HAVING -> ORDER BY
+        // --- 3. Handle Group By (SQL) ---
         $groupByClause = '';
         if (!empty($groupBy)) {
             $groupStr = is_array($groupBy) ? implode(', ', $groupBy) : $groupBy;
@@ -301,61 +311,77 @@ class DatabaseManager
         }
         $orderByClause = !empty($orderParts) ? " ORDER BY " . implode(', ', $orderParts) : "";
 
-        // --- Construct Main Query Part ---
-        // Added $groupByClause between WHERE and ORDER BY
-        $baseSql = "SELECT $distinctClause $selectColumns FROM $tableClause $joinClause";
+        // --- 5. Construct & Execute SQL ---
+        $sql = "SELECT $distinctClause $selectColumns FROM $tableClause $joinClause";
 
         if (!empty($where['clause'])) {
-            $baseSql .= " WHERE " . $where['clause'];
+            $sql .= " WHERE " . $where['clause'];
         }
 
-        $baseSql .= $groupByClause; // <--- Inserted Here
-        $baseSql .= $orderByClause;
+        $sql .= $groupByClause;
+        $sql .= $orderByClause;
 
-        // --- Handle Chunking ---
-        if ($chunkSize !== null && $chunkSize > 0) {
-            $sql = $baseSql;
-
-            if ($limit !== null && $limit > 0) {
-                $sql .= ($offset > 0) ? " LIMIT $offset, $limit" : " LIMIT $limit";
-            } elseif ($offset > 0) {
-                $sql .= " LIMIT $offset, 18446744073709551615";
-            }
-
-            try {
-                $stmt = $this->pdo->prepare($sql);
-                $stmt->execute($where['params']);
-                $allData = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-                if (empty($allData)) return [];
-
-                $chunks = [];
-                for ($i = 0; $i < count($allData); $i += $chunkSize) {
-                    $chunks[] = array_slice($allData, $i, $chunkSize);
-                }
-                return $chunks;
-
-            } catch (PDOException $e) {
-                error_log("READ (CHUNK) operation failed: " . $e->getMessage());
-                return false;
-            }
-        }
-
-        // --- Handle Standard Query ---
-        $sql = $baseSql;
-
+        // Handle LIMIT/OFFSET for the query
         if ($single) {
             $sql .= " LIMIT 1";
         } elseif ($limit !== null && $limit > 0) {
             $sql .= ($offset > 0) ? " LIMIT $offset, $limit" : " LIMIT $limit";
         } elseif ($offset > 0) {
+            // Big number to accommodate offset without limit
             $sql .= " LIMIT $offset, 18446744073709551615";
         }
 
         try {
             $stmt = $this->pdo->prepare($sql);
             $stmt->execute($where['params']);
-            return $single ? $stmt->fetch(PDO::FETCH_ASSOC) : $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            if ($single) {
+                return $stmt->fetch(PDO::FETCH_ASSOC);
+            }
+
+            $data = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            if (empty($data)) {
+                return [];
+            }
+
+            // --- 6. Post-Processing: Grouping by Column ---
+            if ($chunkByColumn !== null && $chunkByColumn !== '') {
+                $groupedData = [];
+
+                foreach ($data as $row) {
+                    $key = $row[$chunkByColumn] ?? 'undefined';
+
+                    // Explicitly handle Boolean-like values to ensure keys are "true"/"false"
+                    if ($key === 1 || $key === '1' || $key === true) {
+                        $key = 'true';
+                    } elseif ($key === 0 || $key === '0' || $key === false) {
+                        $key = 'false';
+                    }
+
+                    $groupedData[$key][] = $row;
+                }
+
+                // Replace main data with grouped data
+                $data = $groupedData;
+            }
+
+            // --- 7. Post-Processing: Numerical Chunking ---
+            if ($chunkSize !== null && $chunkSize > 0) {
+                if ($chunkByColumn !== null && $chunkByColumn !== '') {
+                    // Case A: Grouped by Column AND Chunked by Size
+                    // We need to chunk the arrays inside the groups
+                    foreach ($data as $groupKey => $rows) {
+                        $data[$groupKey] = array_chunk($rows, $chunkSize);
+                    }
+                } else {
+                    // Case B: Only Chunked by Size (Flat List)
+                    $data = array_chunk($data, $chunkSize);
+                }
+            }
+
+            return $data;
+
         } catch (PDOException $e) {
             error_log("READ operation failed: " . $e->getMessage());
             return false;
