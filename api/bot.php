@@ -1080,13 +1080,13 @@ function createLoansView(array $loans, int|string $mssg_id): string
         // Loop through installments to calculate counts
         foreach ($installments as $inst) {
             if ($inst['is_paid'] == 1)
-                $installments_per_year[explode('/', $inst['due_date'])[0]][] = "    [🟢](https://t.me/" . BOT_ID .
+                $installments_per_year[explode('/', $inst['due_date'])[0]][] = " [🟢](https://t.me/" . BOT_ID .
                     "?start=toggleLoanPayment_instId{$inst["id"]}_mssgId$mssg_id)";
             else
                 if ($inst['due_date'] < getJalaliDate())
-                    $installments_per_year[explode('/', $inst['due_date'])[0]][] = "    [🔴](https://t.me/" . BOT_ID .
+                    $installments_per_year[explode('/', $inst['due_date'])[0]][] = " [🔴](https://t.me/" . BOT_ID .
                         "?start=toggleLoanPayment_instId{$inst["id"]}_mssgId$mssg_id)";
-                else $installments_per_year[explode('/', $inst['due_date'])[0]][] = "    [⚪](https://t.me/" . BOT_ID .
+                else $installments_per_year[explode('/', $inst['due_date'])[0]][] = " [⚪](https://t.me/" . BOT_ID .
                     "?start=toggleLoanPayment_instId{$inst["id"]}_mssgId$mssg_id)";
 
             if (strlen($installments_string) % 12 == 0) $installments_string .= "\n‏       ┤─ ";
