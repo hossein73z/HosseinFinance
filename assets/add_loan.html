@@ -1237,7 +1237,7 @@
 
         const name = document.getElementById('name').value;
         const totalAmount = removeCommas(toEnglishDigits(document.getElementById('total_amount').value));
-        const receivedDate = toEnglishDigits(document.getElementById('received_date').value).replace(/\//g, '-'); // Standardize to hyphen or slash? PHP usually fine with hyphen YYYY-MM-DD
+        const receivedDate = toEnglishDigits(document.getElementById('received_date').value).replace(/\//g, '-');
         const alertOffsetVal = toEnglishDigits(document.getElementById('alert_offset').value);
         const totalRepayment = finalInstallments.reduce((sum, item) => sum + parseFloat(item.amount), 0);
 
@@ -1254,6 +1254,22 @@
             alert_offset: Number(alertOffsetVal) || 0
         };
 
+        // --- OPTIMIZATION START: Reduce JSON size ---
+        // We strip 'id' if it is null, and 'is_paid' if it is false to save bytes.
+        const optimizedInstallments = finalInstallments.map(inst => {
+            let clean = {
+                due_date: inst.due_date,
+                amount: inst.amount
+            };
+            // Only send ID if it exists (for edits)
+            if (inst.id) clean.id = inst.id;
+            // Only send is_paid if it is TRUE (assuming backend defaults to false)
+            if (inst.is_paid) clean.is_paid = true;
+
+            return clean;
+        });
+        // --- OPTIMIZATION END ---
+
         let payload = {};
 
         if (appMode === 'edit') {
@@ -1263,7 +1279,6 @@
             if (currentData.name !== originalLoanData.name) updates.name = currentData.name;
             if (currentData.total_amount !== parseFloat(originalLoanData.total_amount)) updates.total_amount = currentData.total_amount;
 
-            // Date compare (standardize format)
             const origDate = originalLoanData.received_date.replace(/\//g, '-');
             const currDate = currentData.received_date.replace(/\//g, '-');
             if (origDate !== currDate) updates.received_date = currDate;
@@ -1271,11 +1286,9 @@
             if (currentData.alert_offset !== parseInt(originalLoanData.alert_offset)) updates.alert_offset = currentData.alert_offset;
 
             // Check Installments
-            // Note: If user regenerated, IDs might be null.
-            // If modified, send the whole list to be safe, server can sync.
             if (hasInstallmentsChanged(originalLoanData.installments, finalInstallments)) {
-                updates.installments = finalInstallments;
-                updates.total_repayment = currentData.total_repayment; // Always update total if installments change
+                updates.installments = optimizedInstallments; // Use optimized array
+                updates.total_repayment = currentData.total_repayment;
             }
 
             if (Object.keys(updates).length === 0) {
@@ -1292,13 +1305,20 @@
             // Add Mode
             payload = {
                 loans: currentData,
-                installments: finalInstallments
+                installments: optimizedInstallments // Use optimized array
             };
         }
 
-        tg.sendData(JSON.stringify(payload));
+        const jsonStr = JSON.stringify(payload);
+
+        // Safety check for Telegram limits (approx 4096 bytes)
+        if (jsonStr.length > 4000) {
+            tg.showAlert('حجم داده‌ها زیاد است (' + jsonStr.length + ' بایت). لطفا تعداد اقساط را کاهش دهید.');
+            return;
+        }
+
+        tg.sendData(jsonStr);
         tg.close();
-    });
-</script>
+    });</script>
 </body>
 </html>

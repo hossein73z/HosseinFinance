@@ -476,6 +476,13 @@ function level_2(array $person, array|null $message = null, array|null $callback
             'input_field_placeholder' => '🏦 وام و اقساط',
         ]
     ];
+    // Add a button for creating new loan
+    array_unshift($data['reply_markup']['keyboard'], [[
+        'text' => '➕ افزودن وام جدید',
+        'web_app' => [
+            'url' =>
+                'https://' . getenv('VERCEL_PROJECT_PRODUCTION_URL') . '/assets/add_loan.html']
+    ]]);
 
 //    // Add web_app button(s)
 //    array_unshift($data['reply_markup']['keyboard'], [[
@@ -500,13 +507,6 @@ function level_2(array $person, array|null $message = null, array|null $callback
 //                'https://' . getenv('VERCEL_PROJECT_PRODUCTION_URL') . '/assets/add_loan.html' .
 //                '?data=' . base64_encode(json_encode($loan))]
 //    ]]);
-    // Add loan
-    array_unshift($data['reply_markup']['keyboard'], [[
-        'text' => '➕ افزودن وام جدید',
-        'web_app' => [
-            'url' =>
-                'https://' . getenv('VERCEL_PROJECT_PRODUCTION_URL') . '/assets/add_loan.html']
-    ]]);
 
     if ($callback_query) {
 
@@ -656,46 +656,6 @@ function level_2(array $person, array|null $message = null, array|null $callback
             } elseif (isset($message['text'])) {
                 if (preg_match("/^\/start (\w*?)_/m", $message['text'])) {
 
-                    // Toggle installment payment in loans message
-                    if (preg_match("/^\/start toggleLoanPayment_instId(\d+?)_mssgId(\d+?)$/m", $message['text'], $matches)) {
-
-                        sendToTelegram('deleteMessage', ['chat_id' => $person['chat_id'], 'message_id' => $message['message_id']]);
-                        $installment = $db->read(
-                            table: 'installments i',
-                            conditions: ['i.id' => $matches[1], 'l.person_id' => $person['id']],
-                            single: true,
-                            selectColumns: 'i.*, l.person_id',
-                            join: 'LEFT JOIN loans l ON i.loan_id = l.id');
-
-                        if ($installment) {
-
-                            $db->update('installments', ['is_paid' => !$installment['is_paid']], ['id' => $installment['id']]);
-
-                            $data['text'] = createLoansView(
-                                loans: $db->read(
-                                    'loans l',
-                                    conditions: ['person_id' => $person['id']],
-                                    selectColumns: "
-                                        l.*,
-                                        JSON_ARRAYAGG(
-                                            JSON_OBJECT(
-                                                'id', i.id,
-                                                'amount', i.amount,
-                                                'due_date', i.due_date,
-                                                'is_paid', i.is_paid
-                                            )
-                                        ) as installments",
-                                    join: "LEFT JOIN installments i ON l.id=i.loan_id",
-                                    groupBy: 'l.id',
-                                ),
-                                mssg_id: $matches[2]);
-                            $telegram_method = 'editMessageText';
-                            unset($data['reply_markup']);
-                            $data['parse_mode'] = "MarkdownV2";
-                            $data['message_id'] = $matches[2];
-
-                        } else $data['text'] = 'قسطی با این مشخصه یافت نشد!';
-                    }
                     // Toggle installment payment in loan's detail message
                     if (preg_match("/^\/start toggleInstPayment_instId(\d+?)_mssgId(\d+?)$/m", $message['text'], $matches)) {
 
@@ -1080,14 +1040,11 @@ function createLoansView(array $loans, int|string $mssg_id): string
         // Loop through installments to calculate counts
         foreach ($installments as $inst) {
             if ($inst['is_paid'] == 1)
-                $installments_per_year[explode('/', $inst['due_date'])[0]][] = " [🟢](https://t.me/" . BOT_ID .
-                    "?start=toggleLoanPayment_instId{$inst["id"]}_mssgId$mssg_id)";
+                $installments_per_year[explode('/', $inst['due_date'])[0]][] = " 🟢";
             else
                 if ($inst['due_date'] < getJalaliDate())
-                    $installments_per_year[explode('/', $inst['due_date'])[0]][] = " [🔴](https://t.me/" . BOT_ID .
-                        "?start=toggleLoanPayment_instId{$inst["id"]}_mssgId$mssg_id)";
-                else $installments_per_year[explode('/', $inst['due_date'])[0]][] = " [⚪](https://t.me/" . BOT_ID .
-                    "?start=toggleLoanPayment_instId{$inst["id"]}_mssgId$mssg_id)";
+                    $installments_per_year[explode('/', $inst['due_date'])[0]][] = " 🔴";
+                else $installments_per_year[explode('/', $inst['due_date'])[0]][] = " ⚪";
 
             if (strlen($installments_string) % 12 == 0) $installments_string .= "\n‏       ┤─ ";
         }
