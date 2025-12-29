@@ -1,3 +1,5 @@
+<!-- START OF FILE add_loan.html -->
+
 <!DOCTYPE html>
 <html lang="fa" dir="rtl">
 <head>
@@ -586,6 +588,7 @@
     // --- DATE VALIDATION HELPERS ---
     function isValidJalaliDateString(str) {
         if (!str) return false;
+        // Ensure inputs are english for calculation
         str = toEnglishDigits(str);
 
         const regex = /^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/;
@@ -601,6 +604,9 @@
         if (m < 1 || m > 12) return false;
         if (d < 1 || d > 31) return false;
         if (m > 6 && d === 31) return false;
+        if (m === 12 && d === 30) {
+            // Leap year check skipped for simplicity in JS, but 30 in Esfand is allowed tentatively
+        }
 
         return {y, m, d};
     }
@@ -631,8 +637,7 @@
             const originalValue = input.value;
 
             // Logical digits check (0-9, Persian digits)
-            let meaningfulChars
-            beforeCursor = 0;
+            let meaningfulCharsBeforeCursor = 0;
             for (let i = 0; i < selectionStart; i++) {
                 if (/[0-9\u0660-\u0669\u06f0-\u06f9]/.test(originalValue[i])) {
                     meaningfulCharsBeforeCursor++;
@@ -685,12 +690,14 @@
         });
     }
 
+    // Combined Date Mask and Validation
     function attachDateMask(element) {
         element.addEventListener('input', function (e) {
             let input = e.target;
             let originalValue = input.value;
             let selectionStart = input.selectionStart;
 
+            // Count meaningful digits before cursor to maintain position
             let digitsBeforeCursor = 0;
             for (let i = 0; i < selectionStart; i++) {
                 if (/[0-9\u0660-\u0669\u06f0-\u06f9]/.test(originalValue[i])) {
@@ -698,8 +705,9 @@
                 }
             }
 
+            // Clean and Format
             let val = toEnglishDigits(originalValue);
-            let clean = val.replace(/\D/g, '');
+            let clean = val.replace(/\D/g, ''); // strip everything non-digit
 
             if (clean.length > 8) {
                 clean = clean.substring(0, 8);
@@ -712,8 +720,11 @@
 
             const persianFormatted = toPersianDigits(formatted);
 
+            // Update Input Value
             if (input.value !== persianFormatted) {
                 input.value = persianFormatted;
+
+                // Restore Cursor Position
                 let newPos = 0;
                 let digitsEncountered = 0;
 
@@ -722,8 +733,30 @@
                     if (/[0-9\u06f0-\u06f9]/.test(persianFormatted[i])) digitsEncountered++;
                     newPos++;
                 }
+                // If cursor lands on a slash, move it forward
                 if (persianFormatted[newPos] === '/') newPos++;
                 input.setSelectionRange(newPos, newPos);
+            }
+
+            // --- VALIDATION ---
+            // Only validate if the user has entered a full date (8 digits -> 10 chars with slashes)
+            if (clean.length === 8) {
+                if (!isValidJalaliDateString(formatted)) {
+                    input.classList.add('input-error');
+                } else {
+                    input.classList.remove('input-error');
+                }
+            } else {
+                // While typing (incomplete date), do not show error
+                input.classList.remove('input-error');
+            }
+        });
+
+        // Validate on blur to catch incomplete dates
+        element.addEventListener('blur', function (e) {
+            const val = toEnglishDigits(e.target.value);
+            if (val.length > 0 && !isValidJalaliDateString(val)) {
+                e.target.classList.add('input-error');
             }
         });
     }
@@ -813,7 +846,7 @@
         const m = getSelectedValue(colMonth);
         let max = 31;
         if (m > 6 && m <= 11) max = 30;
-        if (m == 12) max = 30;
+        if (m == 12) max = 30; // Simplified
 
         const currentSelection = getSelectedValue(colDay);
         const currentItems = colDay.querySelectorAll('li[data-val]').length;
@@ -889,18 +922,8 @@
     function attachDatePicker(inputElement) {
         const wrapper = inputElement.closest('.input-with-icon');
 
-        inputElement.addEventListener('input', function (e) {
-            const val = e.target.value;
-            if (val.length > 0) {
-                if (!isValidJalaliDateString(val)) {
-                    inputElement.classList.add('input-error');
-                } else {
-                    inputElement.classList.remove('input-error');
-                }
-            } else {
-                inputElement.classList.remove('input-error');
-            }
-        });
+        // Note: The previous validation listener that was here has been moved to attachDateMask
+        // to prevent conflicts between the mask logic and validation logic.
 
         if (wrapper.querySelector('.date-picker-trigger')) return;
 
@@ -958,7 +981,8 @@
         document.getElementById('name').value = data.name || '';
 
         // Reveal Delete Button
-        document.getElementById('deleteBtn').classList.remove('hidden');
+        const delBtn = document.getElementById('deleteBtn');
+        delBtn.classList.remove('hidden');
 
         // Amount and Digits
         const amount = data.total_amount ? parseFloat(data.total_amount) : 0;
@@ -1075,11 +1099,6 @@
 
     // Cancel Buttons
     document.getElementById('btnCancelGenerator').addEventListener('click', () => {
-        // If we came from a list (and list exists), go back to list?
-        // Or just cancel everything back to main?
-        // Requirements say: List -> Regenerate -> New List.
-        // If I cancel regeneration, I should probably go back to the Main view or the List view?
-        // Let's assume cancel from Generator goes back to Main if no installments exist, or List if they do.
         if (finalInstallments.length > 0) {
             stepGen.classList.add('hidden');
             stepList.classList.remove('hidden');
@@ -1098,9 +1117,6 @@
     document.getElementById('btnBackToGen').addEventListener('click', () => {
         stepList.classList.add('hidden');
         stepGen.classList.remove('hidden');
-
-        // Pre-fill generator with current count/amount if possible?
-        // For now, keep previous inputs or empty.
     });
 
     // Logic to render rows from a data array
@@ -1227,9 +1243,10 @@
         }, function (btn) {
             if (btn === 'delete') {
                 const id = document.getElementById('loan_id').value;
+                // Specific JSON format as requested
                 const payload = {
-                    id: parseInt(id),
-                    delete: true
+                    delete: true,
+                    id: parseInt(id)
                 };
                 tg.sendData(JSON.stringify(payload));
                 tg.close();

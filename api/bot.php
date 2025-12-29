@@ -1106,7 +1106,7 @@ function createLoanDetailView(array $loan, int|string $mssg_id): string
     $text .= "\n جزئیات اقساط\: ";
 
     foreach ($installments as $index => $inst) {
-        $text .= "\n‏    " . beautifulNumber($index, null) . "\) " . $inst['is_paid'] . "  " . beautifulNumber($inst['due_date'], null) . ":  " . beautifulNumber($inst['amount']);
+        $text .= "\n‏    " . beautifulNumber(intval($index) + 1, null) . "\) " . $inst['is_paid'] . "  " . beautifulNumber($inst['due_date'], null) . ":  " . beautifulNumber($inst['amount']);
         $text .= "    [تغییر وضعیت پرداخت](https://t.me/" . BOT_ID . "?start=toggleInstPayment_instId$inst[id]_mssgId$mssg_id)";
     }
     return $text;
