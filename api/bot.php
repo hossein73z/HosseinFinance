@@ -476,6 +476,27 @@ function level_2(array $person, array|null $message = null, array|null $callback
             'input_field_placeholder' => '🏦 وام و اقساط',
         ]
     ];
+    // Check if user is in the middle of a progress
+    if (isset($person['progress'])) {
+
+        $progress = json_decode($person['progress'], true);
+        if ($progress) {
+
+            if (array_key_first($progress) == 'viewing_loan') {
+
+                $loan = $db->read('loans', ['id' => $progress['viewing_loan']['loan_id'], 'person_id' => $person['id']], true);
+                if ($loan) {
+                    array_unshift($data['reply_markup']['keyboard'], [[
+                        'text' => '✏ ویرایش وام «' . $loan['name'] . '»',
+                        'web_app' => [
+                            'url' =>
+                                'https://' . getenv('VERCEL_PROJECT_PRODUCTION_URL') . '/assets/add_loan.html' .
+                                '?data=' . base64_encode(json_encode($loan))]
+                    ]]);
+                }
+            }
+        }
+    }
     // Add a button for creating new loan
     array_unshift($data['reply_markup']['keyboard'], [[
         'text' => '➕ افزودن وام جدید',
@@ -483,30 +504,6 @@ function level_2(array $person, array|null $message = null, array|null $callback
             'url' =>
                 'https://' . getenv('VERCEL_PROJECT_PRODUCTION_URL') . '/assets/add_loan.html']
     ]]);
-
-//    // Add web_app button(s)
-//    array_unshift($data['reply_markup']['keyboard'], [[
-//        'text' => 'مدیریت وام و اقساط',
-//        'web_app' => [
-//            'url' =>
-//                'https://' . getenv('VERCEL_PROJECT_PRODUCTION_URL') . '/assets/loans.html?' .
-//                'k=' . getenv('DB_API_SECRET') . '&' .
-//                'id=' . $person['id']]
-//    ]]);
-//
-//    // Test edit button
-//    $loan = $db->read('loans', ['person_id' => $person['id']], true);
-//    $installments = $db->read('installments', ["loan_id" => $loan['id']], selectColumns: 'id, amount, due_date, is_paid');
-//    $loan['installments'] = $installments;
-//
-//    // Edit loan
-//    array_unshift($data['reply_markup']['keyboard'], [[
-//        'text' => '✏ ویرایش وام',
-//        'web_app' => [
-//            'url' =>
-//                'https://' . getenv('VERCEL_PROJECT_PRODUCTION_URL') . '/assets/add_loan.html' .
-//                '?data=' . base64_encode(json_encode($loan))]
-//    ]]);
 
     if ($callback_query) {
 
@@ -522,31 +519,9 @@ function level_2(array $person, array|null $message = null, array|null $callback
         if ($query_data == 'null') exit();
         if ($query_data) {
             if (array_key_first($query_data) == 'loan_list') {
-
-                $loans = $db->read(
-                    'loans l',
-                    conditions: ['person_id' => $person['id']],
-                    selectColumns: "
-                        l.*,
-                        JSON_ARRAYAGG(
-                            JSON_OBJECT(
-                                'id', i.id,
-                                'amount', i.amount,
-                                'due_date', i.due_date,
-                                'is_paid', i.is_paid
-                            )
-                        ) as installments",
-                    join: "LEFT JOIN installments i ON l.id=i.loan_id",
-                    groupBy: 'l.id',
-                );
-
-                if ($loans) {
-
-                    $data['text'] = createLoansView($loans, $message['message_id']);
-                    $data['parse_mode'] = "MarkdownV2";
-
-                } else $data['text'] = 'هیچ وام یا قسطی برای شما ثبت نشده است!';
-
+                $telegram_method = 'deleteMessage';
+                sendToTelegram($telegram_method, $data);
+                level_2($person);
             }
         }
 
@@ -652,7 +627,16 @@ function level_2(array $person, array|null $message = null, array|null $callback
                     level_2($person);
 
                 }
+                if ($web_app_data && isset($web_app_data['id']) && isset($web_app_data['delete'])) {
+                    if ($web_app_data['delete']) {
+                        $result = $db->delete('loans', ['id' => $web_app_data['id']]);
+                        $data['text'] = $result ? '✅ حذف وام با موفقیت انجام شد!' : '❌ خطای پایگاه داده در حذف وام!';
+                        sendToTelegram($telegram_method, $data);
+                        level_2($person);
+                    }
+                }
 
+                error_log('Web App Data: ' . json_encode($web_app_data, JSON_PRETTY_PRINT));
             } elseif (isset($message['text'])) {
                 if (preg_match("/^\/start (\w*?)_/m", $message['text'])) {
 
@@ -672,17 +656,13 @@ function level_2(array $person, array|null $message = null, array|null $callback
 
                             $db->update('installments', ['is_paid' => !$installment['is_paid']], ['id' => $installment['id']]);
 
-                            $installments = $db->read(
-                                table: 'installments i',
-                                conditions: ['i.loan_id' => $installment['loan_id'], 'l.person_id' => $person['id']],
-                                selectColumns: 'i.*, l.name as loan_name, l.total_amount as loan_total_amount, l.received_date as loan_received_date',
-                                join: 'JOIN loans l ON i.loan_id = l.id'
-                            );
-                            if ($installments) {
-                                $data['text'] = createLoanDetailView($installments, $matches[2]);
+                            $loan = $db->read('loans', ['id' => $installment['loan_id'], 'person_id' => $person['id']], true);
+                            if ($loan) {
+                                $loan['installments'] = $db->read('installments', ["loan_id" => $loan['id']]);
+                                $data['text'] = createLoanDetailView($loan, $matches[2]);
                                 $telegram_method = 'editMessageText';
                                 $data['reply_markup'] = ['inline_keyboard' => [
-                                    [['text' => 'لیست وام‌ها', 'callback_data' => json_encode(['loan_list' => null])]]
+                                    [['text' => 'برگشت به لیست وام‌ها', 'callback_data' => json_encode(['loan_list' => null])]]
                                 ]];
 
                                 $data['parse_mode'] = "MarkdownV2";
@@ -695,24 +675,43 @@ function level_2(array $person, array|null $message = null, array|null $callback
                     if (preg_match("/^\/start showLoan_loanId(\d+?)_mssgId(\d+?)$/m", $message['text'], $matches)) {
 
                         sendToTelegram('deleteMessage', ['chat_id' => $person['chat_id'], 'message_id' => $message['message_id']]);
+                        sendToTelegram('deleteMessage', ['chat_id' => $person['chat_id'], 'message_id' => $matches[2]]);
 
-                        $installments = $db->read(
-                            table: 'installments i',
-                            conditions: ['l.id' => $matches[1], 'l.person_id' => $person['id']],
-                            selectColumns: 'i.*, l.name as loan_name, l.total_amount as loan_total_amount, l.received_date as loan_received_date',
-                            join: 'JOIN loans l ON i.loan_id = l.id'
-                        );
-                        if ($installments) {
-                            $data['text'] = createLoanDetailView($installments, $matches[2]);
-                            $telegram_method = 'editMessageText';
+                        $loan = $db->read('loans', ['id' => $matches[1], 'person_id' => $person['id']], true);
+                        if ($loan) {
+                            $loan['installments'] = $db->read('installments', ["loan_id" => $loan['id']]);
+
+                            // Send a message just to show the bottom keyboard
+                            $data['text'] = 'جزئیات وام «' . $loan['name'] . '»';
+                            array_unshift($data['reply_markup']['keyboard'], [[
+                                'text' => '✏ ویرایش وام «' . $loan['name'] . '»',
+                                'web_app' => [
+                                    'url' =>
+                                        'https://' . getenv('VERCEL_PROJECT_PRODUCTION_URL') . '/assets/add_loan.html' .
+                                        '?data=' . base64_encode(json_encode($loan))]
+                            ]]);
+
+                            $response = sendToTelegram('sendMessage', $data);
+                            if (!$response) exit();
+
+                            // Send a message just to show the inline keyboard and get message ID
+                            $data['text'] = 'در حال دریافت اطلاعات اقساط ...';
                             $data['reply_markup'] = ['inline_keyboard' => [
-                                [['text' => 'لیست وام‌ها', 'callback_data' => json_encode(['loan_list' => null])]]
+                                [['text' => '...', 'callback_data' => 'null']]
                             ]];
+                            $inst_mssg = sendToTelegram('sendMessage', $data);
 
-                            $data['parse_mode'] = "MarkdownV2";
-                            $data['message_id'] = $matches[2];
+                            if ($inst_mssg) {
+                                $db->update('persons', ['progress' => json_encode(['viewing_loan' => ['loan_id' => $loan['id']]], JSON_PRETTY_PRINT)], ['id' => $person['id']]);
+                                $telegram_method = 'editMessageText';
+                                $data['text'] = createLoanDetailView($loan, $inst_mssg['result']['message_id']);
+                                $data['parse_mode'] = "MarkdownV2";
+                                $data['message_id'] = $inst_mssg['result']['message_id'];
+                                $data['reply_markup'] = ['inline_keyboard' => [
+                                    [['text' => 'برگشت به لیست وام‌ها', 'callback_data' => json_encode(['loan_list' => null])]]
+                                ]];
+                            }
                         }
-
                     }
                 }
             }
@@ -1027,7 +1026,7 @@ function markdownScape(string $text): string
     return str_replace(["(", ")", ".", "-"], ["\(", "\)", "\.", "\-"], $text);
 }
 
-function createLoansView(array $loans, int|string $mssg_id): string
+function createLoansView(array $loans, int|string|null $mssg_id = null): string
 {
     $text = 'وام‌های ثبت شده‌ی شما: ' . "\n";
     foreach ($loans as $loan) {
@@ -1040,16 +1039,18 @@ function createLoansView(array $loans, int|string $mssg_id): string
         // Loop through installments to calculate counts
         foreach ($installments as $inst) {
             if ($inst['is_paid'] == 1)
-                $installments_per_year[explode('/', $inst['due_date'])[0]][] = " 🟢";
+                $installments_per_year[explode('/', $inst['due_date'])[0]][] = "🟢";
             else
                 if ($inst['due_date'] < getJalaliDate())
-                    $installments_per_year[explode('/', $inst['due_date'])[0]][] = " 🔴";
-                else $installments_per_year[explode('/', $inst['due_date'])[0]][] = " ⚪";
+                    $installments_per_year[explode('/', $inst['due_date'])[0]][] = "🔴";
+                else $installments_per_year[explode('/', $inst['due_date'])[0]][] = "⚪";
 
             if (strlen($installments_string) % 12 == 0) $installments_string .= "\n‏       ┤─ ";
         }
 
-        $loan_name = "\n‏\-* " . "[" . markdownScape(beautifulNumber($loan['name'], null)) . "](https://t.me/" . BOT_ID . "?start=showLoan_loanId" . $loan['id'] . "_mssgId" . $mssg_id . ")*";
+        $loan_name = "\n‏\-* " . "[" . markdownScape(beautifulNumber($loan['name'], null)) . "](https://t.me/" . BOT_ID . "?start=showLoan_loanId" . $loan['id'];
+        if ($mssg_id) $loan_name .= "_mssgId" . $mssg_id;
+        $loan_name .= ")*";
         $loan_detail = "\n‏      │  ";
         $loan_detail .= "\n‏      ┤─ " . "مبلغ وام\: " . markdownScape(beautifulNumber($loan['total_amount']));
         $loan_detail .= "\n‏      ┤─ " . "تاریخ دریافت\: " . markdownScape(beautifulNumber($loan['received_date'], null));
@@ -1067,8 +1068,9 @@ function createLoansView(array $loans, int|string $mssg_id): string
     return $text;
 }
 
-function createLoanDetailView(array $installments, int|string $mssg_id): string
+function createLoanDetailView(array $loan, int|string $mssg_id): string
 {
+    $installments = $loan['installments'];
     $paid_count = 0;
     $overdue_count = 0;
     $remaining_count = 0;
@@ -1094,17 +1096,17 @@ function createLoanDetailView(array $installments, int|string $mssg_id): string
             }
     }
 
-    $text = "‏*" . markdownScape($installments[0]['loan_name']) . "*:\n";
-    $text .= "\n مبلغ وام\: " . markdownScape(beautifulNumber($installments[0]['loan_total_amount']));
-    $text .= "\n تاریخ دریافت\: " . markdownScape(beautifulNumber($installments[0]['loan_received_date'], null));
+    $text = "‏*" . markdownScape($loan['name']) . "*:\n";
+    $text .= "\n مبلغ وام\: " . markdownScape(beautifulNumber($loan['total_amount']));
+    $text .= "\n تاریخ دریافت\: " . markdownScape(beautifulNumber($loan['received_date'], null));
     $text .= "\n کل بازپرداخت\: " . markdownScape(beautifulNumber(array_sum(array_column($installments, 'amount'))));
     $text .= "\n " . markdownScape(beautifulNumber($paid_count) . " قسط پرداخت‌شده، معادل " . beautifulNumber($paid_sum));
     $text .= "\n " . markdownScape(beautifulNumber($remaining_count) . " قسط باقی‌مانده، معادل " . beautifulNumber($remaining_sum));
     $text .= "\n " . markdownScape(beautifulNumber($overdue_count) . " قسط معوقه، معادل " . beautifulNumber($overdue_sum));
     $text .= "\n جزئیات اقساط\: ";
 
-    foreach ($installments as $inst) {
-        $text .= "\n‏    \- " . $inst['is_paid'] . "  " . beautifulNumber($inst['due_date'], null) . ":  " . beautifulNumber($inst['amount']);
+    foreach ($installments as $index => $inst) {
+        $text .= "\n‏    " . beautifulNumber($index, null) . "\) " . $inst['is_paid'] . "  " . beautifulNumber($inst['due_date'], null) . ":  " . beautifulNumber($inst['amount']);
         $text .= "    [تغییر وضعیت پرداخت](https://t.me/" . BOT_ID . "?start=toggleInstPayment_instId$inst[id]_mssgId$mssg_id)";
     }
     return $text;

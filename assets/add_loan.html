@@ -441,6 +441,9 @@
             </div>
 
             <button type="submit" id="submitBtn">ثبت و ارسال به ربات</button>
+            <!-- DELETE BUTTON (Hidden by default) -->
+            <button type="button" id="deleteBtn" class="danger-btn hidden" style="margin-top: 15px;">حذف این وام
+            </button>
         </form>
     </div>
 
@@ -628,7 +631,8 @@
             const originalValue = input.value;
 
             // Logical digits check (0-9, Persian digits)
-            let meaningfulCharsBeforeCursor = 0;
+            let meaningfulChars
+            beforeCursor = 0;
             for (let i = 0; i < selectionStart; i++) {
                 if (/[0-9\u0660-\u0669\u06f0-\u06f9]/.test(originalValue[i])) {
                     meaningfulCharsBeforeCursor++;
@@ -953,6 +957,9 @@
         document.getElementById('loan_id').value = data.id;
         document.getElementById('name').value = data.name || '';
 
+        // Reveal Delete Button
+        document.getElementById('deleteBtn').classList.remove('hidden');
+
         // Amount and Digits
         const amount = data.total_amount ? parseFloat(data.total_amount) : 0;
         document.getElementById('total_amount').value = toPersianDigits(addCommas(amount));
@@ -1206,6 +1213,28 @@
         btnGoToInstallments.innerText = 'ویرایش اقساط';
         viewInst.classList.add('hidden');
         viewMain.classList.remove('hidden');
+    });
+
+    // --- DELETE LOGIC ---
+    document.getElementById('deleteBtn').addEventListener('click', function () {
+        tg.showPopup({
+            title: 'حذف وام',
+            message: 'آیا مطمئن هستید که می‌خواهید این وام و تمام اقساط آن را حذف کنید؟ این عملیات غیرقابل بازگشت است.',
+            buttons: [
+                {id: 'delete', type: 'destructive', text: 'حذف شود'},
+                {id: 'cancel', type: 'default', text: 'انصراف'}
+            ]
+        }, function (btn) {
+            if (btn === 'delete') {
+                const id = document.getElementById('loan_id').value;
+                const payload = {
+                    id: parseInt(id),
+                    delete: true
+                };
+                tg.sendData(JSON.stringify(payload));
+                tg.close();
+            }
+        });
     });
 
     // --- SUBMISSION & DIFF LOGIC ---
