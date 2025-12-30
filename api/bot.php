@@ -521,6 +521,7 @@ function level_2(array $person, array|null $message = null, array|null $callback
             if (array_key_first($query_data) == 'loan_list') {
                 $telegram_method = 'deleteMessage';
                 sendToTelegram($telegram_method, $data);
+                $person['progress'] = null;
                 level_2($person);
             }
         }
@@ -529,24 +530,13 @@ function level_2(array $person, array|null $message = null, array|null $callback
         if (!$message) {
 
             $loans = $db->read(
-                'loans l',
+                'loans',
                 conditions: ['person_id' => $person['id']],
-                selectColumns: "
-                l.*, 
-                JSON_ARRAYAGG(
-                    JSON_OBJECT(
-                        'id', i.id,
-                        'amount', i.amount,
-                        'due_date', i.due_date,
-                        'is_paid', i.is_paid
-                    )
-                ) as installments
-                ",
-                join: "LEFT JOIN installments i ON l.id=i.loan_id",
-                groupBy: 'l.id',
             );
 
             if ($loans) {
+                foreach ($loans as $index => $loan)
+                    $loans[$index]['installments'] = $db->read('installments', ["loan_id" => $loan['id']], orderBy: ['due_date' => 'ASC']);
 
                 // Send a message just to show the keyboards
                 $response = sendToTelegram('sendMessage', $data);
@@ -583,16 +573,15 @@ function level_2(array $person, array|null $message = null, array|null $callback
                         'total_amount' => $loanData['total_amount'],
                         'received_date' => $loanData['received_date'],
                         'alert_offset' => $loanData['alert_offset'],
-                        'total_repayment' => $loanData['total_repayment']
                     ];
 
                     $loan_id = $db->create('loans', $loan_insert_data);
 
                     if ($loan_id) {
-                        $installments = $web_app_data['installments'];
+                        $new_insts = $web_app_data['installments'];
                         $count = 0;
 
-                        foreach ($installments as $inst) {
+                        foreach ($new_insts as $inst) {
                             $inst_insert_data = [
                                 'loan_id' => $loan_id,
                                 'amount' => $inst['amount'],
@@ -603,27 +592,37 @@ function level_2(array $person, array|null $message = null, array|null $callback
                             $count++;
                         }
 
-                        $data['text'] = "✅ وام «{$loanData['name']}» با موفقیت ثبت شد.\n📊 تعداد اقساط: $count";
+                        $data['text'] = "✅ وام «{$loanData['name']}» با موفقیت ثبت شد.\n📊 تعداد اقساط: " . beautifulNumber($count);
                         sendToTelegram($telegram_method, $data);
                         level_2($person);
 
                     }
                 }
                 if ($web_app_data && isset($web_app_data['id']) && isset($web_app_data['updates'])) {
-                    $installments = $web_app_data['updates']['installments'];
+                    $new_insts = $web_app_data['updates']['installments'] ?? null;
                     unset($web_app_data['updates']['installments']);
 
-                    $data['text'] = "✅ ویرایش موفقیت آمیز بود!";
+                    $data['text'] = "نتیجه ویرایش وام: ";
+
                     if (sizeof($web_app_data['updates']) > 0) {
-                        $result = $db->update('loans', $web_app_data['updates'], ['id' => $web_app_data['id']]);
-                        if (!$result) $data['text'] = '❌ خط در دریافت اطلاعات. داده‌ها معتبر نیستند.';
-                    }
-                    foreach ($installments as $installment) {
-                        $result = $db->update('installments', $installment, ['id' => $installment['id']]);
-                        if (!$result) $data['text'] = '❌ خط در دریافت اطلاعات. داده‌ها معتبر نیستند.';
+                        $result = $db->update('loans', $web_app_data['updates'], ['id' => $web_app_data['id'], 'person_id' => $person['id']]);
+                        $data['text'] .= $result ? "\nویرایش اطلاعات وام: ✅" : "\nویرایش اطلاعات وام: ❌";
                     }
 
+                    if ($new_insts) {
+                        foreach ($new_insts as $index => $new_inst) $new_insts[$index]['loan_id'] = $web_app_data['id'];
+
+                        $result = $db->upsertBatch('installments', $new_insts);
+
+                        $data['text'] .= $result ?
+                            "\nویرایش اطلاعات اقساط: " . "✅" :
+                            "\nویرایش اطلاعات اقساط: " . "❌";
+
+                        $deleted_rows = $db->delete('installments', ['loan_id' => $web_app_data['id'], '!due_date' => array_column($new_insts, 'due_date')]);
+                        if ($deleted_rows) $data['text'] .= "\nتعداد قسط حذف شده: " . beautifulNumber($deleted_rows);
+                    }
                     sendToTelegram($telegram_method, $data);
+                    $person['progress'] = null;
                     level_2($person);
 
                 }
@@ -658,7 +657,7 @@ function level_2(array $person, array|null $message = null, array|null $callback
 
                             $loan = $db->read('loans', ['id' => $installment['loan_id'], 'person_id' => $person['id']], true);
                             if ($loan) {
-                                $loan['installments'] = $db->read('installments', ["loan_id" => $loan['id']]);
+                                $loan['installments'] = $db->read('installments', ["loan_id" => $loan['id']], orderBy: ['due_date' => 'ASC']);
                                 $data['text'] = createLoanDetailView($loan, $matches[2]);
                                 $telegram_method = 'editMessageText';
                                 $data['reply_markup'] = ['inline_keyboard' => [
@@ -679,7 +678,7 @@ function level_2(array $person, array|null $message = null, array|null $callback
 
                         $loan = $db->read('loans', ['id' => $matches[1], 'person_id' => $person['id']], true);
                         if ($loan) {
-                            $loan['installments'] = $db->read('installments', ["loan_id" => $loan['id']]);
+                            $loan['installments'] = $db->read('installments', ["loan_id" => $loan['id']], orderBy: ['due_date' => 'ASC']);
 
                             // Send a message just to show the bottom keyboard
                             $data['text'] = 'جزئیات وام «' . $loan['name'] . '»';
@@ -983,7 +982,6 @@ function createHoldingDetailText(array $holding, string|null $markdown = null, a
         "🟢 سود: " . beautifulNumber(($price_def * $holding['amount']) * floatval($holding['base_rate'])) :
         "🔴 ضرر: " . beautifulNumber(($price_def * $holding['amount']) * floatval($holding['base_rate']));
 
-
     $price_tree = "\n   │ " . "‏";
     $price_tree .= (in_array('date', $attributes)) ? ("\n   ┤── " . "تاریخ خرید: " . beautifulNumber("$date[2] $date[1] $date[0]", null)) : '';
     $price_tree .= (in_array('org_amount', $attributes)) ? ("\n   ┤── " . "مقدار / تعداد: " . beautifulNumber(floatval($holding['amount']))) : '';
@@ -1030,14 +1028,14 @@ function createLoansView(array $loans, int|string|null $mssg_id = null): string
 {
     $text = 'وام‌های ثبت شده‌ی شما: ' . "\n";
     foreach ($loans as $loan) {
-        $installments = json_decode($loan['installments'], true);
 
         // Initialize counters
         $installments_per_year = [];
         $installments_string = "\n       ┤─ ";
 
         // Loop through installments to calculate counts
-        foreach ($installments as $inst) {
+        foreach ($loan['installments'] as $inst) {
+
             if ($inst['is_paid'] == 1)
                 $installments_per_year[explode('/', $inst['due_date'])[0]][] = "🟢";
             else
@@ -1056,8 +1054,8 @@ function createLoansView(array $loans, int|string|null $mssg_id = null): string
         $loan_detail .= "\n‏      ┤─ " . "تاریخ دریافت\: " . markdownScape(beautifulNumber($loan['received_date'], null));
         $loan_detail .= "\n‏      ┘─ " . "وضعیت اقساط\: ";
         foreach ($installments_per_year as $year => $inst) {
-            if (array_key_last($installments_per_year) != $year) $loan_detail .= "\n‏       ┤─ ";
-            else $loan_detail .= "\n‏       ┘─ ";
+            if (array_key_last($installments_per_year) != $year) $loan_detail .= "\n‏          ┤─ ";
+            else $loan_detail .= "\n‏          ┘─ ";
 
             $loan_detail .= beautifulNumber($year, null) . '\: ' . implode('', $inst);
         }

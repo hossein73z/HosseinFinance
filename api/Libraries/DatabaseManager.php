@@ -135,36 +135,52 @@ class DatabaseManager
         $whereParts = [];
         $params = [];
 
-        foreach ($conditions as $column => $value) {
-            // 1. Determine SQL syntax:
-            // If it contains '->' (JSON) or '.' (Table.Column), do not wrap in backticks.
-            // Otherwise, wrap in backticks to be safe.
+        foreach ($conditions as $key => $value) {
+            // 1. Detect Negation and Strip '!'
+            $isNegation = false;
+            $column = $key;
+
+            if (str_starts_with($key, '!')) {
+                $isNegation = true;
+                $column = substr($key, 1); // Remove the '!'
+            }
+
+            // 2. Determine SQL syntax (Backticks vs Raw)
             if (str_contains($column, '->') || str_contains($column, '.')) {
                 $columnSql = $column;
             } else {
                 $columnSql = "`$column`";
             }
 
-            // 2. Create a safe PDO placeholder name:
-            // Remove ANY character that is not A-Z, 0-9, or underscore.
-            // This turns 'attrs->>"$.text"' into 'attrstext'
+            // 3. Create safe placeholder name base
+            // We include a "not_" prefix in the placeholder to avoid collisions
+            // if both "id" and "!id" are passed in the same array.
             $sanitizedColumn = preg_replace('/[^a-zA-Z0-9_]/', '', $column);
+            $paramPrefix = $isNegation ? 'not_' : '';
 
             if (is_array($value)) {
                 if (empty($value)) {
-                    $whereParts[] = '1 = 0';
+                    // Optimization:
+                    // 'id IN []' is IMPOSSIBLE (1=0)
+                    // 'id NOT IN []' is ALWAYS TRUE (1=1) - logic being nothing is in an empty list
+                    $whereParts[] = $isNegation ? '1 = 1' : '1 = 0';
                     continue;
                 }
+
                 $placeholders = [];
                 foreach ($value as $index => $item) {
-                    $placeholder = ":{$prefix}_{$sanitizedColumn}_{$index}";
+                    $placeholder = ":{$prefix}_{$paramPrefix}{$sanitizedColumn}_{$index}";
                     $placeholders[] = $placeholder;
                     $params[$placeholder] = $item;
                 }
-                $whereParts[] = "$columnSql IN (" . implode(', ', $placeholders) . ")";
+
+                $operator = $isNegation ? 'NOT IN' : 'IN';
+                $whereParts[] = "$columnSql $operator (" . implode(', ', $placeholders) . ")";
             } else {
-                $placeholder = ":{$prefix}_$sanitizedColumn";
-                $whereParts[] = "$columnSql = $placeholder";
+                $placeholder = ":{$prefix}_{$paramPrefix}{$sanitizedColumn}";
+                $operator = $isNegation ? '!=' : '=';
+
+                $whereParts[] = "$columnSql $operator $placeholder";
                 $params[$placeholder] = $value;
             }
         }

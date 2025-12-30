@@ -122,7 +122,6 @@ CREATE TABLE IF NOT EXISTS `test`.`loans`
     total_amount    NUMERIC(18, 8)        NOT NULL,
     received_date   VARCHAR(10) DEFAULT NULL,
     alert_offset    INT         DEFAULT 0 NOT NULL,
-    total_repayment INT                   NOT NULL,
     created_at      TIMESTAMP   DEFAULT CURRENT_TIMESTAMP,
 
     FOREIGN KEY (person_id) REFERENCES persons (id) ON DELETE CASCADE
@@ -136,6 +135,7 @@ CREATE TABLE IF NOT EXISTS `test`.`installments`
     due_date VARCHAR(10)    NOT NULL,
     is_paid  BOOLEAN        NOT NULL DEFAULT 0,
 
+    UNIQUE INDEX idx_unique_installment (loan_id, due_date),
     FOREIGN KEY (loan_id) REFERENCES loans (id) ON DELETE CASCADE
 ) DEFAULT CHARSET = utf8mb4;
 

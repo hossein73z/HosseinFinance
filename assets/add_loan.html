@@ -739,7 +739,8 @@
             }
 
             // --- VALIDATION ---
-            // Only validate if the user has entered a full date (8 digits -> 10 chars with slashes)
+            // Fix: Only add error class if it's a COMPLETE date (8 digits) that is invalid.
+            // If the user is typing (length < 8), remove the error immediately.
             if (clean.length === 8) {
                 if (!isValidJalaliDateString(formatted)) {
                     input.classList.add('input-error');
@@ -747,16 +748,18 @@
                     input.classList.remove('input-error');
                 }
             } else {
-                // While typing (incomplete date), do not show error
+                // While typing (incomplete date) or empty, do not show error
                 input.classList.remove('input-error');
             }
         });
 
-        // Validate on blur to catch incomplete dates
+        // Validate on blur to catch incomplete dates or lingering invalid states
         element.addEventListener('blur', function (e) {
             const val = toEnglishDigits(e.target.value);
             if (val.length > 0 && !isValidJalaliDateString(val)) {
                 e.target.classList.add('input-error');
+            } else if (val.length === 0) {
+                e.target.classList.remove('input-error');
             }
         });
     }
@@ -921,9 +924,6 @@
 
     function attachDatePicker(inputElement) {
         const wrapper = inputElement.closest('.input-with-icon');
-
-        // Note: The previous validation listener that was here has been moved to attachDateMask
-        // to prevent conflicts between the mask logic and validation logic.
 
         if (wrapper.querySelector('.date-picker-trigger')) return;
 
@@ -1285,7 +1285,6 @@
         const totalAmount = removeCommas(toEnglishDigits(document.getElementById('total_amount').value));
         const receivedDate = toEnglishDigits(document.getElementById('received_date').value).replace(/\//g, '-');
         const alertOffsetVal = toEnglishDigits(document.getElementById('alert_offset').value);
-        const totalRepayment = finalInstallments.reduce((sum, item) => sum + parseFloat(item.amount), 0);
 
         if (!isValidJalaliDateString(receivedDate)) {
             tg.showAlert('تاریخ دریافت وام معتبر نیست');
@@ -1296,7 +1295,6 @@
             name: name,
             total_amount: Number(totalAmount),
             received_date: receivedDate,
-            total_repayment: totalRepayment,
             alert_offset: Number(alertOffsetVal) || 0
         };
 
@@ -1334,7 +1332,6 @@
             // Check Installments
             if (hasInstallmentsChanged(originalLoanData.installments, finalInstallments)) {
                 updates.installments = optimizedInstallments; // Use optimized array
-                updates.total_repayment = currentData.total_repayment;
             }
 
             if (Object.keys(updates).length === 0) {
