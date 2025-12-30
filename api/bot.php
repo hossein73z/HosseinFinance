@@ -1024,6 +1024,9 @@ function markdownScape(string $text): string
     return str_replace(["(", ")", ".", "-"], ["\(", "\)", "\.", "\-"], $text);
 }
 
+/**
+ * @throws Exception
+ */
 function createLoansView(array $loans, int|string|null $mssg_id = null): string
 {
     $text = 'وام‌های ثبت شده‌ی شما: ' . "\n";
@@ -1032,18 +1035,34 @@ function createLoansView(array $loans, int|string|null $mssg_id = null): string
         // Initialize counters
         $installments_per_year = [];
         $installments_string = "\n       ┤─ ";
+        $next_payment = getJalaliDate();
 
         // Loop through installments to calculate counts
         foreach ($loan['installments'] as $inst) {
 
             if ($inst['is_paid'] == 1)
                 $installments_per_year[explode('/', $inst['due_date'])[0]][] = "🟢";
-            else
+            else {
+                if ($next_payment <= getJalaliDate()) $next_payment = $inst['due_date'];
                 if ($inst['due_date'] < getJalaliDate())
                     $installments_per_year[explode('/', $inst['due_date'])[0]][] = "🔴";
                 else $installments_per_year[explode('/', $inst['due_date'])[0]][] = "⚪";
+            }
 
             if (strlen($installments_string) % 12 == 0) $installments_string .= "\n‏       ┤─ ";
+        }
+
+        // Get remaining days to payment
+        $daysRemaining = 0;
+        $parts = explode('/', $next_payment);
+        if (count($parts) == 3) {
+
+            $gregorianDueDate = new DateTime(jalaliToGregorian($parts[0], $parts[1], $parts[2]) . ' 00:00:00');
+            $today = new DateTime('now');
+            $today->setTime(0, 0); // Normalize today to midnight for accurate day calc
+
+            $interval = $today->diff($gregorianDueDate);
+            $daysRemaining = (int)$interval->format('%r%a'); // %r gives sign (-/+), %a gives total days
         }
 
         $loan_name = "\n‏\-* " . "[" . markdownScape(beautifulNumber($loan['name'], null)) . "](https://t.me/" . BOT_ID . "?start=showLoan_loanId" . $loan['id'];
@@ -1052,6 +1071,9 @@ function createLoansView(array $loans, int|string|null $mssg_id = null): string
         $loan_detail = "\n‏      │  ";
         $loan_detail .= "\n‏      ┤─ " . "مبلغ وام\: " . markdownScape(beautifulNumber($loan['total_amount']));
         $loan_detail .= "\n‏      ┤─ " . "تاریخ دریافت\: " . markdownScape(beautifulNumber($loan['received_date'], null));
+
+        if ($daysRemaining) $loan_detail .= "\n‏      ┤─ " . "قسط بعدی\: " . beautifulNumber($daysRemaining) . ' روز دیگر';
+
         $loan_detail .= "\n‏      ┘─ " . "وضعیت اقساط\: ";
         foreach ($installments_per_year as $year => $inst) {
             if (array_key_last($installments_per_year) != $year) $loan_detail .= "\n‏          ┤─ ";
