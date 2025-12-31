@@ -148,9 +148,6 @@ function getJalaliDate(
  */
 function jalaliToGregorian(int $j_y, int $j_m, int $j_d): string
 {
-    $j_y = (int)$j_y;
-    $j_m = (int)$j_m;
-    $j_d = (int)$j_d;
 
     $jy = $j_y - 979;
     $jm = $j_m - 1;

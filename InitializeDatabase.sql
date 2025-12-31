@@ -116,13 +116,13 @@ CREATE TABLE IF NOT EXISTS `test`.`transactions`
 
 CREATE TABLE IF NOT EXISTS `test`.`loans`
 (
-    id              INT AUTO_INCREMENT PRIMARY KEY,
-    person_id       INT                   NOT NULL,
-    name            VARCHAR(191)          NOT NULL,
-    total_amount    NUMERIC(18, 8)        NOT NULL,
-    received_date   VARCHAR(10) DEFAULT NULL,
-    alert_offset    INT         DEFAULT 0 NOT NULL,
-    created_at      TIMESTAMP   DEFAULT CURRENT_TIMESTAMP,
+    id            INT AUTO_INCREMENT PRIMARY KEY,
+    person_id     INT                   NOT NULL,
+    name          VARCHAR(191)          NOT NULL,
+    total_amount  NUMERIC(18, 8)        NOT NULL,
+    received_date VARCHAR(10) DEFAULT NULL,
+    alert_offset  INT         DEFAULT 0 NOT NULL,
+    created_at    TIMESTAMP   DEFAULT CURRENT_TIMESTAMP,
 
     FOREIGN KEY (person_id) REFERENCES persons (id) ON DELETE CASCADE
 ) DEFAULT CHARSET = utf8mb4;
@@ -137,6 +137,17 @@ CREATE TABLE IF NOT EXISTS `test`.`installments`
 
     UNIQUE INDEX idx_unique_installment (loan_id, due_date),
     FOREIGN KEY (loan_id) REFERENCES loans (id) ON DELETE CASCADE
+) DEFAULT CHARSET = utf8mb4;
+
+CREATE TABLE IF NOT EXISTS `test`.`special_messages`
+(
+    id        INT AUTO_INCREMENT PRIMARY KEY,
+    person_id INT         NOT NULL,
+    type      VARCHAR(10) NOT NULL,
+    data      text        NOT NULL,
+
+    UNIQUE INDEX idx_unique_installment (person_id, type),
+    FOREIGN KEY (person_id) REFERENCES persons (id) ON DELETE CASCADE
 ) DEFAULT CHARSET = utf8mb4;
 
 alter table `test`.persons
@@ -156,4 +167,6 @@ alter table `test`.transactions
 alter table `test`.loans
     auto_increment 0;
 alter table `test`.installments
+    auto_increment 0;
+alter table `test`.special_messages
     auto_increment 0;
