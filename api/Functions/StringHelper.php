@@ -206,3 +206,30 @@ function jalaliToGregorian(int $j_y, int $j_m, int $j_d): string
     // Return as Y-m-d for DateTime compatibility
     return sprintf('%04d-%02d-%02d', $gy, $gm, $gd);
 }
+
+function createFavoritesText($favorites): string
+{
+    $text = '';
+    if ($favorites) {
+        $asset_type = '';
+        foreach ($favorites as $favorite) {
+            if ($favorite['asset_type'] != $asset_type) {
+                $asset_type = $favorite['asset_type'];
+                $date = preg_split('/-/u', $favorite['date']);
+                $date[1] = str_replace(
+                    ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'],
+                    ['فروردین', 'اردیبهشت', 'خرداد', 'تیر', 'مرداد', 'شهریور', 'مهر', 'آبان', 'آذر', 'دی', 'بهمن', 'اسفند'],
+                    $date[1]);
+                $text .= beautifulNumber("\nآخرین قیمت های «$favorite[asset_type]» در " . "$date[2] $date[1] $date[0]" . " ساعت " . $favorite['time'] . "\n", null);
+            }
+            $text .= "   -- " . beautifulNumber($favorite['name'], null) . ': ' . beautifulNumber($favorite['price']) . "\n";
+        }
+    } else $text = 'لیست علاقه‌مندی‌های شما خالیست!';
+
+    return $text;
+}
+
+function markdownScape(string $text): string
+{
+    return str_replace(["(", ")", ".", "-"], ["\(", "\)", "\.", "\-"], $text);
+}

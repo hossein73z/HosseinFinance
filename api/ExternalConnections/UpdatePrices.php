@@ -221,7 +221,11 @@ if (preg_match_all('/\|[  ].*? ((\d\d?) (.*?) (\d\d\d\d)) -[  ](\d\d:\d\d)/ums
 
     if ($asset_type) {
         // Successful extraction: Save to database and respond.
-        addPriceToDatabase($matches, $asset_type, $date, $time);
+        try {
+            addPriceToDatabase($matches, $asset_type, $date, $time);
+        } catch (Exception $e) {
+            error_log($e->getMessage());
+        }
         error_log("Received message for (($asset_type))");
     }
     exit();
@@ -237,10 +241,17 @@ if (preg_match_all('/\|[  ].*? ((\d\d?) (.*?) (\d\d\d\d)) -[  ](\d\d:\d\d)/ums
  * @param string $date The extracted date in 'YYYY-MM-DD' format.
  * @param string $time The extracted time in 'HH:MM' format.
  * @return void
+ * @throws Exception
  */
 function addPriceToDatabase(array $matches, string $asset_type, string $date, string $time): void
 {
-    $db = DatabaseManager::getInstance();
+    $db = DatabaseManager::getInstance(
+        host: getenv('DB_HOST'),
+        db: getenv('DB_NAME'),
+        user: getenv('DB_USER'),
+        pass: getenv('DB_PASS'),
+        port: getenv('DB_PORT') ?: '3306',
+    );
     $assets = [];
     // Format extracted data into a structured array for batch processing.
     foreach ($matches[1] as $index => $match) {
@@ -301,4 +312,36 @@ function addPriceToDatabase(array $matches, string $asset_type, string $date, st
     }
     // 1. Insert/Update assets (upsert ensures the asset exists in the table).
     $db->upsertBatch('assets', $assets);
+
+
+    // Update live messages
+    $live_mssgs = $db->read(
+        table: 'special_messages sm',
+        conditions: ['sm.type' => 'live_price'],
+        selectColumns: 'sm.*, p.chat_id',
+        join: 'JOIN persons p ON p.id = sm.person_id'
+    );
+
+    if ($live_mssgs) foreach ($live_mssgs as $live_mssg) {
+        $mssg_id = json_decode($live_mssg['data'], true)['mssg_id'];
+        if ($mssg_id) {
+            $favorites = $db->read(
+                table: 'favorites f',
+                conditions: ['person_id' => $live_mssg['person_id']],
+                selectColumns: 'a.*',
+                join: 'JOIN assets a ON a.id=f.asset_id',
+                orderBy: ['asset_type' => 'DESC', 'id' => 'ASC']);
+
+            $data['chat_id'] = $live_mssg['chat_id'];
+            $data['message_id'] = $mssg_id;
+            $data['text'] = createFavoritesText($favorites);
+            $data['reply_markup'] = ['inline_keyboard' => [
+                [['text' => 'توقف نمایش زنده ⏸', 'callback_data' => json_encode(['set_live' => false])]],
+                [['text' => 'ویرایش لیست', 'callback_data' => json_encode(['edit_fav' => null])]],
+            ]];
+
+            sendToTelegram('editMessageText', $data);
+        }
+    }
+
 }

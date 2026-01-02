@@ -27,39 +27,31 @@ class DatabaseManager
 
     /**
      * Private constructor to enforce the Singleton pattern.
-     * Establishes the PDO database connection upon first instantiation.
+     * Establishes the PDO database connection using passed credentials.
+     *
+     * @param string $host Database host
+     * @param string $db Database name
+     * @param string $user Database username
+     * @param string $pass Database password
+     * @param int|string $port Database port
      */
-    private function __construct()
+    private function __construct(string $host, string $db, string $user, string $pass, int|string $port)
     {
-        // 1. Retrieve credentials from Vercel Environment Variables
-        // Note: We use getenv() which works with Vercel's secret injection
-        $host = getenv('DB_HOST');
-        $port = getenv('DB_PORT') ?: '3306';
-        $db = getenv('DB_NAME');
-        $user = getenv('DB_USER');
-        $pass = getenv('DB_PASS');
-
-        if (!$host || !$db || !$user) {
-            // If running locally without .env loaded or secrets missing in Vercel
-            throw new Exception("Database configuration missing. Please check Vercel Environment Variables.");
-        }
-
-        // 2. Data Source Name (DSN)
+        // 1. Data Source Name (DSN)
         $dsn = "mysql:host={$host};port={$port};dbname={$db};charset=utf8mb4";
 
-        // 3. PDO connection options
+        // 2. PDO connection options
         $options = [
             PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,      // Throw exceptions on error
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC, // Default fetch mode is associative array
             PDO::ATTR_EMULATE_PREPARES => false,              // Use real prepared statements
         ];
 
-        // 4. TiDB Cloud / SSL Configuration
+        // 3. TiDB Cloud / SSL Configuration
         // TiDB Cloud (Port 4000) requires a secure connection.
         if ($port == 4000 || $host !== 'localhost') {
-
             // Disable strict certificate verification to avoid "caching_sha2_password" or "SSL certificate" errors
-            // inside the Vercel serverless environment which might lack specific CA bundles.
+            // inside serverless environments which might lack specific CA bundles.
             $options[PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT] = false;
 
             // Force SSL Mode.
@@ -73,7 +65,7 @@ class DatabaseManager
         try {
             $this->pdo = new PDO($dsn, $user, $pass, $options);
         } catch (PDOException $e) {
-            // Log error internally (Vercel logs) and throw generic error to prevent leaking creds
+            // Log error internally and throw generic error to prevent leaking creds
             error_log("Database connection failed: " . $e->getMessage());
             die("Database connection failed. Check server logs.");
         }
@@ -81,15 +73,39 @@ class DatabaseManager
 
     /**
      * Gets the singleton instance of the DatabaseManager.
-     * If no instance exists, it creates one and establishes the connection.
+     *
+     * NOTE: On the FIRST call, you MUST provide $host, $db, $user, and $pass.
+     * On subsequent calls, you can leave them null to retrieve the existing instance.
+     *
+     * @param string|null $host
+     * @param string|null $db
+     * @param string|null $user
+     * @param string|null $pass
+     * @param int|string $port
      *
      * @return DatabaseManager The single instance of the class.
+     * @throws Exception If parameters are missing during the first initialization.
      */
-    public static function getInstance(): DatabaseManager
+    public static function getInstance(
+        ?string    $host = null,
+        ?string    $db = null,
+        ?string    $user = null,
+        ?string    $pass = null,
+        int|string $port = 3306
+    ): DatabaseManager
     {
         if (self::$instance === null) {
-            self::$instance = new self();
+            // If instance doesn't exist, we absolutely need credentials
+            if (!$host || !$db || !$user) {
+                throw new Exception("DatabaseManager not initialized. Host, Database, and User parameters are required for the first call.");
+            }
+
+            // Allow empty password (some local setups), but convert null to string
+            $pass = $pass ?? '';
+
+            self::$instance = new self($host, $db, $user, $pass, $port);
         }
+
         return self::$instance;
     }
 

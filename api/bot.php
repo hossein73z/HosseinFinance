@@ -78,7 +78,18 @@ if (json_last_error() !== JSON_ERROR_NONE) {
 }
 
 // Get Database Instance.
-$db = DatabaseManager::getInstance();
+try {
+    $db = DatabaseManager::getInstance(
+        host: getenv('DB_HOST'),
+        db: getenv('DB_NAME'),
+        user: getenv('DB_USER'),
+        pass: getenv('DB_PASS'),
+        port: getenv('DB_PORT') ?: '3306',
+    );
+} catch (Exception $e) {
+    error_log($e->getMessage());
+    exit();
+}
 
 // --- MAIN UPDATE ROUTER ---
 
@@ -516,7 +527,8 @@ function level_2(array $person, array|null $message = null, array|null $callback
             }
         }
 
-    } else {
+    }
+    if (!$callback_query) {
         if (!$message) {
 
             $loans = $db->read(
@@ -526,7 +538,7 @@ function level_2(array $person, array|null $message = null, array|null $callback
 
             if ($loans) {
                 foreach ($loans as $index => $loan)
-                    $loans[$index]['installments'] = $db->read('installments', ["person_id" => $loan['id']], orderBy: ['due_date' => 'ASC']);
+                    $loans[$index]['installments'] = $db->read('installments', ["loan_id" => $loan['id']], orderBy: ['due_date' => 'ASC']);
 
                 // Send a message just to show the keyboards
                 $response = sendToTelegram('sendMessage', $data);
@@ -651,7 +663,7 @@ function level_2(array $person, array|null $message = null, array|null $callback
 
                             $loan = $db->read('loans', ['id' => $installment['person_id'], 'person_id' => $person['id']], true);
                             if ($loan) {
-                                $loan['installments'] = $db->read('installments', ["person_id" => $loan['id']], orderBy: ['due_date' => 'ASC']);
+                                $loan['installments'] = $db->read('installments', ["loan_id" => $loan['id']], orderBy: ['due_date' => 'ASC']);
                                 $data['text'] = createLoanDetailView($loan, $matches[2]);
                                 $telegram_method = 'editMessageText';
                                 $data['reply_markup'] = ['inline_keyboard' => [
@@ -672,7 +684,7 @@ function level_2(array $person, array|null $message = null, array|null $callback
 
                         $loan = $db->read('loans', ['id' => $matches[1], 'person_id' => $person['id']], true);
                         if ($loan) {
-                            $loan['installments'] = $db->read('installments', ["person_id" => $loan['id']], orderBy: ['due_date' => 'ASC']);
+                            $loan['installments'] = $db->read('installments', ["loan_id" => $loan['id']], orderBy: ['due_date' => 'ASC']);
 
                             // Send a message just to show the bottom keyboard
                             $data['text'] = 'جزئیات وام «' . $loan['name'] . '»';
@@ -695,7 +707,7 @@ function level_2(array $person, array|null $message = null, array|null $callback
                             $inst_mssg = sendToTelegram('sendMessage', $data);
 
                             if ($inst_mssg) {
-                                $db->update('persons', ['progress' => json_encode(['viewing_loan' => ['person_id' => $loan['id']]], JSON_PRETTY_PRINT)], ['id' => $person['id']]);
+                                $db->update('persons', ['progress' => json_encode(['viewing_loan' => ['loan_id' => $loan['id']]], JSON_PRETTY_PRINT)], ['id' => $person['id']]);
                                 $telegram_method = 'editMessageText';
                                 $data['text'] = createLoanDetailView($loan, $inst_mssg['result']['message_id']);
                                 $data['parse_mode'] = "MarkdownV2";
@@ -1092,33 +1104,6 @@ function createHoldingDetailText(array $holding, string|null $markdown = null, a
     if ($markdown === 'MarkdownV2') $price_tree = markdownScape($price_tree);
 
     return $text . $holding['asset_name'] . $price_tree;
-}
-
-function createFavoritesText($favorites): string
-{
-    $text = '';
-    if ($favorites) {
-        $asset_type = '';
-        foreach ($favorites as $favorite) {
-            if ($favorite['asset_type'] != $asset_type) {
-                $asset_type = $favorite['asset_type'];
-                $date = preg_split('/-/u', $favorite['date']);
-                $date[1] = str_replace(
-                    ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'],
-                    ['فروردین', 'اردیبهشت', 'خرداد', 'تیر', 'مرداد', 'شهریور', 'مهر', 'آبان', 'آذر', 'دی', 'بهمن', 'اسفند'],
-                    $date[1]);
-                $text .= beautifulNumber("\nآخرین قیمت های «$favorite[asset_type]» در " . "$date[2] $date[1] $date[0]" . " ساعت " . $favorite['time'] . "\n", null);
-            }
-            $text .= "   -- " . beautifulNumber($favorite['name'], null) . ': ' . beautifulNumber($favorite['price']) . "\n";
-        }
-    } else $text = 'لیست علاقه‌مندی‌های شما خالیست!';
-
-    return $text;
-}
-
-function markdownScape(string $text): string
-{
-    return str_replace(["(", ")", ".", "-"], ["\(", "\)", "\.", "\-"], $text);
 }
 
 /**
