@@ -564,7 +564,8 @@ function level_2(array $person, array|null $message = null, array|null $callback
 
             } else $data['text'] = 'هیچ وام یا قسطی برای شما ثبت نشده است!';
 
-        } else {
+        }
+        if ($message) {
             $data['text'] = "پیام نامفهوم است!";
 
             if (isset($message['web_app_data'])) {
@@ -661,7 +662,7 @@ function level_2(array $person, array|null $message = null, array|null $callback
 
                             $db->update('installments', ['is_paid' => !$installment['is_paid']], ['id' => $installment['id']]);
 
-                            $loan = $db->read('loans', ['id' => $installment['person_id'], 'person_id' => $person['id']], true);
+                            $loan = $db->read('loans', ['id' => $installment['loan_id'], 'person_id' => $person['id']], true);
                             if ($loan) {
                                 $loan['installments'] = $db->read('installments', ["loan_id" => $loan['id']], orderBy: ['due_date' => 'ASC']);
                                 $data['text'] = createLoanDetailView($loan, $matches[2]);
