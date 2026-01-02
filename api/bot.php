@@ -655,7 +655,7 @@ function level_2(array $person, array|null $message = null, array|null $callback
                             conditions: ['i.id' => $matches[1], 'l.person_id' => $person['id']],
                             single: true,
                             selectColumns: 'i.*, l.person_id',
-                            join: 'LEFT JOIN loans l ON i.person_id = l.id');
+                            join: 'LEFT JOIN loans l ON i.loan_id = l.id');
 
                         if ($installment) {
 
