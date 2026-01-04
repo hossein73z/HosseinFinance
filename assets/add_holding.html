@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>ثبت دارایی</title>
+    <title>مدیریت دارایی</title>
 
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css" rel="stylesheet"
@@ -49,7 +49,7 @@
             box-sizing: border-box;
         }
 
-        h2 {
+        h2, h3 {
             text-align: center;
             color: var(--text-color);
             margin-top: 0;
@@ -59,15 +59,6 @@
 
         .form-group {
             margin-bottom: 12px;
-        }
-
-        .row-group {
-            display: flex;
-            gap: 10px;
-        }
-
-        .row-group > div {
-            flex: 1;
         }
 
         label {
@@ -83,6 +74,15 @@
             width: 100%;
         }
 
+        .row-group {
+            display: flex;
+            gap: 10px;
+        }
+
+        .row-group .form-group {
+            flex: 1;
+        }
+
         input, select, textarea {
             width: 100%;
             padding: 10px;
@@ -96,15 +96,19 @@
             color: var(--text-color);
         }
 
-        /* Change Amount to text type so we need inputmode decimal */
-        input[inputmode="decimal"] {
-            direction: ltr; /* Keeps decimals aligned correctly logic-wise, but font is Persian */
-            text-align: right;
-        }
-
-        /* Specific fix for Persian inputs to ensure text alignment */
         input, textarea {
             text-align: right;
+            direction: ltr; /* Keeps numbers aligned correctly while typing */
+        }
+
+        /* Override direction for specific inputs to ensure Persian feel */
+        input:not([type="number"]) {
+            direction: rtl;
+        }
+
+        /* Specific override for numeric-like inputs to ensure cursors behave in RTL */
+        .decimal-input, .date-input, .time-input {
+            text-align: center; /* Center align looks better for dates/numbers in cards */
         }
 
         input.input-error {
@@ -136,11 +140,6 @@
             fill: currentColor;
         }
 
-        textarea {
-            resize: vertical;
-            min-height: 80px;
-        }
-
         input:focus, select:focus, textarea:focus {
             border-color: var(--button-color);
             outline: none;
@@ -160,25 +159,17 @@
             margin-top: 10px;
         }
 
+        button.danger-btn {
+            background-color: #dc3545;
+            color: white;
+        }
+
         button:active {
             transform: translateY(1px);
         }
 
-        button:disabled {
-            opacity: 0.7;
-            cursor: not-allowed;
-        }
-
-        /* Delete Button Styles */
-        .btn-delete {
-            background-color: transparent;
-            color: var(--error-color);
-            border: 1px solid var(--error-color);
-            margin-top: 10px;
-        }
-
-        .btn-delete:active {
-            background-color: rgba(220, 53, 69, 0.1);
+        .hidden {
+            display: none !important;
         }
 
         /* --- LOADING OVERLAY --- */
@@ -221,8 +212,8 @@
             }
         }
 
-        /* --- PICKER MODAL (Shared for Date & Time) --- */
-        .picker-overlay {
+        /* --- PICKER MODAL --- */
+        #picker-overlay {
             position: fixed;
             top: 0;
             left: 0;
@@ -237,7 +228,7 @@
             transition: opacity 0.3s;
         }
 
-        .picker-overlay.active {
+        #picker-overlay.active {
             opacity: 1;
         }
 
@@ -251,7 +242,7 @@
             box-shadow: 0 -5px 25px rgba(0, 0, 0, 0.1);
         }
 
-        .picker-overlay.active .picker-container {
+        #picker-overlay.active .picker-container {
             transform: translateY(0);
         }
 
@@ -273,6 +264,13 @@
 
         .picker-btn.cancel {
             color: var(--hint-color);
+        }
+
+        #picker-titles {
+            display: flex;
+            text-align: center;
+            direction: ltr;
+            margin-bottom: 5px;
         }
 
         .wheels-wrapper {
@@ -311,10 +309,6 @@
             scrollbar-width: none;
             -ms-overflow-style: none;
             cursor: grab;
-        }
-
-        .wheel-col:active {
-            cursor: grabbing;
         }
 
         .wheel-col::-webkit-scrollbar {
@@ -358,108 +352,85 @@
 <!-- Loading Overlay -->
 <div id="loading-overlay">
     <div class="spinner"></div>
-    <div class="loading-text">در حال بارگذاری اطلاعات...</div>
+    <div class="loading-text">در حال دریافت اطلاعات...</div>
 </div>
 
 <div class="container">
     <h2 id="page-title">افزودن دارایی جدید</h2>
     <form id="holdingForm">
+        <input type="hidden" id="holding_id">
 
         <!-- Asset Type Selection -->
         <div class="form-group">
             <label for="asset_type">نوع دارایی</label>
             <select id="asset_type" required>
-                <option value="" disabled selected>در حال بارگذاری...</option>
+                <option value="" disabled selected>انتخاب کنید...</option>
+                <!-- Filled via JS -->
             </select>
         </div>
 
         <!-- Asset Name Selection -->
         <div class="form-group">
             <label for="asset_id">نام دارایی</label>
-            <select id="asset_id" disabled required>
+            <select id="asset_id" required disabled>
                 <option value="" disabled selected>ابتدا نوع دارایی را انتخاب کنید</option>
+                <!-- Filled via JS -->
             </select>
         </div>
 
-        <!-- Amount (Allows decimals, formatted with commas, Persian) -->
+        <!-- Amount -->
         <div class="form-group">
-            <label for="amount">مقدار (تعداد/حجم)</label>
-            <input type="text" id="amount" class="formatted-number" placeholder="مثلا: ۰.۵" inputmode="decimal"
-                   required>
+            <label for="amount">مقدار / تعداد</label>
+            <input type="text" id="amount" class="decimal-input" inputmode="decimal" placeholder="مثلا: ۱.۵" required>
         </div>
 
-        <!-- Average Price (Currency formatted, Persian) -->
+        <!-- Avg Price -->
         <div class="form-group">
-            <label for="avg_price">میانگین قیمت خرید (ریال)</label>
-            <input type="text" id="avg_price" class="formatted-number" placeholder="۲۰۰,۰۰۰,۰۰۰" inputmode="numeric"
+            <label for="avg_price" id="label_avg_price">میانگین قیمت خرید</label>
+            <input type="text" id="avg_price" class="decimal-input" inputmode="decimal" placeholder="مثلا: ۱۰۰,۰۰۰"
                    required>
         </div>
 
         <!-- Date & Time Row -->
-        <div class="row-group form-group">
-            <div>
-                <label for="holding_date">تاریخ خرید</label>
+        <div class="row-group">
+            <div class="form-group" style="flex: 1.5;">
+                <label for="date">تاریخ</label>
                 <div class="input-with-icon">
-                    <input type="text" id="holding_date" class="has-picker" placeholder="۱۴۰۳/۰۱/۰۱" required>
+                    <input type="text" id="date" class="date-input has-picker" placeholder="۱۴۰۳/۰۱/۰۱" required>
                 </div>
             </div>
-            <div>
-                <label for="holding_time">زمان ثبت</label>
+            <div class="form-group" style="flex: 1;">
+                <label for="time">ساعت</label>
                 <div class="input-with-icon">
-                    <input type="text" id="holding_time" class="has-picker" placeholder="۱۴:۳۰" required>
+                    <input type="text" id="time" class="time-input has-picker" placeholder="۱۲:۳۰" required>
                 </div>
             </div>
         </div>
 
         <!-- Note -->
         <div class="form-group">
-            <label for="note">توضیحات (اختیاری)</label>
-            <textarea id="note" placeholder="یادداشت..."></textarea>
+            <label for="note">یادداشت (اختیاری)</label>
+            <textarea id="note" rows="3" placeholder="توضیحات اضافه..."></textarea>
         </div>
 
-        <button type="submit" id="submitBtn">ثبت</button>
-
-        <!-- Delete Button (Initially Hidden) -->
-        <button type="button" id="deleteBtn" class="btn-delete" style="display: none;">حذف دارایی</button>
+        <button type="submit" id="submitBtn">ثبت دارایی</button>
+        <button type="button" id="deleteBtn" class="danger-btn hidden" style="margin-top: 15px;">حذف دارایی</button>
     </form>
 </div>
 
-<!-- Date Picker Overlay -->
-<div id="date-picker-overlay" class="picker-overlay">
+<!-- Generic Picker Overlay -->
+<div id="picker-overlay">
     <div class="picker-container">
         <div class="picker-header">
-            <button class="picker-btn cancel" id="date-picker-cancel">انصراف</button>
-            <button class="picker-btn" id="date-picker-done">تایید</button>
+            <button class="picker-btn cancel" id="picker-cancel">انصراف</button>
+            <button class="picker-btn" id="picker-done">تایید</button>
         </div>
-        <div style="display: flex; text-align: center; direction: ltr;">
-            <div class="wheel-title" style="flex:1">سال</div>
-            <div class="wheel-title" style="flex:1">ماه</div>
-            <div class="wheel-title" style="flex:1">روز</div>
+        <div id="picker-titles">
+            <!-- Populated via JS -->
         </div>
-        <div class="wheels-wrapper">
+        <div class="wheels-wrapper" id="wheels-container">
             <div class="wheel-highlight"></div>
-            <ul class="wheel-col" id="col-year"></ul>
-            <ul class="wheel-col" id="col-month"></ul>
-            <ul class="wheel-col" id="col-day"></ul>
-        </div>
-    </div>
-</div>
-
-<!-- Time Picker Overlay -->
-<div id="time-picker-overlay" class="picker-overlay">
-    <div class="picker-container">
-        <div class="picker-header">
-            <button class="picker-btn cancel" id="time-picker-cancel">انصراف</button>
-            <button class="picker-btn" id="time-picker-done">تایید</button>
-        </div>
-        <div style="display: flex; text-align: center; direction: ltr;">
-            <div class="wheel-title" style="flex:1">ساعت</div>
-            <div class="wheel-title" style="flex:1">دقیقه</div>
-        </div>
-        <div class="wheels-wrapper">
-            <div class="wheel-highlight"></div>
-            <ul class="wheel-col" id="col-hour"></ul>
-            <ul class="wheel-col" id="col-minute"></ul>
+            <!-- Populated via JS -->
         </div>
     </div>
 </div>
@@ -468,22 +439,26 @@
     const tg = window.Telegram.WebApp;
     tg.expand();
 
-    // --- API Configuration ---
-    const API_URL = 'https://hossein-finance.vercel.app/api/ExternalConnections/api.php';
-    const urlParams = new URLSearchParams(window.location.search);
-    const SECRET_KEY = urlParams.get('k');
-    const EDIT_ID = urlParams.get('edit_holding_id');
-
-    // Global State
+    // --- STATE MANAGEMENT ---
+    let appMode = 'add';
+    let originalData = null;
     let availableAssets = [];
 
-    // --- Language Utils ---
+    // --- UTILS ---
+    function hideLoading() {
+        const overlay = document.getElementById('loading-overlay');
+        overlay.style.opacity = '0';
+        setTimeout(() => {
+            overlay.style.display = 'none';
+        }, 300);
+    }
+
     function toEnglishDigits(str) {
         if (!str) return '';
         str = String(str);
-        var persianNumbers = [/۰/g, /۱/g, /۲/g, /۳/g, /۴/g, /۵/g, /۶/g, /۷/g, /۸/g, /۹/g];
-        var arabicNumbers = [/٠/g, /١/g, /٢/g, /٣/g, /٤/g, /٥/g, /٦/g, /٧/g, /٨/g, /٩/g];
-        for (var i = 0; i < 10; i++) {
+        const persianNumbers = [/۰/g, /۱/g, /۲/g, /۳/g, /۴/g, /۵/g, /۶/g, /۷/g, /۸/g, /۹/g];
+        const arabicNumbers = [/٠/g, /١/g, /٢/g, /٣/g, /٤/g, /٥/g, /٦/g, /٧/g, /٨/g, /٩/g];
+        for (let i = 0; i < 10; i++) {
             str = str.replace(persianNumbers[i], i).replace(arabicNumbers[i], i);
         }
         return str;
@@ -497,14 +472,17 @@
         });
     }
 
-    function addCommas(nStr) {
-        nStr += '';
-        var x = nStr.split('.');
-        var x1 = x[0];
-        var x2 = x.length > 1 ? '.' + x[1] : '';
-        var rgx = /(\d+)(\d{3})/;
-        while (rgx.test(x1)) x1 = x1.replace(rgx, '$1' + ',' + '$2');
-        return x1 + x2;
+    // Removes unnecessary trailing zeros (e.g. 100.000 -> 100)
+    function cleanDecimal(val) {
+        if (!val && val !== 0) return '';
+        return parseFloat(val).toString();
+    }
+
+    function formatNumberWithCommas(val) {
+        if (!val) return '';
+        let parts = val.split('.');
+        parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+        return parts.join('.');
     }
 
     function removeCommas(str) {
@@ -512,67 +490,44 @@
         return str.replace(/,/g, '');
     }
 
-    // --- Loading Control ---
-    function hideLoading() {
-        const overlay = document.getElementById('loading-overlay');
-        overlay.style.opacity = '0';
-        setTimeout(() => {
-            overlay.style.display = 'none';
-        }, 300);
+    function b64DecodeUnicode(str) {
+        return decodeURIComponent(Array.prototype.map.call(atob(str), function (c) {
+            return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)
+        }).join(''));
     }
 
-    async function apiRequest(payload) {
-        if (!SECRET_KEY) {
-            tg.showAlert('خطای امنیتی: کلید دسترسی یافت نشد.');
-            hideLoading();
-            return null;
-        }
-        try {
-            const response = await fetch(API_URL, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'x-api-key': SECRET_KEY
-                },
-                body: JSON.stringify(payload)
-            });
-            return await response.json();
-        } catch (error) {
-            tg.showAlert('خطا در ارتباط با سرور: ' + error.message);
-            hideLoading();
-            return null;
-        }
-    }
-
-    // --- Validations ---
+    // Date Validation
     function isValidJalaliDateString(str) {
         if (!str) return false;
         str = toEnglishDigits(str);
         const regex = /^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/;
         const match = str.match(regex);
         if (!match) return false;
-        const y = parseInt(match[1]);
-        const m = parseInt(match[2]);
-        const d = parseInt(match[3]);
-        if (y < 1300 || y > 1500) return false;
-        if (m < 1 || m > 12) return false;
-        if (d < 1 || d > 31) return false;
+        const y = parseInt(match[1]), m = parseInt(match[2]), d = parseInt(match[3]);
+        if (y < 1300 || y > 1500 || m < 1 || m > 12 || d < 1 || d > 31) return false;
         if (m > 6 && d === 31) return false;
         return {y, m, d};
     }
 
+    // Time Validation
     function isValidTimeString(str) {
         if (!str) return false;
         str = toEnglishDigits(str);
-        const regex = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/; // Matches HH:MM (00:00 to 23:59)
-        return regex.test(str);
+        const regex = /^(\d{1,2}):(\d{1,2})$/;
+        const match = str.match(regex);
+        if (!match) return false;
+        const h = parseInt(match[1]), m = parseInt(match[2]);
+        if (h < 0 || h > 23 || m < 0 || m > 59) return false;
+        return {h, m};
     }
 
     function getTodayJalali() {
         try {
             const d = new Date();
             const formatter = new Intl.DateTimeFormat('fa-IR-u-nu-latn', {
-                year: 'numeric', month: '2-digit', day: '2-digit'
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit'
             });
             const parts = formatter.formatToParts(d);
             const y = parseInt(parts.find(p => p.type === 'year').value);
@@ -584,152 +539,229 @@
         }
     }
 
-    // --- Number Masks & Formatting ---
+    function getCurrentTime() {
+        const d = new Date();
+        return {h: d.getHours(), m: d.getMinutes()};
+    }
 
-    function attachNumberMask(element) {
+    // --- MASKS & CURSOR LOGIC ---
+
+    // 1. Decimal Input (Amount, Price)
+    function attachDecimalMask(element) {
         element.addEventListener('input', function (e) {
             const input = e.target;
             const originalValue = input.value;
             const selectionStart = input.selectionStart;
 
-            // 1. Count logical digits/dots preceding the cursor to restore position later
-            // We consider 0-9, Persian digits, and dot/slash as "content"
+            // Track cursor based on meaningful digits
             let meaningfulCharsBeforeCursor = 0;
             for (let i = 0; i < selectionStart; i++) {
-                if (/[0-9\u0660-\u0669\u06f0-\u06f9\.\/]/.test(originalValue[i])) {
+                if (/[0-9\u0660-\u0669\u06f0-\u06f9\.]/.test(originalValue[i])) {
                     meaningfulCharsBeforeCursor++;
                 }
             }
 
-            // 2. Clean and Standardize to English internal format
-            let englishVal = toEnglishDigits(originalValue);
-            // Allow only digits and one dot
-            englishVal = englishVal.replace(/,/g, ''); // Remove existing commas
-            englishVal = englishVal.replace(/[^0-9.]/g, ''); // Remove non-numeric/non-dot
+            let raw = toEnglishDigits(removeCommas(originalValue));
+            let english = raw.replace(/[^0-9.]/g, '');
+            // Ensure only one dot
+            const dots = english.split('.');
+            if (dots.length > 2) english = dots[0] + '.' + dots.slice(1).join('');
 
-            // Handle multiple dots: keep first
-            const dots = englishVal.split('.');
-            if (dots.length > 2) {
-                englishVal = dots[0] + '.' + dots.slice(1).join('');
-            }
+            let formatted = formatNumberWithCommas(english);
+            const finalPersian = toPersianDigits(formatted);
 
-            // 3. Format: Add commas to integer part
-            let formattedEnglish = '';
-            if (englishVal) {
-                const parts = englishVal.split('.');
-                parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-                formattedEnglish = parts.join('.');
-            }
-
-            // 4. Convert back to Persian for display
-            const finalPersian = toPersianDigits(formattedEnglish);
-
-            // 5. Update input if changed
             if (input.value !== finalPersian) {
                 input.value = finalPersian;
-
-                // 6. Restore Cursor Position
-                // Iterate through new string and find where the 'meaningfulCharsBeforeCursor' ends
+                // Restore cursor
                 let newPos = 0;
                 let foundChars = 0;
                 for (let i = 0; i < finalPersian.length; i++) {
                     if (foundChars >= meaningfulCharsBeforeCursor) break;
-                    // Count if it is a digit or dot (comma is not "meaningful" for cursor logic relative to typing)
-                    // Note: In Persian string, dots are still '.' usually, or we mapped them.
-                    if (/[0-9\u0660-\u0669\u06f0-\u06f9\.\/]/.test(finalPersian[i])) {
-                        foundChars++;
-                    }
+                    if (/[0-9\u0660-\u0669\u06f0-\u06f9\.]/.test(finalPersian[i])) foundChars++;
                     newPos++;
                 }
-                // Correction for comma insertion right at cursor
-                if (newPos < finalPersian.length && finalPersian[newPos] === ',') {
-                    // newPos++;
-                }
-
                 input.setSelectionRange(newPos, newPos);
             }
         });
     }
 
+    // Helper for Backspace Jumping logic (Date/Time)
+    function handleSeparatorBackspace(e, separator) {
+        if (e.key === 'Backspace') {
+            const input = e.target;
+            const start = input.selectionStart;
+            // If cursor is immediately after a separator, jump back
+            if (start > 0 && input.value[start - 1] === separator) {
+                e.preventDefault(); // Stop default deletion
+                input.setSelectionRange(start - 1, start - 1); // Move cursor back
+            }
+        }
+    }
+
+    // 2. Date Input (xxxx/xx/xx)
     function attachDateMask(element) {
+        // Handle Backspace jumping
+        element.addEventListener('keydown', (e) => handleSeparatorBackspace(e, '/'));
+
         element.addEventListener('input', function (e) {
             let input = e.target;
             let originalValue = input.value;
             let selectionStart = input.selectionStart;
+
             let digitsBeforeCursor = 0;
             for (let i = 0; i < selectionStart; i++) {
                 if (/[0-9\u0660-\u0669\u06f0-\u06f9]/.test(originalValue[i])) digitsBeforeCursor++;
             }
+
             let val = toEnglishDigits(originalValue);
-            let clean = val.replace(/\D/g, '');
-            if (clean.length > 8) clean = clean.substring(0, 8);
+            let clean = val.replace(/\D/g, '').substring(0, 8); // Max 8 digits
 
             let formatted = '';
             if (clean.length > 0) formatted += clean.substring(0, 4);
             if (clean.length >= 5) formatted += '/' + clean.substring(4, 6);
             if (clean.length >= 7) formatted += '/' + clean.substring(6, 8);
 
-            // Convert to Persian
-            const persianFormatted = toPersianDigits(formatted);
+            const finalPersian = toPersianDigits(formatted);
 
-            if (input.value !== persianFormatted) {
-                input.value = persianFormatted;
+            if (input.value !== finalPersian) {
+                input.value = finalPersian;
                 let newPos = 0;
                 let digitsEncountered = 0;
-                for (let i = 0; i < persianFormatted.length; i++) {
+                for (let i = 0; i < finalPersian.length; i++) {
                     if (digitsEncountered === digitsBeforeCursor) break;
-                    if (/[0-9\u06f0-\u06f9]/.test(persianFormatted[i])) digitsEncountered++;
+                    if (/[0-9\u06f0-\u06f9]/.test(finalPersian[i])) digitsEncountered++;
                     newPos++;
                 }
-                if (persianFormatted[newPos] === '/') newPos++;
+                // Note: We do NOT force jump over slash here, the keydown handles jumps
                 input.setSelectionRange(newPos, newPos);
             }
+
+            // Validation styling
+            if (clean.length === 8) {
+                if (!isValidJalaliDateString(formatted)) input.classList.add('input-error');
+                else input.classList.remove('input-error');
+            } else {
+                input.classList.remove('input-error');
+            }
+        });
+
+        element.addEventListener('blur', function (e) {
+            const val = toEnglishDigits(e.target.value);
+            if (val.length > 0 && !isValidJalaliDateString(val)) e.target.classList.add('input-error');
         });
     }
 
+    // 3. Time Input (xx:xx)
     function attachTimeMask(element) {
+        // Handle Backspace jumping for colon
+        element.addEventListener('keydown', (e) => handleSeparatorBackspace(e, ':'));
+
         element.addEventListener('input', function (e) {
             let input = e.target;
             let originalValue = input.value;
             let selectionStart = input.selectionStart;
+
             let digitsBeforeCursor = 0;
             for (let i = 0; i < selectionStart; i++) {
                 if (/[0-9\u0660-\u0669\u06f0-\u06f9]/.test(originalValue[i])) digitsBeforeCursor++;
             }
 
             let val = toEnglishDigits(originalValue);
-            let clean = val.replace(/\D/g, '');
-            if (clean.length > 4) clean = clean.substring(0, 4); // HHMM
+            let clean = val.replace(/\D/g, '').substring(0, 4); // Max 4 digits
 
             let formatted = '';
             if (clean.length > 0) formatted += clean.substring(0, 2);
             if (clean.length >= 3) formatted += ':' + clean.substring(2, 4);
 
-            const persianFormatted = toPersianDigits(formatted);
+            const finalPersian = toPersianDigits(formatted);
 
-            if (input.value !== persianFormatted) {
-                input.value = persianFormatted;
+            if (input.value !== finalPersian) {
+                input.value = finalPersian;
                 let newPos = 0;
                 let digitsEncountered = 0;
-                for (let i = 0; i < persianFormatted.length; i++) {
+                for (let i = 0; i < finalPersian.length; i++) {
                     if (digitsEncountered === digitsBeforeCursor) break;
-                    if (/[0-9\u06f0-\u06f9]/.test(persianFormatted[i])) digitsEncountered++;
+                    if (/[0-9\u06f0-\u06f9]/.test(finalPersian[i])) digitsEncountered++;
                     newPos++;
                 }
-                if (persianFormatted[newPos] === ':') newPos++;
                 input.setSelectionRange(newPos, newPos);
             }
+
+            // Validation
+            if (clean.length === 4) {
+                if (!isValidTimeString(formatted)) input.classList.add('input-error');
+                else input.classList.remove('input-error');
+            } else {
+                input.classList.remove('input-error');
+            }
+        });
+
+        element.addEventListener('blur', function (e) {
+            const val = toEnglishDigits(e.target.value);
+            if (val.length > 0 && !isValidTimeString(val)) e.target.classList.add('input-error');
         });
     }
 
-    // --- GENERIC PICKER LOGIC ---
-    const ITEM_HEIGHT = 40;
+
+    // --- UNIFIED PICKER LOGIC ---
+    const pickerOverlay = document.getElementById('picker-overlay');
+    const pickerTitles = document.getElementById('picker-titles');
+    const wheelsContainer = document.getElementById('wheels-container');
     let activeInput = null;
+    let activeMode = 'date'; // 'date' or 'time'
+    const ITEM_HEIGHT = 40;
+
+    // Generates generic wheels based on config
+    // Config: [{id, min, max, val, labelFn}, ...]
+    function buildPicker(config) {
+        pickerTitles.innerHTML = '';
+        wheelsContainer.innerHTML = '<div class="wheel-highlight"></div>';
+
+        config.forEach(col => {
+            // Add Title
+            const titleDiv = document.createElement('div');
+            titleDiv.className = 'wheel-title';
+            titleDiv.style.flex = '1';
+            titleDiv.innerText = col.title;
+            pickerTitles.appendChild(titleDiv);
+
+            // Build Wheel
+            const ul = document.createElement('ul');
+            ul.className = 'wheel-col';
+            ul.id = `wheel-${col.id}`;
+
+            const spacer = '<li class="wheel-spacer"></li>';
+            let html = spacer;
+            for (let i = col.min; i <= col.max; i++) {
+                const text = col.labelFn ? col.labelFn(i) : toPersianDigits(i);
+                html += `<li data-val="${i}">${text}</li>`;
+            }
+            html += spacer;
+            ul.innerHTML = html;
+            wheelsContainer.appendChild(ul);
+
+            // Logic
+            ul.addEventListener('scroll', () => highlightActive(ul));
+            enableDragToScroll(ul);
+
+            // Initial Scroll
+            setTimeout(() => {
+                scrollToValue(ul, col.val);
+            }, 0);
+        });
+
+        // Specific logic for Date (month length validation)
+        if (activeMode === 'date') {
+            const monthWheel = document.getElementById('wheel-month');
+            const dayWheel = document.getElementById('wheel-day');
+            if (monthWheel && dayWheel) {
+                monthWheel.addEventListener('scrollend', () => validateDateDays(monthWheel, dayWheel));
+            }
+        }
+    }
 
     function enableDragToScroll(slider) {
-        let isDown = false;
-        let startY;
-        let scrollTop;
+        let isDown = false, startY, scrollTop;
         slider.addEventListener('mousedown', (e) => {
             isDown = true;
             startY = e.pageY - slider.offsetTop;
@@ -750,24 +782,14 @@
             if (!isDown) return;
             e.preventDefault();
             const y = e.pageY - slider.offsetTop;
-            const walk = (y - startY) * 1.5;
-            slider.scrollTop = scrollTop - walk;
+            slider.scrollTop = scrollTop - (y - startY) * 1.5;
         });
     }
 
-    function getSelectedValue(col) {
-        const scrollTop = col.scrollTop;
-        const index = Math.round(scrollTop / ITEM_HEIGHT);
-        const items = col.querySelectorAll('li[data-val]');
-        if (items[index]) return parseInt(items[index].getAttribute('data-val'));
-        return 0;
-    }
-
     function highlightActive(col) {
-        const scrollTop = col.scrollTop;
-        const index = Math.round(scrollTop / ITEM_HEIGHT);
+        const index = Math.round(col.scrollTop / ITEM_HEIGHT);
+        col.querySelectorAll('li').forEach(li => li.classList.remove('active'));
         const items = col.querySelectorAll('li[data-val]');
-        items.forEach(li => li.classList.remove('active'));
         if (items[index]) items[index].classList.add('active');
     }
 
@@ -780,375 +802,412 @@
         }
     }
 
-    // --- DATE PICKER SPECIFIC ---
-    const datePickerOverlay = document.getElementById('date-picker-overlay');
-    const colYear = document.getElementById('col-year');
-    const colMonth = document.getElementById('col-month');
-    const colDay = document.getElementById('col-day');
-
-    function initDatePicker() {
-        const spacer = '<li class="wheel-spacer"></li>';
-        let yearsHTML = spacer;
-        for (let i = 1380; i <= 1450; i++) yearsHTML += `<li data-val="${i}">${toPersianDigits(i)}</li>`;
-        yearsHTML += spacer;
-        colYear.innerHTML = yearsHTML;
-
-        let monthsHTML = spacer;
-        for (let i = 1; i <= 12; i++) monthsHTML += `<li data-val="${i}">${toPersianDigits(String(i).padStart(2, '0'))}</li>`;
-        monthsHTML += spacer;
-        colMonth.innerHTML = monthsHTML;
-
-        updateDays(31);
-
-        [colYear, colMonth, colDay].forEach(col => {
-            col.addEventListener('scroll', () => highlightActive(col));
-            col.addEventListener('scrollend', () => {
-                if (col === colMonth) validateDays();
-            });
-            enableDragToScroll(col);
-        });
-
-        document.getElementById('date-picker-cancel').addEventListener('click', () => closePicker(datePickerOverlay));
-        document.getElementById('date-picker-done').addEventListener('click', confirmDate);
+    function getSelectedValue(col) {
+        const index = Math.round(col.scrollTop / ITEM_HEIGHT);
+        const items = col.querySelectorAll('li[data-val]');
+        return items[index] ? parseInt(items[index].getAttribute('data-val')) : 0;
     }
 
-    function updateDays(count) {
-        const spacer = '<li class="wheel-spacer"></li>';
-        let daysHTML = spacer;
-        for (let i = 1; i <= count; i++) daysHTML += `<li data-val="${i}">${toPersianDigits(String(i).padStart(2, '0'))}</li>`;
-        daysHTML += spacer;
-        colDay.innerHTML = daysHTML;
-        enableDragToScroll(colDay);
-        highlightActive(colDay);
-    }
+    function validateDateDays(monthCol, dayCol) {
+        const m = getSelectedValue(monthCol);
+        let max = (m <= 6) ? 31 : (m === 12) ? 29 : 30; // Simple logic
 
-    function validateDays() {
-        const m = getSelectedValue(colMonth);
-        let max = 31;
-        if (m > 6 && m <= 11) max = 30;
-        if (m == 12) max = 30;
-        const currentSelection = getSelectedValue(colDay);
-        const currentItems = colDay.querySelectorAll('li[data-val]').length;
-        if (currentItems !== max) {
-            updateDays(max);
-            scrollToValue(colDay, Math.min(currentSelection, max));
+        // Rebuild day col if count mismatch
+        const currentCount = dayCol.querySelectorAll('li[data-val]').length;
+        if (currentCount !== max) {
+            const currentVal = getSelectedValue(dayCol);
+            const spacer = '<li class="wheel-spacer"></li>';
+            let html = spacer;
+            for (let i = 1; i <= max; i++) html += `<li data-val="${i}">${toPersianDigits(String(i).padStart(2, '0'))}</li>`;
+            html += spacer;
+            dayCol.innerHTML = html;
+            scrollToValue(dayCol, Math.min(currentVal, max));
         }
     }
 
-    function openDatePicker(input) {
+    // --- OPEN PICKER ---
+    function openPicker(input, mode) {
         activeInput = input;
+        activeMode = mode;
+        pickerOverlay.style.display = 'flex';
+
         const val = input.value;
-        let parsed = isValidJalaliDateString(val);
-        if (!parsed) parsed = getTodayJalali();
-        datePickerOverlay.style.display = 'flex';
-        setTimeout(() => {
-            datePickerOverlay.classList.add('active');
-            scrollToValue(colYear, parsed.y);
-            scrollToValue(colMonth, parsed.m);
-            validateDays();
-            scrollToValue(colDay, parsed.d);
-        }, 10);
-    }
+        let config = [];
 
-    function confirmDate() {
-        if (!activeInput) return;
-        const y = getSelectedValue(colYear);
-        const m = String(getSelectedValue(colMonth)).padStart(2, '0');
-        const d = String(getSelectedValue(colDay)).padStart(2, '0');
-        // Set value in Persian
-        activeInput.value = toPersianDigits(`${y}/${m}/${d}`);
-        activeInput.classList.remove('input-error');
-        closePicker(datePickerOverlay);
-    }
-
-    // --- TIME PICKER SPECIFIC ---
-    const timePickerOverlay = document.getElementById('time-picker-overlay');
-    const colHour = document.getElementById('col-hour');
-    const colMinute = document.getElementById('col-minute');
-
-    function initTimePicker() {
-        const spacer = '<li class="wheel-spacer"></li>';
-
-        // Hours 00-23
-        let hoursHTML = spacer;
-        for (let i = 0; i <= 23; i++) hoursHTML += `<li data-val="${i}">${toPersianDigits(String(i).padStart(2, '0'))}</li>`;
-        hoursHTML += spacer;
-        colHour.innerHTML = hoursHTML;
-
-        // Minutes 00-59
-        let minutesHTML = spacer;
-        for (let i = 0; i <= 59; i++) minutesHTML += `<li data-val="${i}">${toPersianDigits(String(i).padStart(2, '0'))}</li>`;
-        minutesHTML += spacer;
-        colMinute.innerHTML = minutesHTML;
-
-        [colHour, colMinute].forEach(col => {
-            col.addEventListener('scroll', () => highlightActive(col));
-            enableDragToScroll(col);
-        });
-
-        document.getElementById('time-picker-cancel').addEventListener('click', () => closePicker(timePickerOverlay));
-        document.getElementById('time-picker-done').addEventListener('click', confirmTime);
-    }
-
-    function openTimePicker(input) {
-        activeInput = input;
-        const val = input.value;
-        let h = new Date().getHours();
-        let m = new Date().getMinutes();
-
-        // Parse existing time if valid
-        if (isValidTimeString(val)) {
-            const parts = toEnglishDigits(val).split(':');
-            h = parseInt(parts[0]);
-            m = parseInt(parts[1]);
+        if (mode === 'date') {
+            const def = isValidJalaliDateString(val) || getTodayJalali();
+            config = [
+                {id: 'year', title: 'سال', min: 1380, max: 1450, val: def.y},
+                {
+                    id: 'month',
+                    title: 'ماه',
+                    min: 1,
+                    max: 12,
+                    val: def.m,
+                    labelFn: (i) => toPersianDigits(String(i).padStart(2, '0'))
+                },
+                {
+                    id: 'day',
+                    title: 'روز',
+                    min: 1,
+                    max: 31,
+                    val: def.d,
+                    labelFn: (i) => toPersianDigits(String(i).padStart(2, '0'))
+                }
+            ];
+        } else {
+            // Time
+            const def = isValidTimeString(val) || getCurrentTime();
+            config = [
+                {
+                    id: 'hour',
+                    title: 'ساعت',
+                    min: 0,
+                    max: 23,
+                    val: def.h,
+                    labelFn: (i) => toPersianDigits(String(i).padStart(2, '0'))
+                },
+                {
+                    id: 'minute',
+                    title: 'دقیقه',
+                    min: 0,
+                    max: 59,
+                    val: def.m,
+                    labelFn: (i) => toPersianDigits(String(i).padStart(2, '0'))
+                }
+            ];
         }
 
-        timePickerOverlay.style.display = 'flex';
-        setTimeout(() => {
-            timePickerOverlay.classList.add('active');
-            scrollToValue(colHour, h);
-            scrollToValue(colMinute, m);
-        }, 10);
+        buildPicker(config);
+        setTimeout(() => pickerOverlay.classList.add('active'), 10);
     }
 
-    function confirmTime() {
-        if (!activeInput) return;
-        const h = String(getSelectedValue(colHour)).padStart(2, '0');
-        const m = String(getSelectedValue(colMinute)).padStart(2, '0');
-        // Set value in Persian
-        activeInput.value = toPersianDigits(`${h}:${m}`);
-        activeInput.classList.remove('input-error');
-        closePicker(timePickerOverlay);
-    }
-
-    // --- Generic Closer ---
-    function closePicker(overlay) {
-        overlay.classList.remove('active');
+    function closePicker() {
+        pickerOverlay.classList.remove('active');
         setTimeout(() => {
-            overlay.style.display = 'none';
+            pickerOverlay.style.display = 'none';
         }, 300);
     }
 
-    // --- Attachers ---
-    function attachDatePicker(inputElement) {
-        const wrapper = inputElement.closest('.input-with-icon');
-        inputElement.addEventListener('input', function (e) {
-            const val = e.target.value;
-            if (val.length > 0) {
-                if (!isValidJalaliDateString(val)) inputElement.classList.add('input-error');
-                else inputElement.classList.remove('input-error');
-            } else inputElement.classList.remove('input-error');
-        });
-        if (wrapper.querySelector('.picker-trigger')) return;
-        const icon = document.createElement('span');
-        icon.className = 'picker-trigger';
-        // Calendar Icon
-        icon.innerHTML = `<svg viewBox="0 0 24 24"><path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20a2 2 0 0 0 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zM9 14H7v-2h2v2zm4 0h-2v-2h2v2zm4 0h-2v-2h2v2zm-8 4H7v-2h2v2zm4 0h-2v-2h2v2zm4 0h-2v-2h2v2z"/></svg>`;
-        inputElement.parentNode.insertBefore(icon, inputElement);
-        icon.addEventListener('click', (e) => {
-            e.stopPropagation();
-            openDatePicker(inputElement);
-        });
-    }
+    document.getElementById('picker-cancel').addEventListener('click', closePicker);
 
-    function attachTimePicker(inputElement) {
-        const wrapper = inputElement.closest('.input-with-icon');
-        inputElement.addEventListener('input', function (e) {
-            const val = e.target.value;
-            if (val.length > 0) {
-                if (!isValidTimeString(val)) inputElement.classList.add('input-error');
-                else inputElement.classList.remove('input-error');
-            } else inputElement.classList.remove('input-error');
-        });
-        if (wrapper.querySelector('.picker-trigger')) return;
-        const icon = document.createElement('span');
-        icon.className = 'picker-trigger';
-        // Clock Icon
-        icon.innerHTML = `<svg viewBox="0 0 24 24"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/></svg>`;
-        inputElement.parentNode.insertBefore(icon, inputElement);
-        icon.addEventListener('click', (e) => {
-            e.stopPropagation();
-            openTimePicker(inputElement);
-        });
-    }
+    document.getElementById('picker-done').addEventListener('click', () => {
+        if (!activeInput) return;
 
-    // --- APPLICATION LOGIC ---
-
-    async function loadAssets() {
-        const payload = {"operation": "read", "table": "assets"};
-        const data = await apiRequest(payload);
-        if (data && data.data) {
-            availableAssets = data.data;
-            populateAssetTypes();
+        if (activeMode === 'date') {
+            const y = getSelectedValue(document.getElementById('wheel-year'));
+            const m = String(getSelectedValue(document.getElementById('wheel-month'))).padStart(2, '0');
+            const d = String(getSelectedValue(document.getElementById('wheel-day'))).padStart(2, '0');
+            activeInput.value = toPersianDigits(`${y}/${m}/${d}`);
         } else {
-            document.getElementById('asset_type').innerHTML = '<option disabled>خطا در بارگذاری</option>';
+            const h = String(getSelectedValue(document.getElementById('wheel-hour'))).padStart(2, '0');
+            const m = String(getSelectedValue(document.getElementById('wheel-minute'))).padStart(2, '0');
+            activeInput.value = toPersianDigits(`${h}:${m}`);
         }
+        activeInput.classList.remove('input-error');
+        closePicker();
+    });
+
+    function attachPickerTrigger(inputElement, mode) {
+        if (inputElement.parentNode.querySelector('.picker-trigger')) return;
+        const icon = document.createElement('span');
+        icon.className = 'picker-trigger';
+        // Generic Icon (Calendar or Clock could differ, but using generic edit icon or calendar)
+        if (mode === 'date') {
+            icon.innerHTML = `<svg viewBox="0 0 24 24"><path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20a2 2 0 0 0 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zM9 14H7v-2h2v2zm4 0h-2v-2h2v2zm4 0h-2v-2h2v2zm-8 4H7v-2h2v2zm4 0h-2v-2h2v2zm4 0h-2v-2h2v2z"/></svg>`;
+        } else {
+            icon.innerHTML = `<svg viewBox="0 0 24 24"><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/></svg>`;
+        }
+
+        inputElement.parentNode.insertBefore(icon, inputElement);
+        icon.addEventListener('click', (e) => {
+            e.stopPropagation();
+            openPicker(inputElement, mode);
+        });
+    }
+
+    // --- MAIN LOGIC ---
+    const typeSelect = document.getElementById('asset_type');
+    const assetSelect = document.getElementById('asset_id');
+    const priceLabel = document.getElementById('label_avg_price');
+
+    document.addEventListener('DOMContentLoaded', function () {
+        // Attach masks
+        document.querySelectorAll('.decimal-input').forEach(attachDecimalMask);
+        const dateInput = document.getElementById('date');
+        attachPickerTrigger(dateInput, 'date');
+        attachDateMask(dateInput);
+
+        const timeInput = document.getElementById('time');
+        attachPickerTrigger(timeInput, 'time');
+        attachTimeMask(timeInput);
+
+        // Parse URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const apiUrl = urlParams.get('api_url');
+        const apiKey = urlParams.get('api_key');
+        const dataEncoded = urlParams.get('data');
+
+        // Check Editing Mode
+        if (dataEncoded) {
+            try {
+                originalData = JSON.parse(b64DecodeUnicode(dataEncoded));
+                if (originalData && originalData.id) appMode = 'edit';
+            } catch (e) {
+                console.error("Error parsing data", e);
+            }
+        } else {
+            // New Entry: Set default date & time
+            const today = getTodayJalali();
+            const now = getCurrentTime();
+
+            const todayStr = `${today.y}/${String(today.m).padStart(2, '0')}/${String(today.d).padStart(2, '0')}`;
+            dateInput.value = toPersianDigits(todayStr);
+
+            const nowStr = `${String(now.h).padStart(2, '0')}:${String(now.m).padStart(2, '0')}`;
+            timeInput.value = toPersianDigits(nowStr);
+        }
+
+        // Fetch Assets from API
+        if (apiUrl && apiKey) {
+            fetchAssets(apiUrl, apiKey);
+        } else {
+            tg.showAlert('خطا: تنظیمات ارتباط با سرور یافت نشد (API URL/Key)');
+            hideLoading();
+        }
+    });
+
+    function fetchAssets(url, key) {
+        fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-API-KEY': key
+            },
+            body: JSON.stringify({
+                "operation": "read",
+                "table": "assets"
+            })
+        })
+            .then(response => {
+                if (!response.ok) throw new Error("HTTP " + response.status);
+                return response.json();
+            })
+            .then(data => {
+                availableAssets = Array.isArray(data) ? data : (data.data || []);
+                populateAssetTypes();
+
+                // If editing, fill the form now that assets are loaded
+                if (appMode === 'edit' && originalData) {
+                    populateForm(originalData);
+                }
+                hideLoading();
+            })
+            .catch(err => {
+                console.error(err);
+                tg.showAlert("خطا در دریافت لیست دارایی‌ها");
+                hideLoading();
+            });
     }
 
     function populateAssetTypes() {
-        const typeSelect = document.getElementById('asset_type');
-        const types = [...new Set(availableAssets.map(item => item.asset_type))];
-        let html = '<option value="" disabled selected>انتخاب کنید</option>';
-        types.forEach(type => {
-            html += `<option value="${type}">${type}</option>`;
+        const types = [...new Set(availableAssets.map(a => a.asset_type))];
+        types.forEach(t => {
+            const opt = document.createElement('option');
+            opt.value = t;
+            // Persian Numbers in Dropdown
+            opt.innerText = toPersianDigits(t);
+            typeSelect.appendChild(opt);
         });
-        typeSelect.innerHTML = html;
-        typeSelect.disabled = false;
     }
 
-    function filterAssetsByType(type) {
-        const assetSelect = document.getElementById('asset_id');
-        const filtered = availableAssets.filter(item => item.asset_type === type);
-        let html = '<option value="" disabled selected>انتخاب کنید</option>';
-        filtered.forEach(asset => {
-            html += `<option value="${asset.id}">${asset.name}</option>`;
-        });
-        assetSelect.innerHTML = html;
-        assetSelect.disabled = false;
-    }
+    // --- EVENT LISTENERS ---
 
-    async function loadHoldingForEdit() {
-        if (!EDIT_ID) return;
-        document.getElementById('page-title').innerText = 'ویرایش دارایی';
-        document.getElementById('submitBtn').innerText = 'ویرایش و ذخیره';
+    // 1. Asset Type Change
+    typeSelect.addEventListener('change', function () {
+        const selectedType = this.value;
+        assetSelect.innerHTML = '<option value="" disabled selected>انتخاب کنید...</option>';
 
-        // Show delete button in edit mode
-        const deleteBtn = document.getElementById('deleteBtn');
-        if (deleteBtn) {
-            deleteBtn.style.display = 'block';
-        }
-
-        const payload = {
-            "operation": "read",
-            "table": "holdings",
-            "conditions": {"id": EDIT_ID},
-            "single": true
-        };
-        const data = await apiRequest(payload);
-        if (data && data.data) {
-            const holding = data.data;
-            const targetAsset = availableAssets.find(a => a.id == holding.asset_id);
-            if (targetAsset) {
-                document.getElementById('asset_type').value = targetAsset.asset_type;
-                filterAssetsByType(targetAsset.asset_type);
-                document.getElementById('asset_id').value = holding.asset_id;
-            }
-
-            // Format Amount: Remove trailing zeros (using parseFloat), add commas, convert to Persian
-            const formattedAmount = toPersianDigits(addCommas(parseFloat(holding.amount)));
-            document.getElementById('amount').value = formattedAmount;
-
-            // Format Price: Remove trailing zeros, add commas, convert to Persian
-            const formattedPrice = toPersianDigits(addCommas(parseFloat(holding.avg_price)));
-            document.getElementById('avg_price').value = formattedPrice;
-
-            document.getElementById('holding_date').value = toPersianDigits(holding.date) || '';
-            document.getElementById('holding_time').value = toPersianDigits(holding.time) || '';
-            document.getElementById('note').value = holding.note || '';
+        if (selectedType) {
+            const filtered = availableAssets.filter(a => a.asset_type === selectedType);
+            filtered.forEach(a => {
+                const opt = document.createElement('option');
+                opt.value = a.id;
+                // Persian Numbers in Dropdown
+                opt.innerText = toPersianDigits(a.name);
+                assetSelect.appendChild(opt);
+            });
+            assetSelect.disabled = false;
         } else {
-            tg.showAlert('اطلاعات دارایی یافت نشد');
+            assetSelect.disabled = true;
         }
+        if (!selectedType) priceLabel.innerText = 'میانگین قیمت خرید';
+    });
+
+    // 2. Asset Name Change (Update Currency & Pre-fill Price)
+    assetSelect.addEventListener('change', function () {
+        const id = parseInt(this.value);
+        const asset = availableAssets.find(a => a.id === id);
+
+        if (asset) {
+            const currency = asset.base_currency || 'ریال';
+            priceLabel.innerText = `میانگین قیمت خرید (${currency})`;
+
+            if (appMode === 'add') {
+                const priceInput = document.getElementById('avg_price');
+                // CLEAN UP PRICE (No trailing zeros)
+                const cleanPrice = cleanDecimal(asset.price);
+                const formattedPrice = formatNumberWithCommas(cleanPrice);
+                priceInput.value = toPersianDigits(formattedPrice);
+            }
+        }
+    });
+
+    function populateForm(data) {
+        document.getElementById('page-title').innerText = 'ویرایش دارایی';
+        document.getElementById('submitBtn').innerText = 'ثبت تغییرات';
+        document.getElementById('deleteBtn').classList.remove('hidden');
+        document.getElementById('holding_id').value = data.id;
+
+        // Find asset info
+        const asset = availableAssets.find(a => a.id == data.asset_id);
+        if (asset) {
+            typeSelect.value = asset.asset_type;
+
+            const filtered = availableAssets.filter(a => a.asset_type === asset.asset_type);
+            assetSelect.innerHTML = '<option value="" disabled>انتخاب کنید...</option>';
+            filtered.forEach(a => {
+                const opt = document.createElement('option');
+                opt.value = a.id;
+                opt.innerText = toPersianDigits(a.name); // Persian digits
+                assetSelect.appendChild(opt);
+            });
+            assetSelect.disabled = false;
+            assetSelect.value = asset.id;
+
+            const currency = asset.base_currency || 'ریال';
+            priceLabel.innerText = `میانگین قیمت خرید (${currency})`;
+        }
+
+        // Amount (Clean Zeros + Commas)
+        const amtStr = cleanDecimal(data.amount);
+        document.getElementById('amount').value = toPersianDigits(formatNumberWithCommas(amtStr));
+
+        // Price (Clean Zeros + Commas)
+        const priceStr = cleanDecimal(data.avg_price);
+        document.getElementById('avg_price').value = toPersianDigits(formatNumberWithCommas(priceStr));
+
+        // Date
+        if (data.date) {
+            document.getElementById('date').value = toPersianDigits(data.date.replace(/-/g, '/'));
+        }
+
+        // Time
+        if (data.time) {
+            // Ensure format HH:MM
+            const parts = data.time.split(':');
+            if (parts.length >= 2) {
+                document.getElementById('time').value = toPersianDigits(`${parts[0]}:${parts[1]}`);
+            }
+        } else {
+            // Default to now if not set in DB
+            const now = getCurrentTime();
+            document.getElementById('time').value = toPersianDigits(`${String(now.h).padStart(2, '0')}:${String(now.m).padStart(2, '0')}`);
+        }
+
+        document.getElementById('note').value = data.note || '';
     }
 
-    document.addEventListener('DOMContentLoaded', async function () {
-        initDatePicker();
-        initTimePicker();
-
-        // Apply number mask to Amount and Price fields
-        document.querySelectorAll('.formatted-number').forEach(input => attachNumberMask(input));
-
-        // Setup Date Input
-        const dateInput = document.getElementById('holding_date');
-        attachDatePicker(dateInput);
-        attachDateMask(dateInput);
-
-        // Setup Time Input
-        const timeInput = document.getElementById('holding_time');
-        attachTimePicker(timeInput);
-        attachTimeMask(timeInput);
-
-        // Initialize Logic with visual delay for better UX
-        const loadingPromise = loadAssets();
-
-        await loadingPromise;
-        if (EDIT_ID) {
-            await loadHoldingForEdit();
-        }
-
-        // Hide overlay only after everything is ready
-        hideLoading();
-    });
-
-    document.getElementById('asset_type').addEventListener('change', function (e) {
-        filterAssetsByType(e.target.value);
-    });
-
-    // --- Delete Handler ---
-    document.getElementById('deleteBtn').addEventListener('click', function () {
-        if (!EDIT_ID) return;
-
-        tg.showConfirm("آیا از حذف این دارایی مطمئن هستید؟", function (confirmed) {
-            if (confirmed) {
-                const payload = {
-                    "delete": {
-                        "id": parseInt(EDIT_ID)
-                    }
-                };
-                tg.sendData(JSON.stringify(payload));
-            }
-        });
-    });
-
+    // --- SUBMISSION ---
     document.getElementById('holdingForm').addEventListener('submit', function (e) {
         e.preventDefault();
 
         const assetId = document.getElementById('asset_id').value;
-        const amountRaw = document.getElementById('amount').value;
-        const avgPriceRaw = document.getElementById('avg_price').value;
-        const dateStrRaw = document.getElementById('holding_date').value;
-        const timeStrRaw = document.getElementById('holding_time').value;
+        if (!assetId) {
+            tg.showAlert("لطفا نام دارایی را انتخاب کنید");
+            return;
+        }
+
+        const amountVal = toEnglishDigits(removeCommas(document.getElementById('amount').value));
+        const priceVal = toEnglishDigits(removeCommas(document.getElementById('avg_price').value));
+        const dateVal = toEnglishDigits(document.getElementById('date').value).replace(/\//g, '-');
+        const timeVal = toEnglishDigits(document.getElementById('time').value);
         const note = document.getElementById('note').value;
 
-        // Convert UI inputs (Persian) to English before validation
-        const amountClean = removeCommas(toEnglishDigits(amountRaw));
-        const avgPriceClean = removeCommas(toEnglishDigits(avgPriceRaw));
-        const dateStr = toEnglishDigits(dateStrRaw);
-        const timeStr = toEnglishDigits(timeStrRaw);
-
-        if (!assetId || !amountClean || !avgPriceClean || !dateStr || !timeStr) {
-            tg.showAlert('لطفا تمام فیلدهای ضروری را پر کنید');
+        if (!isValidJalaliDateString(dateVal)) {
+            tg.showAlert("تاریخ وارد شده معتبر نیست");
             return;
         }
 
-        if (!isValidJalaliDateString(dateStr)) {
-            tg.showAlert('تاریخ وارد شده معتبر نیست');
-            return;
-        }
-        if (!isValidTimeString(timeStr)) {
-            tg.showAlert('زمان وارد شده معتبر نیست (HH:MM)');
+        if (!isValidTimeString(timeVal)) {
+            tg.showAlert("ساعت وارد شده معتبر نیست");
             return;
         }
 
-        const innerData = {
-            "asset_id": parseInt(assetId),
-            "amount": parseFloat(amountClean),
-            "avg_price": parseFloat(avgPriceClean),
-            "date": dateStr,
-            "time": timeStr,
-            "note": note
-        };
+        // Prepare Payload
+        let payload = {};
 
-        let finalPayload = {};
-
-        if (EDIT_ID) {
-            innerData.id = parseInt(EDIT_ID);
-            finalPayload = {"edit": innerData};
+        if (appMode === 'add') {
+            payload = {
+                action: 'add',
+                holding: {
+                    asset_id: parseInt(assetId),
+                    amount: parseFloat(amountVal),
+                    avg_price: parseFloat(priceVal),
+                    date: dateVal,
+                    time: timeVal, // New Field
+                    note: note
+                }
+            };
         } else {
-            finalPayload = {"add": innerData};
+            // Edit Mode - Only send updates
+            const updates = {};
+            if (originalData.asset_id != assetId) updates.asset_id = parseInt(assetId);
+            if (parseFloat(originalData.amount) !== parseFloat(amountVal)) updates.amount = parseFloat(amountVal);
+            if (parseFloat(originalData.avg_price) !== parseFloat(priceVal)) updates.avg_price = parseFloat(priceVal);
+            if (originalData.date.replace(/\//g, '-') !== dateVal) updates.date = dateVal;
+            // Check time update
+            const oldTime = originalData.time ? originalData.time.substring(0, 5) : '';
+            if (oldTime !== timeVal) updates.time = timeVal;
+
+            if ((originalData.note || '') !== note) updates.note = note;
+
+            if (Object.keys(updates).length === 0) {
+                tg.showAlert("تغییری ایجاد نشده است");
+                return;
+            }
+
+            payload = {
+                action: 'edit',
+                id: originalData.id,
+                updates: updates
+            };
         }
 
-        tg.sendData(JSON.stringify(finalPayload));
+        tg.sendData(JSON.stringify(payload));
+        tg.close();
     });
+
+    document.getElementById('deleteBtn').addEventListener('click', function () {
+        tg.showPopup({
+            title: 'حذف دارایی',
+            message: 'آیا مطمئن هستید که می‌خواهید این دارایی را حذف کنید؟',
+            buttons: [
+                {id: 'delete', type: 'destructive', text: 'حذف شود'},
+                {id: 'cancel', type: 'default', text: 'انصراف'}
+            ]
+        }, function (btn) {
+            if (btn === 'delete') {
+                const payload = {
+                    action: 'delete',
+                    id: parseInt(document.getElementById('holding_id').value)
+                };
+                tg.sendData(JSON.stringify(payload));
+                tg.close();
+            }
+        });
+    });
+
 </script>
 </body>
 </html>

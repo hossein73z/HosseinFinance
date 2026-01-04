@@ -75,9 +75,6 @@ CREATE TABLE IF NOT EXISTS `test`.favorites
     FOREIGN KEY (asset_id) REFERENCES assets (id) ON DELETE RESTRICT
 ) DEFAULT CHARSET = utf8mb4;
 
-alter table `test`.favorites
-    auto_increment 0;
-
 CREATE TABLE IF NOT EXISTS `test`.`alerts`
 (
     id             BIGINT AUTO_INCREMENT PRIMARY KEY,

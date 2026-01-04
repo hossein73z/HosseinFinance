@@ -236,23 +236,29 @@ function choosePath(
 
             } else { // Pressed button is a normal buttons
 
-                if ($pressed_button['id'] == "1") level_1($person); // Holdings
-                if ($pressed_button['id'] == "2") level_2($person); // Loans
-                if ($pressed_button['id'] == "5") level_5($person); // Prices
+                $db->update('persons', ['last_btn' => $pressed_button['id'], 'progress' => null], ['id' => $person['id']]);
 
-                // Send button's text as message and update user's `last_btn`
-                $data = [
-                    'text' => json_decode($pressed_button['attrs'], true)['text'],
-                    'chat_id' => $person['chat_id'],
-                    'reply_markup' => [
-                        'keyboard' => createKeyboardsArray($pressed_button['id'], $person['is_admin'], $db),
-                        'resize_keyboard' => true,
-                        'is_persistent' => true,
-                        'input_field_placeholder' => json_decode($pressed_button['attrs'], true)['text'],
-                    ]
-                ];
-                if (sendToTelegram('sendMessage', $data))
-                    $db->update('persons', ['last_btn' => $pressed_button['id']], ['id' => $person['id']]);
+                switch ($pressed_button['id']) {
+                    case "1":
+                        level_1($person);
+                    case "2":
+                        level_2($person);
+                    case "5":
+                        level_5($person);
+                    default:
+                        // Send button's text as message and update user's `last_btn`
+                        sendToTelegram('sendMessage', [
+                            'text' => json_decode($pressed_button['attrs'], true)['text'],
+                            'chat_id' => $person['chat_id'],
+                            'reply_markup' => [
+                                'keyboard' => createKeyboardsArray($pressed_button['id'], $person['is_admin'], $db),
+                                'resize_keyboard' => true,
+                                'is_persistent' => true,
+                                'input_field_placeholder' => json_decode($pressed_button['attrs'], true)['text'],
+                            ]
+                        ]);
+                        break;
+                }
             }
         }
     }
@@ -330,12 +336,11 @@ function level_1(array $person, array|null $message = null, array|null $callback
         ]]], $data['reply_markup']['keyboard']);
 
     } else { // User has just entered level 1
-
         // Add holding button
         $data['reply_markup']['keyboard'] = array_merge([[[
             'text' => '➕ افزودن دارایی جدید',
             'web_app' => [
-                'url' => 'https://' . getenv('VERCEL_PROJECT_PRODUCTION_URL') . '/assets/add_holding.html?k=' . getenv('DB_API_SECRET')]
+                'url' => 'https://' . getenv('VERCEL_PROJECT_PRODUCTION_URL') . '/assets/add_holding.html?api_url=https://' . getenv('VERCEL_PROJECT_PRODUCTION_URL') . '/api/ExternalConnections/api.php&api_key=' . getenv('DB_API_SECRET')]
         ]]], $data['reply_markup']['keyboard']);
 
     }
@@ -352,6 +357,7 @@ function level_1(array $person, array|null $message = null, array|null $callback
             a.exchange_rate as base_rate',
         join: 'INNER JOIN assets a ON h.asset_id = a.id');
 
+    // Received request is a callback wuery
     if ($callback_query) {
 
         // Answer the query
@@ -364,7 +370,10 @@ function level_1(array $person, array|null $message = null, array|null $callback
         $data['text'] = 'این پیام منقضی شده است.';
         $data['message_id'] = $message['message_id'];
 
-    } elseif (!$message) { // User has just entered the level 1
+    }
+
+    // User has just the entered
+    if (!$callback_query && !$message) {
 
         if ($holdings) { // User has registered holdings
 
@@ -384,17 +393,21 @@ function level_1(array $person, array|null $message = null, array|null $callback
 
         } else $data['text'] = 'شما هیچ دارایی‌ای ثبت نکرده‌اید.';
 
-    } else { // Message received in the level 1
+    }
 
+    // Message received in the level 1
+    if ((!$callback_query && $message)) {
+
+        // Received message is web app data
+        // This part stops the function by recalling it
         if (isset($message['web_app_data'])) {
 
             $web_app_data = json_decode($message['web_app_data']['data'], true);
-            $action = array_key_first($web_app_data);
 
-            if (in_array($action, ['add', 'edit'])) {
+            if ($web_app_data['action'] == 'add') {
 
-                $holding = $web_app_data[$action];
-                $result = $db->upsert('holdings', [
+                $holding = $web_app_data['holding'];
+                $result = $db->create('holdings', [
                     "person_id" => $person['id'],
                     "asset_id" => $holding["asset_id"],
                     "amount" => $holding["amount"],
@@ -404,53 +417,53 @@ function level_1(array $person, array|null $message = null, array|null $callback
                     "note" => $holding["note"],
                 ]);
 
-                if ($result) $data['text'] = $action == 'edit' ? '✅ دارایی با موفقیت ویرایش شد.' : '✅ دارایی جدید با موفقیت ثبت شد.';
-                else $data['text'] = $action == 'edit' ? '❌ خطای پایگاه داده در ویرایش دارایی.' : '❌ خطای پایگاه داده در ثبت دارایی جدید.';
+                if ($result) $data['text'] = '✅ دارایی جدید با موفقیت ثبت شد.';
+                else $data['text'] = '❌ خطای پایگاه داده در ثبت دارایی جدید.';
 
-            } elseif ($action == 'delete') {
-
-                $holding_id = $web_app_data[$action]['id'];
-                $result = $db->delete('holdings', ['id' => $holding_id], true);
-
-                if ($result) $data['text'] = '✅ دارایی با موفقیت حذف شد.';
-                else $data['text'] = '❌ خطای پایگاه داده درحذف دارایی.';
+//            } elseif ($action == 'delete') {
+//
+//                $holding_id = $web_app_data[$action]['id'];
+//                $result = $db->delete('holdings', ['id' => $holding_id], true);
+//
+//                if ($result) $data['text'] = '✅ دارایی با موفقیت حذف شد.';
+//                else $data['text'] = '❌ خطای پایگاه داده درحذف دارایی.';
 
             }
 
             sendToTelegram($telegram_method, $data); // Send success/failure message to the user
             level_1($person); // Call the level to send user the new list of their holdings
 
-        } else {
-            // Check deep-link: /start <holding_id>
-            $matched = preg_match("/^\/start holding_(\d*)$/m", $message['text'], $matches);
-            if ($matched) {
-
-                if ($matches[1]) {
-
-                    $index = array_search($matches[1], array_column($holdings, 'id'));
-                    $holding = ($index !== false) ? $holdings[$index] : null;
-
-                    if ($holding) {
-
-                        $data['text'] = createHoldingDetailText(holding: $holding);
-
-                        // Add web_app button to edit the holding
-                        unset($data['reply_markup']['keyboard'][0]);
-                        $data['reply_markup']['keyboard'] = array_merge([[[
-                            'text' => '✏ ویرایش',
-                            'web_app' => [
-                                'url' => 'https://' . getenv('VERCEL_PROJECT_PRODUCTION_URL') . '/assets/add_holding.html?k=' . getenv('DB_API_SECRET') . '&edit_holding_id=' . $holding['id']]
-                        ]]], $data['reply_markup']['keyboard']);
-
-                        // Set user progress
-                        $db->update('persons',
-                            ['progress' => json_encode(['view_holding' => ['holding_id' => $holding['id']]])],
-                            ['id' => $person['id']]);
-
-                    } else  $data['text'] = 'دارایی با این مشخصه یافت نشد!';
-                } else  $data['text'] = 'الگوی پیام اشتباه است!';
-            } else $data['text'] = 'پیام نامفهوم است!';
         }
+
+        // Check deep-link for showing holding detail
+        $matched = preg_match("/^\/start holding_(\d*)$/m", $message['text'], $matches);
+        if ($matched) {
+
+            if ($matches[1]) {
+
+                $index = array_search($matches[1], array_column($holdings, 'id'));
+                $holding = ($index !== false) ? $holdings[$index] : null;
+
+                if ($holding) {
+
+                    $data['text'] = createHoldingDetailText(holding: $holding);
+
+                    // Add web_app button to edit the holding
+                    unset($data['reply_markup']['keyboard'][0]);
+                    $data['reply_markup']['keyboard'] = array_merge([[[
+                        'text' => '✏ ویرایش',
+                        'web_app' => [
+                            'url' => 'https://' . getenv('VERCEL_PROJECT_PRODUCTION_URL') . '/assets/add_holding.html?k=' . getenv('DB_API_SECRET') . '&edit_holding_id=' . $holding['id']]
+                    ]]], $data['reply_markup']['keyboard']);
+
+                    // Set user progress
+                    $db->update('persons',
+                        ['progress' => json_encode(['view_holding' => ['holding_id' => $holding['id']]])],
+                        ['id' => $person['id']]);
+
+                } else  $data['text'] = 'دارایی با این مشخصه یافت نشد!';
+            } else  $data['text'] = 'الگوی پیام اشتباه است!';
+        } else $data['text'] = 'پیام نامفهوم است!';
     }
 
     $response = sendToTelegram($telegram_method, $data);
@@ -526,19 +539,29 @@ function level_2(array $person, array|null $message = null, array|null $callback
                 level_2($person);
             }
         }
-
     }
     if (!$callback_query) {
         if (!$message) {
 
             $loans = $db->read(
-                'loans',
-                conditions: ['person_id' => $person['id']],
+                table: 'loans l',
+                conditions: ['l.person_id' => $person['id']],
+                selectColumns: '
+                    l.*,
+                    JSON_ARRAYAGG(JSON_OBJECT(
+                        "id", i.id,
+                        "loan_id", i.loan_id,
+                        "amount", i.amount,
+                        "due_date", i.due_date,
+                        "is_paid", i.is_paid
+                    )) as installments',
+                join: 'JOIN installments i on i.loan_id = l.id',
+                groupBy: 'l.id'
             );
 
             if ($loans) {
                 foreach ($loans as $index => $loan)
-                    $loans[$index]['installments'] = $db->read('installments', ["loan_id" => $loan['id']], orderBy: ['due_date' => 'ASC']);
+                    $loans[$index]['installments'] = json_decode($loan['installments'], true);
 
                 // Send a message just to show the keyboards
                 $response = sendToTelegram('sendMessage', $data);
@@ -646,46 +669,29 @@ function level_2(array $person, array|null $message = null, array|null $callback
             } elseif (isset($message['text'])) {
                 if (preg_match("/^\/start (\w*?)_/m", $message['text'])) {
 
-                    // Toggle installment payment in loan's detail message
-                    if (preg_match("/^\/start toggleInstPayment_instId(\d+?)_mssgId(\d+?)$/m", $message['text'], $matches)) {
-
-                        sendToTelegram('deleteMessage', ['chat_id' => $person['chat_id'], 'message_id' => $message['message_id']]);
-
-                        $installment = $db->read(
-                            table: 'installments i',
-                            conditions: ['i.id' => $matches[1], 'l.person_id' => $person['id']],
-                            single: true,
-                            selectColumns: 'i.*, l.person_id',
-                            join: 'LEFT JOIN loans l ON i.loan_id = l.id');
-
-                        if ($installment) {
-
-                            $db->update('installments', ['is_paid' => !$installment['is_paid']], ['id' => $installment['id']]);
-
-                            $loan = $db->read('loans', ['id' => $installment['loan_id'], 'person_id' => $person['id']], true);
-                            if ($loan) {
-                                $loan['installments'] = $db->read('installments', ["loan_id" => $loan['id']], orderBy: ['due_date' => 'ASC']);
-                                $data['text'] = createLoanDetailView($loan, $matches[2]);
-                                $telegram_method = 'editMessageText';
-                                $data['reply_markup'] = ['inline_keyboard' => [
-                                    [['text' => 'برگشت به لیست وام‌ها', 'callback_data' => json_encode(['loan_list' => null])]]
-                                ]];
-
-                                $data['parse_mode'] = "MarkdownV2";
-                                $data['message_id'] = $matches[2];
-                            }
-
-                        } else $data['text'] = 'قسطی با این مشخصه یافت نشد!';
-                    }
                     // Show loan detail
                     if (preg_match("/^\/start showLoan_loanId(\d+?)_mssgId(\d+?)$/m", $message['text'], $matches)) {
 
                         sendToTelegram('deleteMessage', ['chat_id' => $person['chat_id'], 'message_id' => $message['message_id']]);
                         sendToTelegram('deleteMessage', ['chat_id' => $person['chat_id'], 'message_id' => $matches[2]]);
 
-                        $loan = $db->read('loans', ['id' => $matches[1], 'person_id' => $person['id']], true);
+                        $loan = $db->read(
+                            table: 'loans l',
+                            conditions: ['l.id' => $matches[1], 'l.person_id' => $person['id']],
+                            single: true,
+                            selectColumns: '
+                                    l.*, JSON_ARRAYAGG(JSON_OBJECT(
+                                        "id", i.id,
+                                        "loan_id", i.loan_id,
+                                        "amount", i.amount,
+                                        "due_date", i.due_date,
+                                        "is_paid", i.is_paid
+                                    )) as installments',
+                            join: 'JOIN installments i on i.loan_id = l.id',
+                            groupBy: 'l.id'
+                        );
                         if ($loan) {
-                            $loan['installments'] = $db->read('installments', ["loan_id" => $loan['id']], orderBy: ['due_date' => 'ASC']);
+                            $loan['installments'] = json_decode($loan['installments'], true);
 
                             // Send a message just to show the bottom keyboard
                             $data['text'] = 'جزئیات وام «' . $loan['name'] . '»';
@@ -718,6 +724,52 @@ function level_2(array $person, array|null $message = null, array|null $callback
                                 ]];
                             }
                         }
+                    }
+                    // Toggle installment payment in loan's detail message
+                    if (preg_match("/^\/start toggleInstPayment_instId(\d+?)_mssgId(\d+?)$/m", $message['text'], $matches)) {
+
+                        sendToTelegram('deleteMessage', ['chat_id' => $person['chat_id'], 'message_id' => $message['message_id']]);
+
+                        $installment = $db->read(
+                            table: 'installments i',
+                            conditions: ['i.id' => $matches[1], 'l.person_id' => $person['id']],
+                            single: true,
+                            selectColumns: 'i.*, l.person_id',
+                            join: 'LEFT JOIN loans l ON i.loan_id = l.id');
+
+                        if ($installment) {
+
+                            $db->update('installments', ['is_paid' => !$installment['is_paid']], ['id' => $installment['id']]);
+
+                            $loan = $db->read(
+                                table: 'loans l',
+                                conditions: ['l.id' => $installment['loan_id'], 'l.person_id' => $person['id']],
+                                single: true,
+                                selectColumns: '
+                                    l.*, JSON_ARRAYAGG(JSON_OBJECT(
+                                        "id", i.id,
+                                        "loan_id", i.loan_id,
+                                        "amount", i.amount,
+                                        "due_date", i.due_date,
+                                        "is_paid", i.is_paid
+                                    )) as installments',
+                                join: 'JOIN installments i on i.loan_id = l.id',
+                                groupBy: 'l.id'
+                            );
+
+                            if ($loan) {
+                                $loan['installments'] = json_decode($loan['installments'], true);
+                                $data['text'] = createLoanDetailView($loan, $matches[2]);
+                                $telegram_method = 'editMessageText';
+                                $data['reply_markup'] = ['inline_keyboard' => [
+                                    [['text' => 'برگشت به لیست وام‌ها', 'callback_data' => json_encode(['loan_list' => null])]]
+                                ]];
+
+                                $data['parse_mode'] = "MarkdownV2";
+                                $data['message_id'] = $matches[2];
+                            }
+
+                        } else $data['text'] = 'قسطی با این مشخصه یافت نشد!';
                     }
                 }
             }
@@ -1058,8 +1110,7 @@ function level_5(array $person, array|null $message = null, array|null $callback
         }
     } else $data['text'] = "دسته‌بندی‌ای در سیستم یافت نشد!";
 
-    $response = sendToTelegram($telegram_method, $data);
-    if ($response && !$message && !$callback_query) $db->update('persons', ['last_btn' => 5, 'progress' => null], ['id' => $person['id']]);
+    sendToTelegram($telegram_method, $data);
     exit();
 
 }
