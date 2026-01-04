@@ -84,7 +84,13 @@ if (!in_array($table, $allowedTables)) {
 // -------------------------------------------------------------------------
 
 try {
-    $db = DatabaseManager::getInstance();
+    $db = DatabaseManager::getInstance(
+        host: getenv('DB_HOST'),
+        db: getenv('DB_NAME'),
+        user: getenv('DB_USER'),
+        pass: getenv('DB_PASS'),
+        port: getenv('DB_PORT') ?: '3306',
+    );
 
     // 1. Check if the requested function exists in DatabaseManager
     if (!method_exists($db, $operation)) {
