@@ -316,6 +316,7 @@ function level_1(array $person, array|null $message = null, array|null $callback
     $telegram_method = 'sendMessage';
     $data = [
         'chat_id' => $person['chat_id'],
+        'text' => 'دارایی‌ها',
         'reply_markup' => [
             'keyboard' => createKeyboardsArray(1, $person['is_admin'], $db),
             'resize_keyboard' => true,
@@ -328,22 +329,40 @@ function level_1(array $person, array|null $message = null, array|null $callback
     $progress = json_decode($person['progress'], true);
     if ($progress && array_key_first($progress) == 'view_holding') { // User is viewing a holding
 
-        // Edit holding button
-        $data['reply_markup']['keyboard'] = array_merge([[[
-            'text' => '✏ ویرایش',
-            'web_app' => [
-                'url' => 'https://' . getenv('VERCEL_PROJECT_PRODUCTION_URL') . '/assets/add_holding.html?k=' . getenv('DB_API_SECRET') . '&edit_holding_id=' . $progress['view_holding']['holding_id']]
-        ]]], $data['reply_markup']['keyboard']);
+        // Read holding to send to the edit page
+        $holding = $db->read(
+            table: 'holdings',
+            conditions: [
+                'id' => $progress['view_holding']['holding_id'],
+                'person_id' => $person['id']],
+            single: true
+        );
 
-    } else { // User has just entered level 1
-        // Add holding button
-        $data['reply_markup']['keyboard'] = array_merge([[[
-            'text' => '➕ افزودن دارایی جدید',
-            'web_app' => [
-                'url' => 'https://' . getenv('VERCEL_PROJECT_PRODUCTION_URL') . '/assets/add_holding.html?api_url=https://' . getenv('VERCEL_PROJECT_PRODUCTION_URL') . '/api/ExternalConnections/api.php&api_key=' . getenv('DB_API_SECRET')]
-        ]]], $data['reply_markup']['keyboard']);
+        // Add 'Edit Holding' Button
+        if ($holding) {
+            // Edit holding button
+            $data['reply_markup']['keyboard'] = array_merge([[[
+                'text' => '✏ ویرایش',
+                'web_app' => [
+                    'url' => 'https://' . getenv('VERCEL_PROJECT_PRODUCTION_URL') . '/assets/add_holding.html' . '?' .
+                        'api_url=' . 'https://' . getenv('VERCEL_PROJECT_PRODUCTION_URL') . '/api/ExternalConnections/api.php' . '&' .
+                        'api_key=' . getenv('DB_API_SECRET') . '&' .
+                        'data=' . base64_encode(json_encode($holding))
+                ]
+            ]]], $data['reply_markup']['keyboard']);
+        }
 
     }
+
+    // Add 'Add Holding' button
+    $data['reply_markup']['keyboard'] = array_merge([[[
+        'text' => '➕ افزودن دارایی جدید',
+        'web_app' => [
+            'url' => 'https://' . getenv('VERCEL_PROJECT_PRODUCTION_URL') . '/assets/add_holding.html?' .
+                'api_url=' . 'https://' . getenv('VERCEL_PROJECT_PRODUCTION_URL') . '/api/ExternalConnections/api.php&' .
+                'api_key=' . getenv('DB_API_SECRET')
+        ]
+    ]]], $data['reply_markup']['keyboard']);
 
     // Retrieve user holdings
     $holdings = $db->read(
@@ -357,12 +376,14 @@ function level_1(array $person, array|null $message = null, array|null $callback
             a.exchange_rate as base_rate',
         join: 'INNER JOIN assets a ON h.asset_id = a.id');
 
-    // Received request is a callback wuery
+    // Received request is a callback query
     if ($callback_query) {
 
         // Answer the query
         sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
-        // $query_data = json_decode($callback_query['data'], true);
+
+        $query_data = json_decode($callback_query['data'], true);
+        if ($query_data == 'null') exit();
 
         // Delete the message generating the callback
         $telegram_method = 'editMessageText';
@@ -377,20 +398,42 @@ function level_1(array $person, array|null $message = null, array|null $callback
 
         if ($holdings) { // User has registered holdings
 
-            $data['text'] = "دارایی‌های ثبت شده‌ی شما:\n";
-            $total_profit = 0;
-            foreach ($holdings as $holding) {
-                $total_profit += $holding['amount'] * ($holding['current_price'] - $holding['avg_price']) * $holding['base_rate'];
-                $data['text'] = $data['text'] . "\n" . createHoldingDetailText(holding: $holding, markdown: 'MarkdownV2', attributes: ['org_amount', 'org_total_price', 'profit']);
+            // Send a message just to show the keyboards
+            $response = sendToTelegram('sendMessage', $data);
+            if (!$response) exit();
+
+            $data['text'] = 'در حال دریافت اطلاعات دارایی‌ها ...';
+            $data['reply_markup'] = ['inline_keyboard' => [
+                [['text' => '...', 'callback_data' => 'null']]
+            ]];
+            $temp_mssg = sendToTelegram('sendMessage', $data);
+
+            if ($temp_mssg) {
+                try {
+                    $data['text'] = "دارایی‌های ثبت شده‌ی شما:\n";
+                    $total_profit = 0;
+                    foreach ($holdings as $holding) {
+                        $total_profit += $holding['amount'] * ($holding['current_price'] - $holding['avg_price']) * $holding['base_rate'];
+                        $data['text'] .= "\n" . createHoldingDetailText(
+                                holding: $holding,
+                                markdown: 'MarkdownV2',
+                                attributes: ['org_amount', 'org_total_price', 'profit'],
+                                mssg_id: $temp_mssg['result']['message_id']
+                            );
+                    }
+                    $total_profit = ($total_profit >= 0) ?
+                        "🟢 کل سود: " . beautifulNumber($total_profit) . ' ریال' :
+                        "🔴 کل ضرر: " . beautifulNumber($total_profit) . ' ریال';
+                    $total_profit = markdownScape($total_profit);
+                    $data['text'] .= "\n" . $total_profit;
+                    $data['parse_mode'] = "MarkdownV2";
+                    $data['message_id'] = $temp_mssg['result']['message_id'];
+                    unset($data['reply_markup']);
+                    $telegram_method = 'editMessageText';
+                } catch (Exception $e) {
+                    error_log($e->getMessage());
+                }
             }
-            $total_profit = ($total_profit >= 0) ?
-                "🟢 کل سود: " . beautifulNumber($total_profit) . ' ریال' :
-                "🔴 کل ضرر: " . beautifulNumber($total_profit) . ' ریال';
-            $total_profit = markdownScape($total_profit);
-            $data['text'] .= "\n" . $total_profit;
-
-            $data['parse_mode'] = "MarkdownV2";
-
         } else $data['text'] = 'شما هیچ دارایی‌ای ثبت نکرده‌اید.';
 
     }
@@ -436,7 +479,7 @@ function level_1(array $person, array|null $message = null, array|null $callback
         }
 
         // Check deep-link for showing holding detail
-        $matched = preg_match("/^\/start holding_(\d*)$/m", $message['text'], $matches);
+        $matched = preg_match('/^\/start viewHolding_holdingId(\d+)(_mssgId(\d+))$/m', $message['text'], $matches);
         if ($matched) {
 
             if ($matches[1]) {
@@ -446,15 +489,24 @@ function level_1(array $person, array|null $message = null, array|null $callback
 
                 if ($holding) {
 
+                    if ($matches[3]) {
+                        sendToTelegram('deleteMessage', ['chat_id' => $person['chat_id'], 'message_id' => $message['message_id']]);
+                        sendToTelegram('deleteMessage', ['chat_id' => $person['chat_id'], 'message_id' => $matches[3]]);
+                    }
+
                     $data['text'] = createHoldingDetailText(holding: $holding);
 
                     // Add web_app button to edit the holding
-                    unset($data['reply_markup']['keyboard'][0]);
-                    $data['reply_markup']['keyboard'] = array_merge([[[
+                    $data['reply_markup']['keyboard'][2] = $data['reply_markup']['keyboard'][1];
+                    $data['reply_markup']['keyboard'][1] = [[
                         'text' => '✏ ویرایش',
                         'web_app' => [
-                            'url' => 'https://' . getenv('VERCEL_PROJECT_PRODUCTION_URL') . '/assets/add_holding.html?k=' . getenv('DB_API_SECRET') . '&edit_holding_id=' . $holding['id']]
-                    ]]], $data['reply_markup']['keyboard']);
+                            'url' => 'https://' . getenv('VERCEL_PROJECT_PRODUCTION_URL') . '/assets/add_holding.html' . '?' .
+                                'api_url=' . 'https://' . getenv('VERCEL_PROJECT_PRODUCTION_URL') . '/api/ExternalConnections/api.php' . '&' .
+                                'api_key=' . getenv('DB_API_SECRET') . '&' .
+                                'data=' . base64_encode(json_encode($holding))
+                        ]
+                    ]];
 
                     // Set user progress
                     $db->update('persons',
@@ -571,13 +623,13 @@ function level_2(array $person, array|null $message = null, array|null $callback
                 $data['reply_markup'] = ['inline_keyboard' => [
                     [['text' => '...', 'callback_data' => 'null']]
                 ]];
-                $inst_mssg = sendToTelegram('sendMessage', $data);
+                $temp_mssg = sendToTelegram('sendMessage', $data);
 
-                if ($inst_mssg) {
+                if ($temp_mssg) {
                     try {
-                        $data['text'] = createLoansView($loans, $inst_mssg['result']['message_id']);
+                        $data['text'] = createLoansView($loans, $temp_mssg['result']['message_id']);
                         $data['parse_mode'] = "MarkdownV2";
-                        $data['message_id'] = $inst_mssg['result']['message_id'];
+                        $data['message_id'] = $temp_mssg['result']['message_id'];
                         unset($data['reply_markup']);
                         $telegram_method = 'editMessageText';
                     } catch (Exception $e) {
@@ -711,14 +763,14 @@ function level_2(array $person, array|null $message = null, array|null $callback
                             $data['reply_markup'] = ['inline_keyboard' => [
                                 [['text' => '...', 'callback_data' => 'null']]
                             ]];
-                            $inst_mssg = sendToTelegram('sendMessage', $data);
+                            $temp_mssg = sendToTelegram('sendMessage', $data);
 
-                            if ($inst_mssg) {
+                            if ($temp_mssg) {
                                 $db->update('persons', ['progress' => json_encode(['viewing_loan' => ['loan_id' => $loan['id']]], JSON_PRETTY_PRINT)], ['id' => $person['id']]);
                                 $telegram_method = 'editMessageText';
-                                $data['text'] = createLoanDetailView($loan, $inst_mssg['result']['message_id']);
+                                $data['text'] = createLoanDetailView($loan, $temp_mssg['result']['message_id']);
                                 $data['parse_mode'] = "MarkdownV2";
-                                $data['message_id'] = $inst_mssg['result']['message_id'];
+                                $data['message_id'] = $temp_mssg['result']['message_id'];
                                 $data['reply_markup'] = ['inline_keyboard' => [
                                     [['text' => 'برگشت به لیست وام‌ها', 'callback_data' => json_encode(['loan_list' => null])]]
                                 ]];
@@ -1115,15 +1167,19 @@ function level_5(array $person, array|null $message = null, array|null $callback
 
 }
 
-function createHoldingDetailText(array $holding, string|null $markdown = null, array $attributes = [
-    'date',
-    'org_amount',
-    'org_price',
-    'new_price',
-    'org_total_price',
-    'new_total_price',
-    'profit',
-]): string
+function createHoldingDetailText(
+    array       $holding,
+    string|null $markdown = null,
+    array       $attributes = [
+        'date',
+        'org_amount',
+        'org_price',
+        'new_price',
+        'org_total_price',
+        'new_total_price',
+        'profit',
+    ],
+    int|string  $mssg_id = null): string
 {
     $text = '';
 
@@ -1134,8 +1190,8 @@ function createHoldingDetailText(array $holding, string|null $markdown = null, a
         $date[1]);
 
     if ($markdown === 'MarkdownV2') {
-        $holding['asset_name'] = beautifulNumber(markdownScape($holding['asset_name']), null) . '‏';
-        $holding['asset_name'] = "[" . $holding['asset_name'] . "](https://t.me/" . BOT_ID . "?start=holding_" . $holding['id'] . ")" . '‏';
+        $asset_name = beautifulNumber(markdownScape($holding['asset_name']), null);
+        $holding['asset_name'] = "[$asset_name](https://t.me/" . BOT_ID . "?start=viewHolding_holdingId$holding[id]" . ($mssg_id ? "_mssgId" . $mssg_id : '') . ")" . '‏';
     }
 
     $price_def = $holding['current_price'] - $holding['avg_price'];
