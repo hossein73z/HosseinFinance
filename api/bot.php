@@ -470,19 +470,17 @@ function level_1(array $person, array|null $message = null, array|null $callback
                 if ($result) $data['text'] = '✅ دارایی با موفقیت ویرایش ثبت شد.';
                 else $data['text'] = '❌ خطای پایگاه داده در ویرایش دارایی.';
             }
-//            } elseif ($action == 'delete') {
-//
-//                $holding_id = $web_app_data[$action]['id'];
-//                $result = $db->delete('holdings', ['id' => $holding_id], true);
-//
-//                if ($result) $data['text'] = '✅ دارایی با موفقیت حذف شد.';
-//                else $data['text'] = '❌ خطای پایگاه داده درحذف دارایی.';
-//
-//            }
+            if ($web_app_data['action'] == 'delete') {
+
+                $result = $db->delete('holdings', ['id' => $web_app_data['id']], true);
+
+                if ($result) $data['text'] = '✅ دارایی با موفقیت حذف شد.';
+                else $data['text'] = '❌ خطای پایگاه داده درحذف دارایی.';
+
+            }
 
             sendToTelegram($telegram_method, $data); // Send success/failure message to the user
-            level_1($person); // Call the level to send user the new list of their holdings
-
+            backButton($person);
         }
 
         // Check deep-link for showing holding detail
