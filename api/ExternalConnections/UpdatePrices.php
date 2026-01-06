@@ -326,7 +326,7 @@ function addPriceToDatabase(array $matches, string $asset_type, string $date, st
 
         $live_mssg_data = json_decode($live_mssg['data'], true);
 
-        if ($live_mssg['is_active'] === true) {
+        if ($live_mssg['is_active']) {
             $favorites = $db->read(
                 table: 'favorites f',
                 conditions: ['person_id' => $live_mssg['person_id']],
