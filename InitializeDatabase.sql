@@ -26,11 +26,13 @@ VALUES ('1', '{"text": "دارایی‌ها"}', 0, null, '0', '[["s0"]]');
 INSERT INTO `test`.buttons (id, attrs, admin_key, messages, belong_to, keyboards)
 VALUES ('2', '{"text": "🏦 وام و اقساط"}', 0, null, '0', '[["s0"]]');
 INSERT INTO `test`.buttons (id, attrs, admin_key, messages, belong_to, keyboards)
-VALUES ('3', '{"text": "ابزارها"}', 0, null, '0', '[["5"], ["s0"]]');
+VALUES ('3', '{"text": "ابزارها"}', 0, null, '0', '[["5"], ["6"], ["s0"]]');
 INSERT INTO `test`.buttons (id, attrs, admin_key, messages, belong_to, keyboards)
 VALUES ('4', '{"text": "بخش مدیریت"}', 1, null, '0', '[["s0"]]');
 INSERT INTO `test`.buttons (id, attrs, admin_key, messages, belong_to, keyboards)
 VALUES ('5', '{"text": "قیمت‌ها"}', 0, null, '3', '[["s0"]]');
+INSERT INTO `test`.buttons (id, attrs, admin_key, messages, belong_to, keyboards)
+VALUES ('6', '{"text": "هوش مصنوعی"}', 0, null, '3', '[["s0"]]');
 INSERT INTO `test`.buttons (id, attrs, admin_key, messages, belong_to, keyboards)
 VALUES ('s0', '{"text": "🔙 برگشت 🔙"}', 0, null, null, null);
 INSERT INTO `test`.buttons (id, attrs, admin_key, messages, belong_to, keyboards)
@@ -141,6 +143,7 @@ CREATE TABLE IF NOT EXISTS `test`.`special_messages`
     id        INT AUTO_INCREMENT PRIMARY KEY,
     person_id INT         NOT NULL,
     type      VARCHAR(10) NOT NULL,
+    is_active BOOLEAN     NOT NULL DEFAULT 0,
     data      text        NOT NULL,
 
     UNIQUE INDEX idx_unique_installment (person_id, type),
