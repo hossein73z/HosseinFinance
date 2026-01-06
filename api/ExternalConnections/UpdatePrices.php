@@ -339,6 +339,7 @@ function addPriceToDatabase(array $matches, string $asset_type, string $date, st
             $data['text'] = createFavoritesText($favorites);
             $data['reply_markup'] = ['inline_keyboard' => [
                 [['text' => 'توقف نمایش زنده ⏸', 'callback_data' => json_encode(['set_live' => false])]],
+                [['text' => 'هشدار قیمت', 'callback_data' => json_encode(['price_alert' => null])]],
                 [['text' => 'ویرایش لیست', 'callback_data' => json_encode(['edit_fav' => null])]],
             ]];
 
