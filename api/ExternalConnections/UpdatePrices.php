@@ -324,8 +324,6 @@ function addPriceToDatabase(array $matches, string $asset_type, string $date, st
 
     if ($live_mssgs) foreach ($live_mssgs as $live_mssg) {
 
-        $live_mssg_data = json_decode($live_mssg['data'], true);
-
         if ($live_mssg['is_active']) {
             $favorites = $db->read(
                 table: 'favorites f',
@@ -335,7 +333,7 @@ function addPriceToDatabase(array $matches, string $asset_type, string $date, st
                 orderBy: ['asset_type' => 'DESC', 'id' => 'ASC']);
 
             $data['chat_id'] = $live_mssg['chat_id'];
-            $data['message_id'] = $live_mssg_data['mssg_id'];
+            $data['message_id'] = $live_mssg['message_id'];
             $data['text'] = createFavoritesText($favorites);
             $data['reply_markup'] = ['inline_keyboard' => [
                 [['text' => 'توقف نمایش زنده ⏸', 'callback_data' => json_encode(['set_live' => false])]],

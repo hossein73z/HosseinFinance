@@ -907,7 +907,7 @@ function level_5(array $person, array|null $message = null, array|null $callback
                             'type' => 'live_price',
                             'is_active' => true
                         ], true);
-                        if ($live_mssg && json_decode($live_mssg['data'], true)['mssg_id'] == $message['message_id']) {
+                        if ($live_mssg && $live_mssg['message_id'] == $message['message_id']) {
                             $db->update('special_messages', ['is_active' => false], ['id' => $live_mssg['id']]);
                         }
 
@@ -1042,14 +1042,14 @@ function level_5(array $person, array|null $message = null, array|null $callback
                         ], true);
 
                         // Delete previous live message if exists
-                        if ($live_mssg) sendToTelegram('deleteMessage', ['message_id' => json_decode($live_mssg['data'], true)['mssg_id'], 'chat_id' => $person['chat_id']]);
+                        if ($live_mssg) sendToTelegram('deleteMessage', ['message_id' => $live_mssg['message_id'], 'chat_id' => $person['chat_id']]);
 
                         // Create/Update the live message in the database
                         $result = $db->upsert('special_messages', [
                             'person_id' => $person['id'],
                             'type' => 'live_price',
                             'is_active' => true,
-                            'data' => json_encode(['mssg_id' => $message['message_id']], JSON_PRETTY_PRINT)
+                            'message_id' => $message['message_id'],
                         ]);
                     }
 
@@ -1089,7 +1089,7 @@ function level_5(array $person, array|null $message = null, array|null $callback
                 // Price alerts
                 if ($query_key == 'price_alert') {
 
-                    //
+                    // Show main alert setting menu and disable live message
                     if ($query_data[$query_key] == null) {
 
                     }
@@ -1111,7 +1111,7 @@ function level_5(array $person, array|null $message = null, array|null $callback
 
                         $data['text'] = createFavoritesText($favorites);
                         $data['reply_markup'] = ['inline_keyboard' => [
-                            $result && json_decode($result['data'], true)['mssg_id'] == $message['message_id'] ?
+                            $result && $result['message_id'] == $message['message_id'] ?
                                 [['text' => 'توقف نمایش زنده ⏸', 'callback_data' => json_encode(['set_live' => false])]] :
                                 [['text' => 'نمایش زنده قیمت‌ها ▶', 'callback_data' => json_encode(['set_live' => true])]],
                             [['text' => 'هشدار قیمت', 'callback_data' => json_encode(['price_alert' => null])]],
@@ -1199,13 +1199,13 @@ function level_5(array $person, array|null $message = null, array|null $callback
                             // Update message ID in the database
                             $update_live_mssg = $db->update(
                                 table: 'special_messages',
-                                data: ['data' => json_encode(['mssg_id' => $response['result']['message_id']], JSON_PRETTY_PRINT)],
+                                data: ['message_id' => $response['result']['message_id']],
                                 conditions: ['person_id' => $person['id'], 'type' => 'live_price',]);
 
                             // Delete previous live message and exit
                             if ($update_live_mssg) {
                                 $telegram_method = 'deleteMessage';
-                                $data = ['message_id' => json_decode($live_mssg['data'], true)['mssg_id'], 'chat_id' => $person['chat_id']];
+                                $data = ['message_id' => $live_mssg['message_id'], 'chat_id' => $person['chat_id']];
                             }
                         }
                     }

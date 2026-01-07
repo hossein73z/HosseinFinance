@@ -140,11 +140,12 @@ CREATE TABLE IF NOT EXISTS `test`.`installments`
 
 CREATE TABLE IF NOT EXISTS `test`.`special_messages`
 (
-    id        INT AUTO_INCREMENT PRIMARY KEY,
-    person_id INT         NOT NULL,
-    type      VARCHAR(10) NOT NULL,
-    is_active BOOLEAN     NOT NULL DEFAULT 0,
-    data      text        NOT NULL,
+    id         INT AUTO_INCREMENT PRIMARY KEY,
+    person_id  INT         NOT NULL,
+    type       VARCHAR(10) NOT NULL,
+    is_active  BOOLEAN     NOT NULL DEFAULT 0,
+    message_id NUMERIC(6)  NOT NULL,
+    data       text,
 
     UNIQUE INDEX idx_unique_installment (person_id, type),
     FOREIGN KEY (person_id) REFERENCES persons (id) ON DELETE CASCADE
