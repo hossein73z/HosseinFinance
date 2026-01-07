@@ -1199,7 +1199,7 @@ function level_5(array $person, array|null $message = null, array|null $callback
                             // Update message ID in the database
                             $update_live_mssg = $db->update(
                                 table: 'special_messages',
-                                data: ['message_id' => $response['result']['message_id']],
+                                data: ['message_id' => $response['result']['message_id'], 'is_active' => true],
                                 conditions: ['person_id' => $person['id'], 'type' => 'live_price',]);
 
                             // Delete previous live message and exit
