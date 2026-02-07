@@ -68,13 +68,13 @@ CREATE TABLE IF NOT EXISTS `test`.`holdings`
 
 CREATE TABLE IF NOT EXISTS `test`.favorites
 (
-    id        INT AUTO_INCREMENT PRIMARY KEY,
-    person_id INT NOT NULL,
-    asset_id  INT NOT NULL,
+    id         INT AUTO_INCREMENT PRIMARY KEY,
+    person_id  INT          NOT NULL,
+    asset_name VARCHAR(191) NOT NULL,
 
-    UNIQUE KEY idx_unique_favorite (person_id, asset_id),
+    UNIQUE KEY idx_unique_favorite (person_id, asset_name),
     FOREIGN KEY (person_id) REFERENCES persons (id) ON DELETE CASCADE,
-    FOREIGN KEY (asset_id) REFERENCES assets (id) ON DELETE RESTRICT
+    FOREIGN KEY (asset_name) REFERENCES assets (name) ON DELETE RESTRICT
 ) DEFAULT CHARSET = utf8mb4;
 
 CREATE TABLE IF NOT EXISTS `test`.`alerts`
