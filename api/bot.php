@@ -466,6 +466,7 @@ function level_1(array $person, array|null $message = null, array|null $callback
 
                 if ($result) $data['text'] = '✅ دارایی جدید با موفقیت ثبت شد.';
                 else $data['text'] = '❌ خطای پایگاه داده در ثبت دارایی جدید.';
+                sendToTelegram($telegram_method, $data); // Send success/failure message to the user
                 level_1($person);
             }
             if ($web_app_data['action'] == 'edit') {
