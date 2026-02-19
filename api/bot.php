@@ -742,25 +742,14 @@ function level_2(array $person, array|null $message = null, array|null $callback
                             table: 'loans l',
                             conditions: ['l.id' => $matches[1], 'l.person_id' => $person['id']],
                             single: true,
-                            // We use GROUP_CONCAT with ORDER BY, then wrap in brackets and CAST to JSON
                             selectColumns: '
-            l.*, 
-            CAST(
-                CONCAT("[", 
-                    IFNULL(
-                        GROUP_CONCAT(
-                            JSON_OBJECT(
-                                "id", i.id,
-                                "loan_id", i.loan_id,
-                                "amount", i.amount,
-                                "due_date", i.due_date,
-                                "is_paid", i.is_paid
-                            )
-                            ORDER BY i.due_date ASC
-                        )
-                    , "")
-                , "]") 
-            AS JSON) as installments',
+                                    l.*, JSON_ARRAYAGG(JSON_OBJECT(
+                                        "id", i.id,
+                                        "loan_id", i.loan_id,
+                                        "amount", i.amount,
+                                        "due_date", i.due_date,
+                                        "is_paid", i.is_paid
+                                    )) as installments',
                             join: 'JOIN installments i on i.loan_id = l.id',
                             groupBy: 'l.id'
                         );
