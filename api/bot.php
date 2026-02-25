@@ -392,7 +392,7 @@ function handleHoldingsDeepLink(array $person, array $message, DatabaseManager $
     sendTelegramMsg('sendMessage', ['chat_id' => $person['chat_id'], 'text' => $text]);
 }
 
-function renderHoldingsMainView(array $person, $db): void
+function renderHoldingsMainView(array $person, DatabaseManager $db): void
 {
     $keyboard = createKeyboardsArray(1, $person['is_admin'], $db);
 
@@ -419,7 +419,18 @@ function renderHoldingsMainView(array $person, $db): void
         ]
     ]);
 
-    $holdings = $db->read('holdings h', ['person_id' => $person['id']], false, 'h.*, a.name as asset_name, a.price as current_price, a.base_currency, a.exchange_rate as base_rate', 'INNER JOIN assets a ON h.asset_id = a.id');
+    $holdings = $db->read(
+        'holdings h',
+        [
+            'person_id' => $person['id']
+        ],
+        selectColumns: '
+            h.*,
+            a.name as asset_name,
+            a.price as current_price,
+            a.base_currency,
+            a.exchange_rate as base_rate',
+        join: 'INNER JOIN assets a ON h.asset_id = a.id');
 
     if ($holdings) {
         $temp_mssg = sendLoadingMessage($person['chat_id'], 'در حال دریافت اطلاعات دارایی‌ها ...');
