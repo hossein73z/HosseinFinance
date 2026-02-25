@@ -351,8 +351,8 @@ function handleHoldingsDeepLink(array $person, array $message, DatabaseManager $
         $mssg_id_to_delete = $matches[3] ?? null;
 
         $holding = $db->read(
-            'holdings h',
-            [
+            table: 'holdings h',
+            conditions: [
                 'h.id' => $holding_id,
                 'h.person_id' => $person['id']
             ],
@@ -420,8 +420,8 @@ function renderHoldingsMainView(array $person, DatabaseManager $db): void
     ]);
 
     $holdings = $db->read(
-        'holdings h',
-        [
+        table: 'holdings h',
+        conditions: [
             'person_id' => $person['id']
         ],
         selectColumns: '
@@ -949,9 +949,14 @@ function renderFavoritesList(array $person, ?int $message_id_to_edit, bool $is_e
     }
 }
 
-function getFavoritesList(int $person_id, $db): array|false
+function getFavoritesList(int $person_id, DatabaseManager $db): array|false
 {
-    return $db->read('favorites f', ['person_id' => $person_id], false, 'a.*, f.id as fav_id', 'JOIN assets a ON a.id=f.asset_id', ['asset_type' => 'DESC', 'f.id' => 'ASC']);
+    return $db->read(
+        table: 'favorites f',
+        conditions: ['person_id' => $person_id],
+        selectColumns: 'a.*, f.id as fav_id',
+        join: 'JOIN assets a ON a.id=f.asset_id',
+        orderBy: ['asset_type' => 'DESC', 'f.id' => 'ASC']);
 }
 
 function disableLivePriceMessage(array $person, int $message_id, $db): void
