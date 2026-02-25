@@ -677,7 +677,7 @@ function level_2(array $person, array|null $message = null, array|null $callback
 
                         foreach ($new_insts as $inst) {
                             $inst_insert_data = [
-                                'person_id' => $loan_id,
+                                'loan_id' => $loan_id,
                                 'amount' => $inst['amount'],
                                 'due_date' => $inst['due_date'],
                                 'is_paid' => $inst['is_paid'] ? 1 : 0
