@@ -341,7 +341,7 @@ function handleHoldingsWebAppData(array $person, array $message, $db): void
     renderHoldingsMainView($person, $db);
 }
 
-function handleHoldingsDeepLink(array $person, array $message, $db): void
+function handleHoldingsDeepLink(array $person, array $message, DatabaseManager $db): void
 {
     $matched = preg_match('/^\/start viewHolding_holdingId(\d+)(_mssgId(\d+))?$/m', $message['text'], $matches);
     $text = 'پیام نامفهوم است!';
@@ -350,7 +350,21 @@ function handleHoldingsDeepLink(array $person, array $message, $db): void
         $holding_id = $matches[1];
         $mssg_id_to_delete = $matches[3] ?? null;
 
-        $holding = $db->read('holdings h', ['h.id' => $holding_id, 'h.person_id' => $person['id']], true, 'h.*, a.name as asset_name, a.price as current_price, a.base_currency, a.exchange_rate as base_rate', 'INNER JOIN assets a ON h.asset_id = a.id');
+        $holding = $db->read(
+            'holdings h',
+            [
+                'h.id' => $holding_id,
+                'h.person_id' => $person['id']
+            ],
+            single: true,
+            selectColumns: '
+                h.*,
+                a.name as asset_name,
+                a.price as current_price,
+                a.base_currency,
+                a.exchange_rate as base_rate',
+            join: 'INNER JOIN assets a ON h.asset_id = a.id'
+        );
 
         if ($holding) {
             if ($mssg_id_to_delete) {
