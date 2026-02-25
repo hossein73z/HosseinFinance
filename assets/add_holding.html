@@ -1,0 +1,1213 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>مدیریت دارایی</title>
+
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css" rel="stylesheet"
+          type="text/css"/>
+
+    <style>
+        :root {
+            --bg-color: var(--tg-theme-bg-color, #fff);
+            --secondary-bg-color: var(--tg-theme-secondary-bg-color, #f4f4f9);
+            --text-color: var(--tg-theme-text-color, #222);
+            --hint-color: var(--tg-theme-hint-color, #999);
+            --button-color: var(--tg-theme-button-color, #4a90e2);
+            --button-text-color: var(--tg-theme-button-text-color, #ffffff);
+            --error-color: #dc3545;
+        }
+
+        html, body {
+            min-height: 100%;
+            margin: 0;
+            padding: 0;
+            background-color: var(--secondary-bg-color);
+            color: var(--text-color);
+            font-family: 'Vazirmatn', sans-serif;
+            overflow-x: hidden;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            padding: 10px;
+            box-sizing: border-box;
+            padding-bottom: 50px;
+        }
+
+        .container {
+            background-color: var(--bg-color);
+            padding: 15px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+            width: 100%;
+            max-width: 450px;
+            margin: 0 auto;
+            box-sizing: border-box;
+        }
+
+        h2, h3 {
+            text-align: center;
+            color: var(--text-color);
+            margin-top: 0;
+            margin-bottom: 15px;
+            font-size: 1.1rem;
+        }
+
+        .form-group {
+            margin-bottom: 12px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: var(--hint-color);
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        .input-with-icon {
+            position: relative;
+            width: 100%;
+        }
+
+        .row-group {
+            display: flex;
+            gap: 10px;
+        }
+
+        .row-group .form-group {
+            flex: 1;
+        }
+
+        input, select, textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-family: 'Vazirmatn', sans-serif;
+            box-sizing: border-box;
+            font-size: 0.95rem;
+            transition: border-color 0.2s, background-color 0.2s;
+            background: var(--bg-color);
+            color: var(--text-color);
+        }
+
+        input, textarea {
+            text-align: right;
+            direction: ltr; /* Keeps numbers aligned correctly while typing */
+        }
+
+        /* Override direction for specific inputs to ensure Persian feel */
+        input:not([type="number"]) {
+            direction: rtl;
+        }
+
+        /* Specific override for numeric-like inputs to ensure cursors behave in RTL */
+        .decimal-input, .date-input, .time-input {
+            text-align: center; /* Center align looks better for dates/numbers in cards */
+        }
+
+        input.input-error {
+            border-color: var(--error-color) !important;
+            background-color: rgba(220, 53, 69, 0.05);
+        }
+
+        input.has-picker {
+            padding-left: 40px;
+        }
+
+        .picker-trigger {
+            position: absolute;
+            left: 5px;
+            top: 50%;
+            transform: translateY(-50%);
+            cursor: pointer;
+            padding: 5px;
+            color: var(--button-color);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2;
+        }
+
+        .picker-trigger svg {
+            width: 20px;
+            height: 20px;
+            fill: currentColor;
+        }
+
+        input:focus, select:focus, textarea:focus {
+            border-color: var(--button-color);
+            outline: none;
+        }
+
+        button {
+            width: 100%;
+            padding: 12px;
+            background-color: var(--button-color);
+            color: var(--button-text-color);
+            border: none;
+            border-radius: 8px;
+            font-family: 'Vazirmatn', sans-serif;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+
+        button.danger-btn {
+            background-color: #dc3545;
+            color: white;
+        }
+
+        button:active {
+            transform: translateY(1px);
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        /* --- LOADING OVERLAY --- */
+        #loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: var(--bg-color);
+            z-index: 2000;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 0.3s ease-out;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid var(--secondary-bg-color);
+            border-top: 4px solid var(--button-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 15px;
+        }
+
+        .loading-text {
+            color: var(--hint-color);
+            font-size: 0.9rem;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* --- PICKER MODAL --- */
+        #picker-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            display: none;
+            flex-direction: column;
+            justify-content: flex-end;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        #picker-overlay.active {
+            opacity: 1;
+        }
+
+        .picker-container {
+            background: var(--bg-color);
+            border-top-left-radius: 20px;
+            border-top-right-radius: 20px;
+            padding: 20px 10px;
+            transform: translateY(100%);
+            transition: transform 0.3s cubic-bezier(0.1, 0.7, 0.1, 1);
+            box-shadow: 0 -5px 25px rgba(0, 0, 0, 0.1);
+        }
+
+        #picker-overlay.active .picker-container {
+            transform: translateY(0);
+        }
+
+        .picker-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 15px;
+            padding: 0 10px;
+        }
+
+        .picker-btn {
+            background: none;
+            border: none;
+            color: var(--button-color);
+            font-size: 1rem;
+            cursor: pointer;
+            padding: 5px 15px;
+        }
+
+        .picker-btn.cancel {
+            color: var(--hint-color);
+        }
+
+        #picker-titles {
+            display: flex;
+            text-align: center;
+            direction: ltr;
+            margin-bottom: 5px;
+        }
+
+        .wheels-wrapper {
+            position: relative;
+            display: flex;
+            height: 200px;
+            overflow: hidden;
+            direction: ltr;
+        }
+
+        .wheel-highlight {
+            position: absolute;
+            top: 50%;
+            left: 0;
+            width: 100%;
+            height: 40px;
+            margin-top: -20px;
+            background: var(--secondary-bg-color);
+            border-top: 1px solid #ddd;
+            border-bottom: 1px solid #ddd;
+            pointer-events: none;
+            z-index: 1;
+            opacity: 0.5;
+        }
+
+        .wheel-col {
+            flex: 1;
+            height: 100%;
+            overflow-y: scroll;
+            scroll-snap-type: y mandatory;
+            text-align: center;
+            z-index: 2;
+            padding: 0;
+            margin: 0;
+            list-style: none;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+            cursor: grab;
+        }
+
+        .wheel-col::-webkit-scrollbar {
+            display: none;
+        }
+
+        .wheel-col li {
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.1rem;
+            color: var(--hint-color);
+            scroll-snap-align: center;
+            scroll-snap-stop: always;
+            transition: color 0.1s, transform 0.1s;
+        }
+
+        .wheel-spacer {
+            height: 80px !important;
+            flex-shrink: 0;
+            pointer-events: none;
+        }
+
+        .wheel-title {
+            text-align: center;
+            font-size: 0.75rem;
+            color: var(--hint-color);
+            margin-bottom: 5px;
+        }
+
+        .wheel-col li.active {
+            color: var(--text-color);
+            font-weight: bold;
+            transform: scale(1.1);
+        }
+    </style>
+</head>
+<body>
+
+<!-- Loading Overlay -->
+<div id="loading-overlay">
+    <div class="spinner"></div>
+    <div class="loading-text">در حال دریافت اطلاعات...</div>
+</div>
+
+<div class="container">
+    <h2 id="page-title">افزودن دارایی جدید</h2>
+    <form id="holdingForm">
+        <input type="hidden" id="holding_id">
+
+        <!-- Asset Type Selection -->
+        <div class="form-group">
+            <label for="asset_type">نوع دارایی</label>
+            <select id="asset_type" required>
+                <option value="" disabled selected>انتخاب کنید...</option>
+                <!-- Filled via JS -->
+            </select>
+        </div>
+
+        <!-- Asset Name Selection -->
+        <div class="form-group">
+            <label for="asset_id">نام دارایی</label>
+            <select id="asset_id" required disabled>
+                <option value="" disabled selected>ابتدا نوع دارایی را انتخاب کنید</option>
+                <!-- Filled via JS -->
+            </select>
+        </div>
+
+        <!-- Amount -->
+        <div class="form-group">
+            <label for="amount">مقدار / تعداد</label>
+            <input type="text" id="amount" class="decimal-input" inputmode="decimal" placeholder="مثلا: ۱.۵" required>
+        </div>
+
+        <!-- Avg Price -->
+        <div class="form-group">
+            <label for="avg_price" id="label_avg_price">میانگین قیمت خرید</label>
+            <input type="text" id="avg_price" class="decimal-input" inputmode="decimal" placeholder="مثلا: ۱۰۰,۰۰۰"
+                   required>
+        </div>
+
+        <!-- Date & Time Row -->
+        <div class="row-group">
+            <div class="form-group" style="flex: 1.5;">
+                <label for="date">تاریخ</label>
+                <div class="input-with-icon">
+                    <input type="text" id="date" class="date-input has-picker" placeholder="۱۴۰۳/۰۱/۰۱" required>
+                </div>
+            </div>
+            <div class="form-group" style="flex: 1;">
+                <label for="time">ساعت</label>
+                <div class="input-with-icon">
+                    <input type="text" id="time" class="time-input has-picker" placeholder="۱۲:۳۰" required>
+                </div>
+            </div>
+        </div>
+
+        <!-- Note -->
+        <div class="form-group">
+            <label for="note">یادداشت (اختیاری)</label>
+            <textarea id="note" rows="3" placeholder="توضیحات اضافه..."></textarea>
+        </div>
+
+        <button type="submit" id="submitBtn">ثبت دارایی</button>
+        <button type="button" id="deleteBtn" class="danger-btn hidden" style="margin-top: 15px;">حذف دارایی</button>
+    </form>
+</div>
+
+<!-- Generic Picker Overlay -->
+<div id="picker-overlay">
+    <div class="picker-container">
+        <div class="picker-header">
+            <button class="picker-btn cancel" id="picker-cancel">انصراف</button>
+            <button class="picker-btn" id="picker-done">تایید</button>
+        </div>
+        <div id="picker-titles">
+            <!-- Populated via JS -->
+        </div>
+        <div class="wheels-wrapper" id="wheels-container">
+            <div class="wheel-highlight"></div>
+            <!-- Populated via JS -->
+        </div>
+    </div>
+</div>
+
+<script>
+    const tg = window.Telegram.WebApp;
+    tg.expand();
+
+    // --- STATE MANAGEMENT ---
+    let appMode = 'add';
+    let originalData = null;
+    let availableAssets = [];
+
+    // --- UTILS ---
+    function hideLoading() {
+        const overlay = document.getElementById('loading-overlay');
+        overlay.style.opacity = '0';
+        setTimeout(() => {
+            overlay.style.display = 'none';
+        }, 300);
+    }
+
+    function toEnglishDigits(str) {
+        if (!str) return '';
+        str = String(str);
+        const persianNumbers = [/۰/g, /۱/g, /۲/g, /۳/g, /۴/g, /۵/g, /۶/g, /۷/g, /۸/g, /۹/g];
+        const arabicNumbers = [/٠/g, /١/g, /٢/g, /٣/g, /٤/g, /٥/g, /٦/g, /٧/g, /٨/g, /٩/g];
+        for (let i = 0; i < 10; i++) {
+            str = str.replace(persianNumbers[i], i).replace(arabicNumbers[i], i);
+        }
+        return str;
+    }
+
+    function toPersianDigits(str) {
+        if (str === null || str === undefined) return '';
+        const id = ['۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹'];
+        return String(str).replace(/[0-9]/g, function (w) {
+            return id[+w]
+        });
+    }
+
+    // Removes unnecessary trailing zeros (e.g. 100.000 -> 100)
+    function cleanDecimal(val) {
+        if (!val && val !== 0) return '';
+        return parseFloat(val).toString();
+    }
+
+    function formatNumberWithCommas(val) {
+        if (!val) return '';
+        let parts = val.split('.');
+        parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+        return parts.join('.');
+    }
+
+    function removeCommas(str) {
+        if (!str) return '';
+        return str.replace(/,/g, '');
+    }
+
+    function b64DecodeUnicode(str) {
+        return decodeURIComponent(Array.prototype.map.call(atob(str), function (c) {
+            return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)
+        }).join(''));
+    }
+
+    // Date Validation
+    function isValidJalaliDateString(str) {
+        if (!str) return false;
+        str = toEnglishDigits(str);
+        const regex = /^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/;
+        const match = str.match(regex);
+        if (!match) return false;
+        const y = parseInt(match[1]), m = parseInt(match[2]), d = parseInt(match[3]);
+        if (y < 1300 || y > 1500 || m < 1 || m > 12 || d < 1 || d > 31) return false;
+        if (m > 6 && d === 31) return false;
+        return {y, m, d};
+    }
+
+    // Time Validation
+    function isValidTimeString(str) {
+        if (!str) return false;
+        str = toEnglishDigits(str);
+        const regex = /^(\d{1,2}):(\d{1,2})$/;
+        const match = str.match(regex);
+        if (!match) return false;
+        const h = parseInt(match[1]), m = parseInt(match[2]);
+        if (h < 0 || h > 23 || m < 0 || m > 59) return false;
+        return {h, m};
+    }
+
+    function getTodayJalali() {
+        try {
+            const d = new Date();
+            const formatter = new Intl.DateTimeFormat('fa-IR-u-nu-latn', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit'
+            });
+            const parts = formatter.formatToParts(d);
+            const y = parseInt(parts.find(p => p.type === 'year').value);
+            const m = parseInt(parts.find(p => p.type === 'month').value);
+            const dVal = parseInt(parts.find(p => p.type === 'day').value);
+            return {y, m, d: dVal};
+        } catch (e) {
+            return {y: 1403, m: 1, d: 1};
+        }
+    }
+
+    function getCurrentTime() {
+        const d = new Date();
+        return {h: d.getHours(), m: d.getMinutes()};
+    }
+
+    // --- MASKS & CURSOR LOGIC ---
+
+    // 1. Decimal Input (Amount, Price)
+    function attachDecimalMask(element) {
+        element.addEventListener('input', function (e) {
+            const input = e.target;
+            const originalValue = input.value;
+            const selectionStart = input.selectionStart;
+
+            // Track cursor based on meaningful digits
+            let meaningfulCharsBeforeCursor = 0;
+            for (let i = 0; i < selectionStart; i++) {
+                if (/[0-9\u0660-\u0669\u06f0-\u06f9\.]/.test(originalValue[i])) {
+                    meaningfulCharsBeforeCursor++;
+                }
+            }
+
+            let raw = toEnglishDigits(removeCommas(originalValue));
+            let english = raw.replace(/[^0-9.]/g, '');
+            // Ensure only one dot
+            const dots = english.split('.');
+            if (dots.length > 2) english = dots[0] + '.' + dots.slice(1).join('');
+
+            let formatted = formatNumberWithCommas(english);
+            const finalPersian = toPersianDigits(formatted);
+
+            if (input.value !== finalPersian) {
+                input.value = finalPersian;
+                // Restore cursor
+                let newPos = 0;
+                let foundChars = 0;
+                for (let i = 0; i < finalPersian.length; i++) {
+                    if (foundChars >= meaningfulCharsBeforeCursor) break;
+                    if (/[0-9\u0660-\u0669\u06f0-\u06f9\.]/.test(finalPersian[i])) foundChars++;
+                    newPos++;
+                }
+                input.setSelectionRange(newPos, newPos);
+            }
+        });
+    }
+
+    // Helper for Backspace Jumping logic (Date/Time)
+    function handleSeparatorBackspace(e, separator) {
+        if (e.key === 'Backspace') {
+            const input = e.target;
+            const start = input.selectionStart;
+            // If cursor is immediately after a separator, jump back
+            if (start > 0 && input.value[start - 1] === separator) {
+                e.preventDefault(); // Stop default deletion
+                input.setSelectionRange(start - 1, start - 1); // Move cursor back
+            }
+        }
+    }
+
+    // 2. Date Input (xxxx/xx/xx)
+    function attachDateMask(element) {
+        // Handle Backspace jumping
+        element.addEventListener('keydown', (e) => handleSeparatorBackspace(e, '/'));
+
+        element.addEventListener('input', function (e) {
+            let input = e.target;
+            let originalValue = input.value;
+            let selectionStart = input.selectionStart;
+
+            let digitsBeforeCursor = 0;
+            for (let i = 0; i < selectionStart; i++) {
+                if (/[0-9\u0660-\u0669\u06f0-\u06f9]/.test(originalValue[i])) digitsBeforeCursor++;
+            }
+
+            let val = toEnglishDigits(originalValue);
+            let clean = val.replace(/\D/g, '').substring(0, 8); // Max 8 digits
+
+            let formatted = '';
+            if (clean.length > 0) formatted += clean.substring(0, 4);
+            if (clean.length >= 5) formatted += '/' + clean.substring(4, 6);
+            if (clean.length >= 7) formatted += '/' + clean.substring(6, 8);
+
+            const finalPersian = toPersianDigits(formatted);
+
+            if (input.value !== finalPersian) {
+                input.value = finalPersian;
+                let newPos = 0;
+                let digitsEncountered = 0;
+                for (let i = 0; i < finalPersian.length; i++) {
+                    if (digitsEncountered === digitsBeforeCursor) break;
+                    if (/[0-9\u06f0-\u06f9]/.test(finalPersian[i])) digitsEncountered++;
+                    newPos++;
+                }
+                // Note: We do NOT force jump over slash here, the keydown handles jumps
+                input.setSelectionRange(newPos, newPos);
+            }
+
+            // Validation styling
+            if (clean.length === 8) {
+                if (!isValidJalaliDateString(formatted)) input.classList.add('input-error');
+                else input.classList.remove('input-error');
+            } else {
+                input.classList.remove('input-error');
+            }
+        });
+
+        element.addEventListener('blur', function (e) {
+            const val = toEnglishDigits(e.target.value);
+            if (val.length > 0 && !isValidJalaliDateString(val)) e.target.classList.add('input-error');
+        });
+    }
+
+    // 3. Time Input (xx:xx)
+    function attachTimeMask(element) {
+        // Handle Backspace jumping for colon
+        element.addEventListener('keydown', (e) => handleSeparatorBackspace(e, ':'));
+
+        element.addEventListener('input', function (e) {
+            let input = e.target;
+            let originalValue = input.value;
+            let selectionStart = input.selectionStart;
+
+            let digitsBeforeCursor = 0;
+            for (let i = 0; i < selectionStart; i++) {
+                if (/[0-9\u0660-\u0669\u06f0-\u06f9]/.test(originalValue[i])) digitsBeforeCursor++;
+            }
+
+            let val = toEnglishDigits(originalValue);
+            let clean = val.replace(/\D/g, '').substring(0, 4); // Max 4 digits
+
+            let formatted = '';
+            if (clean.length > 0) formatted += clean.substring(0, 2);
+            if (clean.length >= 3) formatted += ':' + clean.substring(2, 4);
+
+            const finalPersian = toPersianDigits(formatted);
+
+            if (input.value !== finalPersian) {
+                input.value = finalPersian;
+                let newPos = 0;
+                let digitsEncountered = 0;
+                for (let i = 0; i < finalPersian.length; i++) {
+                    if (digitsEncountered === digitsBeforeCursor) break;
+                    if (/[0-9\u06f0-\u06f9]/.test(finalPersian[i])) digitsEncountered++;
+                    newPos++;
+                }
+                input.setSelectionRange(newPos, newPos);
+            }
+
+            // Validation
+            if (clean.length === 4) {
+                if (!isValidTimeString(formatted)) input.classList.add('input-error');
+                else input.classList.remove('input-error');
+            } else {
+                input.classList.remove('input-error');
+            }
+        });
+
+        element.addEventListener('blur', function (e) {
+            const val = toEnglishDigits(e.target.value);
+            if (val.length > 0 && !isValidTimeString(val)) e.target.classList.add('input-error');
+        });
+    }
+
+
+    // --- UNIFIED PICKER LOGIC ---
+    const pickerOverlay = document.getElementById('picker-overlay');
+    const pickerTitles = document.getElementById('picker-titles');
+    const wheelsContainer = document.getElementById('wheels-container');
+    let activeInput = null;
+    let activeMode = 'date'; // 'date' or 'time'
+    const ITEM_HEIGHT = 40;
+
+    // Generates generic wheels based on config
+    // Config: [{id, min, max, val, labelFn}, ...]
+    function buildPicker(config) {
+        pickerTitles.innerHTML = '';
+        wheelsContainer.innerHTML = '<div class="wheel-highlight"></div>';
+
+        config.forEach(col => {
+            // Add Title
+            const titleDiv = document.createElement('div');
+            titleDiv.className = 'wheel-title';
+            titleDiv.style.flex = '1';
+            titleDiv.innerText = col.title;
+            pickerTitles.appendChild(titleDiv);
+
+            // Build Wheel
+            const ul = document.createElement('ul');
+            ul.className = 'wheel-col';
+            ul.id = `wheel-${col.id}`;
+
+            const spacer = '<li class="wheel-spacer"></li>';
+            let html = spacer;
+            for (let i = col.min; i <= col.max; i++) {
+                const text = col.labelFn ? col.labelFn(i) : toPersianDigits(i);
+                html += `<li data-val="${i}">${text}</li>`;
+            }
+            html += spacer;
+            ul.innerHTML = html;
+            wheelsContainer.appendChild(ul);
+
+            // Logic
+            ul.addEventListener('scroll', () => highlightActive(ul));
+            enableDragToScroll(ul);
+
+            // Initial Scroll
+            setTimeout(() => {
+                scrollToValue(ul, col.val);
+            }, 0);
+        });
+
+        // Specific logic for Date (month length validation)
+        if (activeMode === 'date') {
+            const monthWheel = document.getElementById('wheel-month');
+            const dayWheel = document.getElementById('wheel-day');
+            if (monthWheel && dayWheel) {
+                monthWheel.addEventListener('scrollend', () => validateDateDays(monthWheel, dayWheel));
+            }
+        }
+    }
+
+    function enableDragToScroll(slider) {
+        let isDown = false, startY, scrollTop;
+        slider.addEventListener('mousedown', (e) => {
+            isDown = true;
+            startY = e.pageY - slider.offsetTop;
+            scrollTop = slider.scrollTop;
+            slider.style.scrollSnapType = 'none';
+        });
+        slider.addEventListener('mouseleave', () => {
+            if (isDown) {
+                isDown = false;
+                slider.style.scrollSnapType = 'y mandatory';
+            }
+        });
+        slider.addEventListener('mouseup', () => {
+            isDown = false;
+            slider.style.scrollSnapType = 'y mandatory';
+        });
+        slider.addEventListener('mousemove', (e) => {
+            if (!isDown) return;
+            e.preventDefault();
+            const y = e.pageY - slider.offsetTop;
+            slider.scrollTop = scrollTop - (y - startY) * 1.5;
+        });
+    }
+
+    function highlightActive(col) {
+        const index = Math.round(col.scrollTop / ITEM_HEIGHT);
+        col.querySelectorAll('li').forEach(li => li.classList.remove('active'));
+        const items = col.querySelectorAll('li[data-val]');
+        if (items[index]) items[index].classList.add('active');
+    }
+
+    function scrollToValue(col, val) {
+        const items = Array.from(col.querySelectorAll('li[data-val]'));
+        const index = items.findIndex(li => parseInt(li.getAttribute('data-val')) == val);
+        if (index !== -1) {
+            col.scrollTop = index * ITEM_HEIGHT;
+            highlightActive(col);
+        }
+    }
+
+    function getSelectedValue(col) {
+        const index = Math.round(col.scrollTop / ITEM_HEIGHT);
+        const items = col.querySelectorAll('li[data-val]');
+        return items[index] ? parseInt(items[index].getAttribute('data-val')) : 0;
+    }
+
+    function validateDateDays(monthCol, dayCol) {
+        const m = getSelectedValue(monthCol);
+        let max = (m <= 6) ? 31 : (m === 12) ? 29 : 30; // Simple logic
+
+        // Rebuild day col if count mismatch
+        const currentCount = dayCol.querySelectorAll('li[data-val]').length;
+        if (currentCount !== max) {
+            const currentVal = getSelectedValue(dayCol);
+            const spacer = '<li class="wheel-spacer"></li>';
+            let html = spacer;
+            for (let i = 1; i <= max; i++) html += `<li data-val="${i}">${toPersianDigits(String(i).padStart(2, '0'))}</li>`;
+            html += spacer;
+            dayCol.innerHTML = html;
+            scrollToValue(dayCol, Math.min(currentVal, max));
+        }
+    }
+
+    // --- OPEN PICKER ---
+    function openPicker(input, mode) {
+        activeInput = input;
+        activeMode = mode;
+        pickerOverlay.style.display = 'flex';
+
+        const val = input.value;
+        let config = [];
+
+        if (mode === 'date') {
+            const def = isValidJalaliDateString(val) || getTodayJalali();
+            config = [
+                {id: 'year', title: 'سال', min: 1380, max: 1450, val: def.y},
+                {
+                    id: 'month',
+                    title: 'ماه',
+                    min: 1,
+                    max: 12,
+                    val: def.m,
+                    labelFn: (i) => toPersianDigits(String(i).padStart(2, '0'))
+                },
+                {
+                    id: 'day',
+                    title: 'روز',
+                    min: 1,
+                    max: 31,
+                    val: def.d,
+                    labelFn: (i) => toPersianDigits(String(i).padStart(2, '0'))
+                }
+            ];
+        } else {
+            // Time
+            const def = isValidTimeString(val) || getCurrentTime();
+            config = [
+                {
+                    id: 'hour',
+                    title: 'ساعت',
+                    min: 0,
+                    max: 23,
+                    val: def.h,
+                    labelFn: (i) => toPersianDigits(String(i).padStart(2, '0'))
+                },
+                {
+                    id: 'minute',
+                    title: 'دقیقه',
+                    min: 0,
+                    max: 59,
+                    val: def.m,
+                    labelFn: (i) => toPersianDigits(String(i).padStart(2, '0'))
+                }
+            ];
+        }
+
+        buildPicker(config);
+        setTimeout(() => pickerOverlay.classList.add('active'), 10);
+    }
+
+    function closePicker() {
+        pickerOverlay.classList.remove('active');
+        setTimeout(() => {
+            pickerOverlay.style.display = 'none';
+        }, 300);
+    }
+
+    document.getElementById('picker-cancel').addEventListener('click', closePicker);
+
+    document.getElementById('picker-done').addEventListener('click', () => {
+        if (!activeInput) return;
+
+        if (activeMode === 'date') {
+            const y = getSelectedValue(document.getElementById('wheel-year'));
+            const m = String(getSelectedValue(document.getElementById('wheel-month'))).padStart(2, '0');
+            const d = String(getSelectedValue(document.getElementById('wheel-day'))).padStart(2, '0');
+            activeInput.value = toPersianDigits(`${y}/${m}/${d}`);
+        } else {
+            const h = String(getSelectedValue(document.getElementById('wheel-hour'))).padStart(2, '0');
+            const m = String(getSelectedValue(document.getElementById('wheel-minute'))).padStart(2, '0');
+            activeInput.value = toPersianDigits(`${h}:${m}`);
+        }
+        activeInput.classList.remove('input-error');
+        closePicker();
+    });
+
+    function attachPickerTrigger(inputElement, mode) {
+        if (inputElement.parentNode.querySelector('.picker-trigger')) return;
+        const icon = document.createElement('span');
+        icon.className = 'picker-trigger';
+        // Generic Icon (Calendar or Clock could differ, but using generic edit icon or calendar)
+        if (mode === 'date') {
+            icon.innerHTML = `<svg viewBox="0 0 24 24"><path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20a2 2 0 0 0 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zM9 14H7v-2h2v2zm4 0h-2v-2h2v2zm4 0h-2v-2h2v2zm-8 4H7v-2h2v2zm4 0h-2v-2h2v2zm4 0h-2v-2h2v2z"/></svg>`;
+        } else {
+            icon.innerHTML = `<svg viewBox="0 0 24 24"><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/></svg>`;
+        }
+
+        inputElement.parentNode.insertBefore(icon, inputElement);
+        icon.addEventListener('click', (e) => {
+            e.stopPropagation();
+            openPicker(inputElement, mode);
+        });
+    }
+
+    // --- MAIN LOGIC ---
+    const typeSelect = document.getElementById('asset_type');
+    const assetSelect = document.getElementById('asset_id');
+    const priceLabel = document.getElementById('label_avg_price');
+
+    document.addEventListener('DOMContentLoaded', function () {
+        // Attach masks
+        document.querySelectorAll('.decimal-input').forEach(attachDecimalMask);
+        const dateInput = document.getElementById('date');
+        attachPickerTrigger(dateInput, 'date');
+        attachDateMask(dateInput);
+
+        const timeInput = document.getElementById('time');
+        attachPickerTrigger(timeInput, 'time');
+        attachTimeMask(timeInput);
+
+        // Parse URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const apiUrl = urlParams.get('api_url');
+        const apiKey = urlParams.get('api_key');
+        const dataEncoded = urlParams.get('data');
+
+        // Check Editing Mode
+        if (dataEncoded) {
+            try {
+                originalData = JSON.parse(b64DecodeUnicode(dataEncoded));
+                if (originalData && originalData.id) appMode = 'edit';
+            } catch (e) {
+                console.error("Error parsing data", e);
+            }
+        } else {
+            // New Entry: Set default date & time
+            const today = getTodayJalali();
+            const now = getCurrentTime();
+
+            const todayStr = `${today.y}/${String(today.m).padStart(2, '0')}/${String(today.d).padStart(2, '0')}`;
+            dateInput.value = toPersianDigits(todayStr);
+
+            const nowStr = `${String(now.h).padStart(2, '0')}:${String(now.m).padStart(2, '0')}`;
+            timeInput.value = toPersianDigits(nowStr);
+        }
+
+        // Fetch Assets from API
+        if (apiUrl && apiKey) {
+            fetchAssets(apiUrl, apiKey);
+        } else {
+            tg.showAlert('خطا: تنظیمات ارتباط با سرور یافت نشد (API URL/Key)');
+            hideLoading();
+        }
+    });
+
+    function fetchAssets(url, key) {
+        fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-API-KEY': key
+            },
+            body: JSON.stringify({
+                "operation": "read",
+                "table": "assets"
+            })
+        })
+            .then(response => {
+                if (!response.ok) throw new Error("HTTP " + response.status);
+                return response.json();
+            })
+            .then(data => {
+                availableAssets = Array.isArray(data) ? data : (data.data || []);
+                populateAssetTypes();
+
+                // If editing, fill the form now that assets are loaded
+                if (appMode === 'edit' && originalData) {
+                    populateForm(originalData);
+                }
+                hideLoading();
+            })
+            .catch(err => {
+                console.error(err);
+                tg.showAlert("خطا در دریافت لیست دارایی‌ها");
+                hideLoading();
+            });
+    }
+
+    function populateAssetTypes() {
+        const types = [...new Set(availableAssets.map(a => a.asset_type))];
+        types.forEach(t => {
+            const opt = document.createElement('option');
+            opt.value = t;
+            // Persian Numbers in Dropdown
+            opt.innerText = toPersianDigits(t);
+            typeSelect.appendChild(opt);
+        });
+    }
+
+    // --- EVENT LISTENERS ---
+
+    // 1. Asset Type Change
+    typeSelect.addEventListener('change', function () {
+        const selectedType = this.value;
+        assetSelect.innerHTML = '<option value="" disabled selected>انتخاب کنید...</option>';
+
+        if (selectedType) {
+            const filtered = availableAssets.filter(a => a.asset_type === selectedType);
+            filtered.forEach(a => {
+                const opt = document.createElement('option');
+                opt.value = a.id;
+                // Persian Numbers in Dropdown
+                opt.innerText = toPersianDigits(a.name);
+                assetSelect.appendChild(opt);
+            });
+            assetSelect.disabled = false;
+        } else {
+            assetSelect.disabled = true;
+        }
+        if (!selectedType) priceLabel.innerText = 'میانگین قیمت خرید';
+    });
+
+    // 2. Asset Name Change (Update Currency & Pre-fill Price)
+    assetSelect.addEventListener('change', function () {
+        const id = parseInt(this.value);
+        const asset = availableAssets.find(a => a.id === id);
+
+        if (asset) {
+            const currency = asset.base_currency || 'ریال';
+            priceLabel.innerText = `میانگین قیمت خرید (${currency})`;
+
+            if (appMode === 'add') {
+                const priceInput = document.getElementById('avg_price');
+                // CLEAN UP PRICE (No trailing zeros)
+                const cleanPrice = cleanDecimal(asset.price);
+                const formattedPrice = formatNumberWithCommas(cleanPrice);
+                priceInput.value = toPersianDigits(formattedPrice);
+            }
+        }
+    });
+
+    function populateForm(data) {
+        document.getElementById('page-title').innerText = 'ویرایش دارایی';
+        document.getElementById('submitBtn').innerText = 'ثبت تغییرات';
+        document.getElementById('deleteBtn').classList.remove('hidden');
+        document.getElementById('holding_id').value = data.id;
+
+        // Find asset info
+        const asset = availableAssets.find(a => a.id == data.asset_id);
+        if (asset) {
+            typeSelect.value = asset.asset_type;
+
+            const filtered = availableAssets.filter(a => a.asset_type === asset.asset_type);
+            assetSelect.innerHTML = '<option value="" disabled>انتخاب کنید...</option>';
+            filtered.forEach(a => {
+                const opt = document.createElement('option');
+                opt.value = a.id;
+                opt.innerText = toPersianDigits(a.name); // Persian digits
+                assetSelect.appendChild(opt);
+            });
+            assetSelect.disabled = false;
+            assetSelect.value = asset.id;
+
+            const currency = asset.base_currency || 'ریال';
+            priceLabel.innerText = `میانگین قیمت خرید (${currency})`;
+        }
+
+        // Amount (Clean Zeros + Commas)
+        const amtStr = cleanDecimal(data.amount);
+        document.getElementById('amount').value = toPersianDigits(formatNumberWithCommas(amtStr));
+
+        // Price (Clean Zeros + Commas)
+        const priceStr = cleanDecimal(data.avg_price);
+        document.getElementById('avg_price').value = toPersianDigits(formatNumberWithCommas(priceStr));
+
+        // Date
+        if (data.date) {
+            document.getElementById('date').value = toPersianDigits(data.date.replace(/-/g, '/'));
+        }
+
+        // Time
+        if (data.time) {
+            // Ensure format HH:MM
+            const parts = data.time.split(':');
+            if (parts.length >= 2) {
+                document.getElementById('time').value = toPersianDigits(`${parts[0]}:${parts[1]}`);
+            }
+        } else {
+            // Default to now if not set in DB
+            const now = getCurrentTime();
+            document.getElementById('time').value = toPersianDigits(`${String(now.h).padStart(2, '0')}:${String(now.m).padStart(2, '0')}`);
+        }
+
+        document.getElementById('note').value = data.note || '';
+    }
+
+    // --- SUBMISSION ---
+    document.getElementById('holdingForm').addEventListener('submit', function (e) {
+        e.preventDefault();
+
+        const assetId = document.getElementById('asset_id').value;
+        if (!assetId) {
+            tg.showAlert("لطفا نام دارایی را انتخاب کنید");
+            return;
+        }
+
+        const amountVal = toEnglishDigits(removeCommas(document.getElementById('amount').value));
+        const priceVal = toEnglishDigits(removeCommas(document.getElementById('avg_price').value));
+        const dateVal = toEnglishDigits(document.getElementById('date').value).replace(/\//g, '-');
+        const timeVal = toEnglishDigits(document.getElementById('time').value);
+        const note = document.getElementById('note').value;
+
+        if (!isValidJalaliDateString(dateVal)) {
+            tg.showAlert("تاریخ وارد شده معتبر نیست");
+            return;
+        }
+
+        if (!isValidTimeString(timeVal)) {
+            tg.showAlert("ساعت وارد شده معتبر نیست");
+            return;
+        }
+
+        // Prepare Payload
+        let payload = {};
+
+        if (appMode === 'add') {
+            payload = {
+                action: 'add',
+                holding: {
+                    asset_id: parseInt(assetId),
+                    amount: parseFloat(amountVal),
+                    avg_price: parseFloat(priceVal),
+                    date: dateVal,
+                    time: timeVal, // New Field
+                    note: note
+                }
+            };
+        } else {
+            // Edit Mode - Only send updates
+            const updates = {};
+            if (originalData.asset_id != assetId) updates.asset_id = parseInt(assetId);
+            if (parseFloat(originalData.amount) !== parseFloat(amountVal)) updates.amount = parseFloat(amountVal);
+            if (parseFloat(originalData.avg_price) !== parseFloat(priceVal)) updates.avg_price = parseFloat(priceVal);
+            if (originalData.date.replace(/\//g, '-') !== dateVal) updates.date = dateVal;
+            // Check time update
+            const oldTime = originalData.time ? originalData.time.substring(0, 5) : '';
+            if (oldTime !== timeVal) updates.time = timeVal;
+
+            if ((originalData.note || '') !== note) updates.note = note;
+
+            if (Object.keys(updates).length === 0) {
+                tg.showAlert("تغییری ایجاد نشده است");
+                return;
+            }
+
+            payload = {
+                action: 'edit',
+                id: originalData.id,
+                updates: updates
+            };
+        }
+
+        tg.sendData(JSON.stringify(payload));
+        tg.close();
+    });
+
+    document.getElementById('deleteBtn').addEventListener('click', function () {
+        tg.showPopup({
+            title: 'حذف دارایی',
+            message: 'آیا مطمئن هستید که می‌خواهید این دارایی را حذف کنید؟',
+            buttons: [
+                {id: 'delete', type: 'destructive', text: 'حذف شود'},
+                {id: 'cancel', type: 'default', text: 'انصراف'}
+            ]
+        }, function (btn) {
+            if (btn === 'delete') {
+                const payload = {
+                    action: 'delete',
+                    id: parseInt(document.getElementById('holding_id').value)
+                };
+                tg.sendData(JSON.stringify(payload));
+                tg.close();
+            }
+        });
+    });
+
+</script>
+</body>
+</html>

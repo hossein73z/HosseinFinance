@@ -1,0 +1,575 @@
+<?php
+
+/**
+ * DatabaseManager.php
+ *
+ * A standalone, reusable PHP class for simplified **MySQL CRUD and UPSERT**
+ * operations using **PDO** and the **Singleton pattern**.
+ *
+ * Key Features:
+ * - Enforces a single database connection instance (`Singleton`).
+ * - Uses prepared statements for all queries to prevent SQL injection.
+ * - Supports standard **CREATE, READ, UPDATE, DELETE** operations.
+ * - Includes efficient **Batch Create** and **Batch Upsert** methods.
+ * - Provides **Upsert (Insert or Update)** functionality for single records.
+ * - Simplifies WHERE clause creation, supporting both equality (`=`) and `IN` array conditions.
+ * - Normalizes PHP boolean values to MySQL integer (1 or 0).
+ * - The `read` method supports joins, ordering, distinct selection, and result chunking.
+ *
+ * NOTE: Define the constants DB_HOST, DB_NAME, DB_USER, and DB_PASS
+ * outside of this class file (e.g., in a configuration file) to avoid
+ * hardcoding sensitive credentials.
+ */
+class DatabaseManager
+{
+    private PDO $pdo;
+    private static ?DatabaseManager $instance = null;
+
+    /**
+     * Private constructor to enforce the Singleton pattern.
+     * Establishes the PDO database connection using passed credentials.
+     *
+     * @param string $host Database host
+     * @param string $db Database name
+     * @param string $user Database username
+     * @param string $pass Database password
+     * @param int|string $port Database port
+     */
+    private function __construct(string $host, string $db, string $user, string $pass, int|string $port)
+    {
+        // 1. Data Source Name (DSN)
+        $dsn = "mysql:host={$host};port={$port};dbname={$db};charset=utf8mb4";
+
+        // 2. PDO connection options
+        $options = [
+            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,      // Throw exceptions on error
+            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC, // Default fetch mode is associative array
+            PDO::ATTR_EMULATE_PREPARES => false,              // Use real prepared statements
+        ];
+
+        // 3. TiDB Cloud / SSL Configuration
+        // TiDB Cloud (Port 4000) requires a secure connection.
+        if ($port == 4000 || $host !== 'localhost') {
+            // Disable strict certificate verification to avoid "caching_sha2_password" or "SSL certificate" errors
+            // inside serverless environments which might lack specific CA bundles.
+            $options[PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT] = false;
+
+            // Force SSL Mode.
+            if (defined('PDO::MYSQL_ATTR_SSL_MODE')) {
+                $options[PDO::MYSQL_ATTR_SSL_MODE] = PDO::MYSQL_ATTR_SSL_MODE_REQUIRED;
+            } else {
+                $options[PDO::MYSQL_ATTR_SSL_CA] = ''; // Fallback to trigger SSL negotiation
+            }
+        }
+
+        try {
+            $this->pdo = new PDO($dsn, $user, $pass, $options);
+        } catch (PDOException $e) {
+            // Log error internally and throw generic error to prevent leaking creds
+            error_log("Database connection failed: " . $e->getMessage());
+            die("Database connection failed. Check server logs.");
+        }
+    }
+
+    /**
+     * Gets the singleton instance of the DatabaseManager.
+     *
+     * NOTE: On the FIRST call, you MUST provide $host, $db, $user, and $pass.
+     * On subsequent calls, you can leave them null to retrieve the existing instance.
+     *
+     * @param string|null $host
+     * @param string|null $db
+     * @param string|null $user
+     * @param string|null $pass
+     * @param int|string $port
+     *
+     * @return DatabaseManager The single instance of the class.
+     * @throws Exception If parameters are missing during the first initialization.
+     */
+    public static function getInstance(
+        ?string    $host = null,
+        ?string    $db = null,
+        ?string    $user = null,
+        ?string    $pass = null,
+        int|string $port = 3306
+    ): DatabaseManager
+    {
+        if (self::$instance === null) {
+            // If instance doesn't exist, we absolutely need credentials
+            if (!$host || !$db || !$user) {
+                throw new Exception("DatabaseManager not initialized. Host, Database, and User parameters are required for the first call.");
+            }
+
+            // Allow empty password (some local setups), but convert null to string
+            $pass = $pass ?? '';
+
+            self::$instance = new self($host, $db, $user, $pass, $port);
+        }
+
+        return self::$instance;
+    }
+
+    /**
+     * Prevents cloning of the instance.
+     */
+    private function __clone()
+    {
+    }
+
+    /**
+     * Prevents unserialization.
+     */
+    public function __wakeup()
+    {
+        throw new Exception("Cannot unserialize a singleton.");
+    }
+
+    // ------------------------------------------------------------------------
+    // --- Connection Management ----------------------------------------------
+    // ------------------------------------------------------------------------
+
+    public function getConnection(): PDO
+    {
+        return $this->pdo;
+    }
+
+    public static function closeConnection(): void
+    {
+        self::$instance = null;
+    }
+
+    // ------------------------------------------------------------------------
+    // --- Internal Utility ---------------------------------------------------
+    // ------------------------------------------------------------------------
+
+    private function buildWhere(array $conditions, string $prefix = 'where'): array
+    {
+        if (empty($conditions)) {
+            return ['clause' => '', 'params' => []];
+        }
+
+        $whereParts = [];
+        $params = [];
+
+        foreach ($conditions as $key => $value) {
+            // 1. Detect Negation and Strip '!'
+            $isNegation = false;
+            $column = $key;
+
+            if (str_starts_with($key, '!')) {
+                $isNegation = true;
+                $column = substr($key, 1); // Remove the '!'
+            }
+
+            // 2. Determine SQL syntax (Backticks vs Raw)
+            if (str_contains($column, '->') || str_contains($column, '.')) {
+                $columnSql = $column;
+            } else {
+                $columnSql = "`$column`";
+            }
+
+            // 3. Create safe placeholder name base
+            // We include a "not_" prefix in the placeholder to avoid collisions
+            // if both "id" and "!id" are passed in the same array.
+            $sanitizedColumn = preg_replace('/[^a-zA-Z0-9_]/', '', $column);
+            $paramPrefix = $isNegation ? 'not_' : '';
+
+            if (is_array($value)) {
+                if (empty($value)) {
+                    // Optimization:
+                    // 'id IN []' is IMPOSSIBLE (1=0)
+                    // 'id NOT IN []' is ALWAYS TRUE (1=1) - logic being nothing is in an empty list
+                    $whereParts[] = $isNegation ? '1 = 1' : '1 = 0';
+                    continue;
+                }
+
+                $placeholders = [];
+                foreach ($value as $index => $item) {
+                    $placeholder = ":{$prefix}_{$paramPrefix}{$sanitizedColumn}_{$index}";
+                    $placeholders[] = $placeholder;
+                    $params[$placeholder] = $item;
+                }
+
+                $operator = $isNegation ? 'NOT IN' : 'IN';
+                $whereParts[] = "$columnSql $operator (" . implode(', ', $placeholders) . ")";
+            } else {
+                $placeholder = ":{$prefix}_{$paramPrefix}{$sanitizedColumn}";
+                $operator = $isNegation ? '!=' : '=';
+
+                $whereParts[] = "$columnSql $operator $placeholder";
+                $params[$placeholder] = $value;
+            }
+        }
+
+        if (empty($whereParts)) {
+            return ['clause' => '', 'params' => []];
+        }
+
+        return [
+            'clause' => implode(' AND ', $whereParts),
+            'params' => $params
+        ];
+    }
+
+    private function normalizeDataForDb(array $data): array
+    {
+        foreach ($data as $key => &$value) {
+            if (is_bool($value)) {
+                $value = (int)$value;
+            }
+        }
+        return $data;
+    }
+
+
+    // ------------------------------------------------------------------------
+    // --- CRUD Operations ----------------------------------------------------
+    // ------------------------------------------------------------------------
+
+    /**
+     * Executes a raw SQL query with optional parameters.
+     * Useful for setting session variables or running custom queries.
+     *
+     * @param string $sql The raw SQL query to execute.
+     * @param array $params Optional array of parameters to bind.
+     * @return PDOStatement|bool Returns the PDOStatement on success, or false on failure.
+     */
+    public function query(string $sql, array $params = []): PDOStatement|bool
+    {
+        try {
+            $stmt = $this->pdo->prepare($sql);
+            $stmt->execute($params);
+            return $stmt;
+        } catch (PDOException $e) {
+            error_log("QUERY operation failed: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    public function create(string $table, array $data): int|bool
+    {
+        if (empty($data)) {
+            return false;
+        }
+
+        $normalizedData = $this->normalizeDataForDb($data);
+        $fields = implode(', ', array_keys($normalizedData));
+        $placeholders = ':' . implode(', :', array_keys($normalizedData));
+
+        $sql = "INSERT INTO `$table` ($fields) VALUES ($placeholders)";
+
+        try {
+            $stmt = $this->pdo->prepare($sql);
+            $stmt->execute($normalizedData);
+            return (int)$this->pdo->lastInsertId();
+        } catch (PDOException $e) {
+            error_log("CREATE operation failed for table $table: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    public function createBatch(string $table, array $dataRows): int|bool
+    {
+        if (empty($dataRows) || empty($dataRows[0])) {
+            return false;
+        }
+
+        $normalizedDataRows = array_map([$this, 'normalizeDataForDb'], $dataRows);
+        $fields = array_keys($normalizedDataRows[0]);
+        $fieldNames = implode(', ', $fields);
+        $fieldCount = count($fields);
+        $placeholderTemplate = '(' . implode(', ', array_fill(0, $fieldCount, '?')) . ')';
+        $valueSets = array_fill(0, count($normalizedDataRows), $placeholderTemplate);
+
+        $sql = "INSERT INTO `$table` ($fieldNames) VALUES " . implode(', ', $valueSets);
+
+        $params = [];
+        foreach ($normalizedDataRows as $row) {
+            $params = array_merge($params, array_values(array_intersect_key($row, array_flip($fields))));
+        }
+
+        try {
+            $stmt = $this->pdo->prepare($sql);
+            $stmt->execute($params);
+            return $stmt->rowCount();
+        } catch (PDOException $e) {
+            error_log("CREATE BATCH operation failed for table $table: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * @param string $table Table name
+     * @param array $conditions Associative array for WHERE clause
+     * @param bool $single Return a single row?
+     * @param string $selectColumns Columns to select
+     * @param bool $distinct Use DISTINCT?
+     * @param string|array $join Can be a raw string or an array of join definitions
+     * @param string|array $groupBy Field(s) to group by (SQL Level)
+     * @param array $orderBy Order by definitions
+     * @param int|null $limit Limit results (SQL LIMIT)
+     * @param int $offset Offset results (SQL OFFSET)
+     * @param int|null $chunkSize Split the result into numerical chunks. If used with $chunkByColumn, chunks apply inside the groups.
+     * @param string|null $chunkByColumn Group the output array by the value of this column. (Converts 1/0 to "true"/"false").
+     */
+    public function read(
+        string       $table,
+        array        $conditions = [],
+        bool         $single = false,
+        string       $selectColumns = '*',
+        bool         $distinct = false,
+        string|array $join = [],
+        string|array $groupBy = [],
+        array        $orderBy = [],
+        ?int         $limit = null,
+        int          $offset = 0,
+        ?int         $chunkSize = null,
+        ?string      $chunkByColumn = null
+    ): array|bool
+    {
+        $where = $this->buildWhere($conditions);
+        $distinctClause = $distinct ? 'DISTINCT ' : '';
+
+        // --- 1. Handle Table Name & Alias ---
+        $tableClause = (!str_contains($table, ' ')) ? "`$table`" : $table;
+
+        // --- 2. Handle Joins ---
+        $joinClause = '';
+        if (is_array($join) && !empty($join)) {
+            foreach ($join as $j) {
+                $type = isset($j['type']) ? strtoupper($j['type']) : 'LEFT';
+                $joinTable = $j['table'];
+                $onCondition = $j['on'];
+                $joinClause .= " $type JOIN $joinTable ON $onCondition";
+            }
+        } elseif (is_string($join)) {
+            $joinClause = " $join";
+        }
+
+        // --- 3. Handle Group By (SQL) ---
+        $groupByClause = '';
+        if (!empty($groupBy)) {
+            $groupStr = is_array($groupBy) ? implode(', ', $groupBy) : $groupBy;
+            $groupByClause = " GROUP BY $groupStr";
+        }
+
+        // --- 4. Handle Ordering ---
+        $orderParts = [];
+        if (!empty($orderBy)) {
+            foreach ($orderBy as $column => $direction) {
+                $sanitizedDirection = (strtoupper($direction) === 'DESC') ? 'DESC' : 'ASC';
+                $orderParts[] = "$column " . $sanitizedDirection;
+            }
+        }
+        $orderByClause = !empty($orderParts) ? " ORDER BY " . implode(', ', $orderParts) : "";
+
+        // --- 5. Construct & Execute SQL ---
+        $sql = "SELECT $distinctClause $selectColumns FROM $tableClause $joinClause";
+
+        if (!empty($where['clause'])) {
+            $sql .= " WHERE " . $where['clause'];
+        }
+
+        $sql .= $groupByClause;
+        $sql .= $orderByClause;
+
+        // Handle LIMIT/OFFSET for the query
+        if ($single) {
+            $sql .= " LIMIT 1";
+        } elseif ($limit !== null && $limit > 0) {
+            $sql .= ($offset > 0) ? " LIMIT $offset, $limit" : " LIMIT $limit";
+        } elseif ($offset > 0) {
+            // Big number to accommodate offset without limit
+            $sql .= " LIMIT $offset, 18446744073709551615";
+        }
+
+        try {
+            $stmt = $this->pdo->prepare($sql);
+            $stmt->execute($where['params']);
+
+            if ($single) {
+                return $stmt->fetch(PDO::FETCH_ASSOC);
+            }
+
+            $data = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            if (empty($data)) {
+                return [];
+            }
+
+            // --- 6. Post-Processing: Grouping by Column ---
+            if ($chunkByColumn !== null && $chunkByColumn !== '') {
+                $groupedData = [];
+
+                foreach ($data as $row) {
+                    $key = $row[$chunkByColumn] ?? 'undefined';
+
+                    // Explicitly handle Boolean-like values to ensure keys are "true"/"false"
+                    if ($key === 1 || $key === '1' || $key === true) {
+                        $key = 'true';
+                    } elseif ($key === 0 || $key === '0' || $key === false) {
+                        $key = 'false';
+                    }
+
+                    $groupedData[$key][] = $row;
+                }
+
+                // Replace main data with grouped data
+                $data = $groupedData;
+            }
+
+            // --- 7. Post-Processing: Numerical Chunking ---
+            if ($chunkSize !== null && $chunkSize > 0) {
+                if ($chunkByColumn !== null && $chunkByColumn !== '') {
+                    // Case A: Grouped by Column AND Chunked by Size
+                    // We need to chunk the arrays inside the groups
+                    foreach ($data as $groupKey => $rows) {
+                        $data[$groupKey] = array_chunk($rows, $chunkSize);
+                    }
+                } else {
+                    // Case B: Only Chunked by Size (Flat List)
+                    $data = array_chunk($data, $chunkSize);
+                }
+            }
+
+            return $data;
+
+        } catch (PDOException $e) {
+            error_log("READ operation failed: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    public function update(string $table, array $data, array $conditions): int|bool
+    {
+        if (empty($data) || empty($conditions)) return false;
+
+        $normalizedData = $this->normalizeDataForDb($data);
+        $setParts = [];
+        $setParams = [];
+        foreach ($normalizedData as $key => $value) {
+            $setPlaceholder = ":set_$key";
+            $setParts[] = "`$key` = $setPlaceholder";
+            $setParams[$setPlaceholder] = $value;
+        }
+        $setFields = implode(', ', $setParts);
+
+        $where = $this->buildWhere($conditions, 'where_upd');
+        if (empty($where['clause'])) {
+            error_log("UPDATE operation failed for table $table: Missing WHERE conditions.");
+            return false;
+        }
+
+        $sql = "UPDATE `$table` SET $setFields WHERE " . $where['clause'];
+        $executeParams = array_merge($setParams, $where['params']);
+
+        try {
+            $stmt = $this->pdo->prepare($sql);
+            $stmt->execute($executeParams);
+            return $stmt->rowCount();
+        } catch (PDOException $e) {
+            error_log("UPDATE operation failed for table $table: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    public function upsert(string $table, array $data): int|bool
+    {
+        if (empty($data)) return false;
+
+        $normalizedData = $this->normalizeDataForDb($data);
+        $fields = array_keys($normalizedData);
+        $fieldNames = implode(', ', $fields);
+        $placeholders = ':' . implode(', :', $fields);
+
+        $updateParts = [];
+        foreach ($fields as $field) {
+            $updateParts[] = "`$field` = VALUES(`$field`)";
+        }
+        $updateFields = implode(', ', $updateParts);
+
+        $sql = "INSERT INTO `$table` ($fieldNames) VALUES ($placeholders)
+                ON DUPLICATE KEY UPDATE $updateFields";
+
+        try {
+            $stmt = $this->pdo->prepare($sql);
+            $stmt->execute($normalizedData);
+            $lastId = $this->pdo->lastInsertId();
+            return ($lastId > 0) ? (int)$lastId : true;
+        } catch (PDOException $e) {
+            error_log("UPSERT operation failed for table $table: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    public function upsertBatch(string $table, array $dataRows): int|bool
+    {
+        if (empty($dataRows) || empty($dataRows[0])) return false;
+
+        $normalizedDataRows = array_map([$this, 'normalizeDataForDb'], $dataRows);
+        $fields = array_keys($normalizedDataRows[0]);
+        $fieldNames = implode(', ', $fields);
+        $fieldCount = count($fields);
+
+        $placeholderTemplate = '(' . implode(', ', array_fill(0, $fieldCount, '?')) . ')';
+        $valueSets = array_fill(0, count($normalizedDataRows), $placeholderTemplate);
+        $valuesClause = implode(', ', $valueSets);
+
+        $updateParts = [];
+        foreach ($fields as $field) {
+            $updateParts[] = "`$field` = VALUES(`$field`)";
+        }
+        $updateFields = implode(', ', $updateParts);
+
+        $sql = "INSERT INTO `$table` ($fieldNames) VALUES $valuesClause
+                ON DUPLICATE KEY UPDATE $updateFields";
+
+        $params = [];
+        foreach ($normalizedDataRows as $row) {
+            $params = array_merge($params, array_values(array_intersect_key($row, array_flip($fields))));
+        }
+
+        try {
+            $stmt = $this->pdo->prepare($sql);
+            $stmt->execute($params);
+            return $stmt->rowCount();
+        } catch (PDOException $e) {
+            error_log("UPSERT BATCH operation failed for table $table: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    public function delete(string $table, array $conditions, bool $resetAutoIncrement = false): int|bool
+    {
+        if (empty($conditions)) {
+            error_log("DELETE operation failed for table $table: Missing WHERE conditions.");
+            return false;
+        }
+
+        $where = $this->buildWhere($conditions);
+        if (empty($where['clause'])) {
+            return false;
+        }
+
+        $sql = "DELETE FROM `$table` WHERE " . $where['clause'];
+
+        try {
+            $stmt = $this->pdo->prepare($sql);
+            $stmt->execute($where['params']);
+            $rowCount = $stmt->rowCount();
+
+            if ($rowCount > 0 && $resetAutoIncrement) {
+                try {
+                    $resetSql = "ALTER TABLE `$table` AUTO_INCREMENT = 1";
+                    $this->pdo->exec($resetSql);
+                } catch (PDOException $e) {
+                    error_log("AUTO_INCREMENT reset failed: " . $e->getMessage());
+                }
+            }
+            return $rowCount;
+        } catch (PDOException $e) {
+            error_log("DELETE operation failed for table $table: " . $e->getMessage());
+            return false;
+        }
+    }
+}
