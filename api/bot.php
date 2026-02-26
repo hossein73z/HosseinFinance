@@ -363,11 +363,6 @@ function handleHoldingsCallback(array $person, array $callback_query, array $mes
 #[NoReturn]
 function handleHoldingsWebAppData(array $person, array $message, DatabaseManager $db): void
 {
-    $data_to_send = [
-        'text' => 'پیام نامفهوم است.',
-        'chat_id' => $person['chat_id']
-    ];
-
     $web_app_data = json_decode($message['web_app_data']['data'], true);
     $action = $web_app_data['action'] ?? null;
 
@@ -386,10 +381,19 @@ function handleHoldingsWebAppData(array $person, array $message, DatabaseManager
                     "time" => $holding["time"],
                     "note" => $holding["note"],
                 ]);
-            $data_to_send['text'] = '✅ دارایی جدید با موفقیت ثبت شد.';
+            sendToTelegram('sendMessage', [
+                'text' => '✅ دارایی جدید با موفقیت ثبت شد.',
+                'chat_id' => $person['chat_id']
+            ]);
+
         } catch (PDOException $e) {
-//            $data_to_send['text'] = '❌ خطای پایگاه داده در ثبت دارایی جدید.';
-            $data_to_send['text'] = json_encode($e->errorInfo, JSON_PRETTY_PRINT);
+            if ($e[1] == 1062)
+                $data_to_send['text'] = json_encode($e->errorInfo, JSON_PRETTY_PRINT);
+            else
+                sendToTelegram('sendMessage', [
+                    'text' => '❌ خطای پایگاه داده در ثبت دارایی جدید: ' . $e->errorInfo[2],
+                    'chat_id' => $person['chat_id']
+                ]);
         }
     } elseif ($action === 'edit') {
         $result = $db->update(
@@ -405,13 +409,11 @@ function handleHoldingsWebAppData(array $person, array $message, DatabaseManager
         $data_to_send['text'] = $result ? '✅ دارایی با موفقیت حذف شد.' : '❌ خطای پایگاه داده درحذف دارایی.';
     }
 
-    sendToTelegram('sendMessage', $data_to_send);
+    sendToTelegram('sendMessage', [
+        'text' => 'پیام نامفهوم است.',
+        'chat_id' => $person['chat_id']
+    ]);
 
-    // Clear progress and return to main view
-    $db->update(
-        table: 'persons',
-        data: ['progress' => null],
-        conditions: ['id' => $person['id']]);
     $person['progress'] = null;
     renderHoldingsMainView($person, $db);
     exit();
