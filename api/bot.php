@@ -389,7 +389,7 @@ function handleHoldingsWebAppData(array $person, array $message, DatabaseManager
             exit();
 
         } catch (PDOException $e) {
-            if ($e[1] == 1062) {
+            if ($e->errorInfo[1] == 1062) {
                 $holding = $db->read(
                     table: 'holdings',
                     conditions: [
