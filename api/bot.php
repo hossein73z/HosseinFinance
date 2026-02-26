@@ -386,27 +386,59 @@ function handleHoldingsWebAppData(array $person, array $message, DatabaseManager
                 'chat_id' => $person['chat_id']
             ]);
 
+            exit();
+
         } catch (PDOException $e) {
-            if ($e[1] == 1062)
-                $data_to_send['text'] = json_encode($e->errorInfo, JSON_PRETTY_PRINT);
-            else
+            if ($e[1] == 1062) {
+                $holding = $db->read(
+                    table: 'holdings',
+                    conditions: [
+                        'person_id' => $person['id'],
+                        "asset_id" => $holding["asset_id"],
+                    ],
+                    single: true
+                );
+
+                sendToTelegram('sendMessage', [
+                    'text' => json_encode($holding, JSON_PRETTY_PRINT),
+                    'chat_id' => $person['chat_id']
+                ]);
+                exit();
+
+            } else
                 sendToTelegram('sendMessage', [
                     'text' => '❌ خطای پایگاه داده در ثبت دارایی جدید: ' . $e->errorInfo[2],
                     'chat_id' => $person['chat_id']
                 ]);
+            exit();
+
         }
+
     } elseif ($action === 'edit') {
         $result = $db->update(
             table: 'holdings',
             data: $web_app_data['updates'],
-            conditions: ['id' => $web_app_data['id']]);
-        $data_to_send['text'] = $result ? '✅ دارایی با موفقیت ویرایش ثبت شد.' : '❌ خطای پایگاه داده در ویرایش دارایی.';
+            conditions: ['id' => $web_app_data['id']]
+        );
+
+        sendToTelegram('sendMessage', [
+            'text' => $result ? '✅ دارایی با موفقیت ویرایش ثبت شد.' : '❌ خطای پایگاه داده در ویرایش دارایی.',
+            'chat_id' => $person['chat_id']
+        ]);
+        exit();
+
     } elseif ($action === 'delete') {
         $result = $db->delete(
             table: 'holdings',
             conditions: ['id' => $web_app_data['id']],
-            resetAutoIncrement: true);
-        $data_to_send['text'] = $result ? '✅ دارایی با موفقیت حذف شد.' : '❌ خطای پایگاه داده درحذف دارایی.';
+            resetAutoIncrement: true
+        );
+
+        sendToTelegram('sendMessage', [
+            'text' => $result ? '✅ دارایی با موفقیت حذف شد.' : '❌ خطای پایگاه داده درحذف دارایی.',
+            'chat_id' => $person['chat_id']
+        ]);
+        exit();
     }
 
     sendToTelegram('sendMessage', [
