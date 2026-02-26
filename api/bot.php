@@ -104,7 +104,7 @@ function validateWebhookSecurity(string $input): void
 /**
  * Handles normal text messages, commands, and web app data.
  */
-function handleIncomingMessage(array $message, $db): void
+function handleIncomingMessage(array $message, DatabaseManager $db): void
 {
     $person = getOrCreateUser($message['chat'], $db);
 
@@ -135,10 +135,13 @@ function handleIncomingMessage(array $message, $db): void
 /**
  * Handles inline button presses.
  */
-function handleCallbackQuery(array $callback_query, $db): void
+function handleCallbackQuery(array $callback_query, DatabaseManager $db): void
 {
     $message = $callback_query['message'];
-    $person = $db->read('persons', ['chat_id' => $message['chat']['id']], true);
+    $person = $db->read(
+        table: 'persons',
+        conditions: ['chat_id' => $message['chat']['id']],
+        single: true);
 
     if ($person !== false) {
         choosePath(message: $message, person: $person, callback_query: $callback_query, db: $db);
@@ -148,24 +151,34 @@ function handleCallbackQuery(array $callback_query, $db): void
 /**
  * Retrieves an existing user or registers a new one.
  */
-function getOrCreateUser(array $chat, $db): array
+function getOrCreateUser(array $chat, DatabaseManager $db): array
 {
-    $person = $db->read('persons', ['chat_id' => $chat['id']], true);
+    $person = $db->read(
+        table: 'persons',
+        conditions: ['chat_id' => $chat['id']],
+        single: true);
 
     if (!$person) {
-        $admins = $db->read('persons', ['is_admin' => 1]);
-        $new_user_id = $db->create('persons', [
-            'chat_id' => $chat['id'],
-            'first_name' => $chat['first_name'] ?? 'N/A',
-            'last_name' => $chat['last_name'] ?? null,
-            'username' => $chat['username'] ?? null,
-            'progress' => null,
-            'is_admin' => ($admins) ? 0 : 1, // First user is admin
-            'last_btn' => 0
-        ]);
+        $admins = $db->read(
+            table: 'persons',
+            conditions: ['is_admin' => 1]);
+        $new_user_id = $db->create(
+            table: 'persons',
+            data: [
+                'chat_id' => $chat['id'],
+                'first_name' => $chat['first_name'] ?? 'N/A',
+                'last_name' => $chat['last_name'] ?? null,
+                'username' => $chat['username'] ?? null,
+                'progress' => null,
+                'is_admin' => ($admins) ? 0 : 1, // First user is admin
+                'last_btn' => 0
+            ]);
 
         if ($new_user_id) {
-            return $db->read('persons', ['chat_id' => $chat['id']], true);
+            return $db->read(
+                table: 'persons',
+                conditions: ['chat_id' => $chat['id']],
+                single: true);
         } else {
             error_log("[ERROR] Failed to create new user: " . $chat['id']);
             exit();
@@ -177,7 +190,7 @@ function getOrCreateUser(array $chat, $db): array
 /**
  * Routes the flow based on user input or state.
  */
-function choosePath(?array $pressed_button = null, ?array $message = null, ?array $person = null, ?array $callback_query = null, $db = null): void
+function choosePath(?array $pressed_button = null, ?array $message = null, ?array $person = null, ?array $callback_query = null, DatabaseManager $db = null): void
 {
     // Handle Callback Queries
     if ($callback_query) {
@@ -227,7 +240,10 @@ function choosePath(?array $pressed_button = null, ?array $message = null, ?arra
                 ]
             ]);
             if ($response) {
-                $db->update('persons', ['last_btn' => $pressed_button['id'], 'progress' => null], ['id' => $person['id']]);
+                $db->update(
+                    table: 'persons',
+                    data: ['last_btn' => $pressed_button['id'], 'progress' => null],
+                    conditions: ['id' => $person['id']]);
             }
         }
     }
@@ -247,16 +263,23 @@ function routeToLevel($level_id, array $person, ?array $message, ?array $callbac
 /**
  * Logic for 'Back' button.
  */
-function backButton(array $person, $db): void
+function backButton(array $person, DatabaseManager $db): void
 {
     $progress = $person['progress'] ? json_decode($person['progress'], true) : null;
-    $current_level = $db->read('buttons', ['id' => $person['last_btn']], true);
+    $current_level = $db->read(
+        table: 'buttons',
+        conditions: ['id' => $person['last_btn']],
+        single: true
+    );
 
     if ($progress) {
         $person['progress'] = null;
         choosePath(pressed_button: $current_level, message: false, person: $person, db: $db);
     } else {
-        $last_level = $db->read('buttons', ['id' => $current_level['belong_to']], true);
+        $last_level = $db->read(
+            table: 'buttons',
+            conditions: ['id' => $current_level['belong_to']],
+            single: true);
         $person['progress'] = null;
         choosePath(pressed_button: $last_level, person: $person, db: $db);
     }
@@ -307,7 +330,7 @@ function handleHoldingsCallback(array $person, array $callback_query, array $mes
     }
 }
 
-function handleHoldingsWebAppData(array $person, array $message, $db): void
+function handleHoldingsWebAppData(array $person, array $message, DatabaseManager $db): void
 {
     $web_app_data = json_decode($message['web_app_data']['data'], true);
     $action = $web_app_data['action'] ?? null;
@@ -315,28 +338,39 @@ function handleHoldingsWebAppData(array $person, array $message, $db): void
 
     if ($action === 'add') {
         $holding = $web_app_data['holding'];
-        $result = $db->create('holdings', [
-            "person_id" => $person['id'],
-            "asset_id" => $holding["asset_id"],
-            "amount" => $holding["amount"],
-            "avg_price" => $holding["avg_price"],
-            "date" => $holding["date"],
-            "time" => $holding["time"],
-            "note" => $holding["note"],
-        ]);
+        $result = $db->create(
+            table: 'holdings',
+            data: [
+                "person_id" => $person['id'],
+                "asset_id" => $holding["asset_id"],
+                "amount" => $holding["amount"],
+                "avg_price" => $holding["avg_price"],
+                "date" => $holding["date"],
+                "time" => $holding["time"],
+                "note" => $holding["note"],
+            ]);
         $text = $result ? '✅ دارایی جدید با موفقیت ثبت شد.' : '❌ خطای پایگاه داده در ثبت دارایی جدید.';
     } elseif ($action === 'edit') {
-        $result = $db->update('holdings', $web_app_data['updates'], ['id' => $web_app_data['id']]);
+        $result = $db->update(
+            table: 'holdings',
+            data: $web_app_data['updates'],
+            conditions: ['id' => $web_app_data['id']]);
         $text = $result ? '✅ دارایی با موفقیت ویرایش ثبت شد.' : '❌ خطای پایگاه داده در ویرایش دارایی.';
     } elseif ($action === 'delete') {
-        $result = $db->delete('holdings', ['id' => $web_app_data['id']], true);
+        $result = $db->delete(
+            table: 'holdings',
+            conditions: ['id' => $web_app_data['id']],
+            resetAutoIncrement: true);
         $text = $result ? '✅ دارایی با موفقیت حذف شد.' : '❌ خطای پایگاه داده درحذف دارایی.';
     }
 
     sendTelegramMsg('sendMessage', ['chat_id' => $person['chat_id'], 'text' => $text]);
 
     // Clear progress and return to main view
-    $db->update('persons', ['progress' => null], ['id' => $person['id']]);
+    $db->update(
+        table: 'persons',
+        data: ['progress' => null],
+        conditions: ['id' => $person['id']]);
     $person['progress'] = null;
     renderHoldingsMainView($person, $db);
 }
@@ -383,7 +417,10 @@ function handleHoldingsDeepLink(array $person, array $message, DatabaseManager $
                 'reply_markup' => ['keyboard' => $keyboard, 'resize_keyboard' => true, 'is_persistent' => true]
             ]);
 
-            $db->update('persons', ['progress' => json_encode(['view_holding' => ['holding_id' => $holding['id']]])], ['id' => $person['id']]);
+            $db->update(
+                table: 'persons',
+                data: ['progress' => json_encode(['view_holding' => ['holding_id' => $holding['id']]])],
+                conditions: ['id' => $person['id']]);
             return;
         } else {
             $text = 'دارایی با این مشخصه یافت نشد!';
@@ -399,7 +436,10 @@ function renderHoldingsMainView(array $person, DatabaseManager $db): void
     // Add App Buttons
     $progress = json_decode($person['progress'], true);
     if ($progress && key($progress) === 'view_holding') {
-        $holding = $db->read('holdings', ['id' => $progress['view_holding']['holding_id'], 'person_id' => $person['id']], true);
+        $holding = $db->read(
+            table: 'holdings',
+            conditions: ['id' => $progress['view_holding']['holding_id'], 'person_id' => $person['id']],
+            single: true);
         if ($holding) {
             array_unshift($keyboard, [
                 createWebAppBtn('✏ ویرایش', '/assets/add_holding.html', ['data' => base64_encode(json_encode($holding))])
@@ -457,7 +497,10 @@ function renderHoldingsMainView(array $person, DatabaseManager $db): void
         sendTelegramMsg('sendMessage', ['chat_id' => $person['chat_id'], 'text' => 'شما هیچ دارایی‌ای ثبت نکرده‌اید.']);
     }
 
-    $db->update('persons', ['last_btn' => 1, 'progress' => null], ['id' => $person['id']]);
+    $db->update(
+        table: 'persons',
+        data: ['last_btn' => 1, 'progress' => null],
+        conditions: ['id' => $person['id']]);
 }
 
 
@@ -500,7 +543,7 @@ function handleLoansCallback(array $person, array $callback_query, array $messag
     }
 }
 
-function handleLoansWebAppData(array $person, array $message, $db): void
+function handleLoansWebAppData(array $person, array $message, DatabaseManager $db): void
 {
     $web_app_data = json_decode($message['web_app_data']['data'], true);
     $text = "پیام نامفهوم است!";
@@ -508,23 +551,27 @@ function handleLoansWebAppData(array $person, array $message, $db): void
     if (isset($web_app_data['loans']) && isset($web_app_data['installments'])) {
         // Create new loan
         $loanData = $web_app_data['loans'];
-        $loan_id = $db->create('loans', [
-            'person_id' => $person['id'],
-            'name' => $loanData['name'],
-            'total_amount' => $loanData['total_amount'],
-            'received_date' => $loanData['received_date'],
-            'alert_offset' => $loanData['alert_offset'],
-        ]);
+        $loan_id = $db->create(
+            table: 'loans',
+            data: [
+                'person_id' => $person['id'],
+                'name' => $loanData['name'],
+                'total_amount' => $loanData['total_amount'],
+                'received_date' => $loanData['received_date'],
+                'alert_offset' => $loanData['alert_offset'],
+            ]);
 
         if ($loan_id) {
             $count = 0;
             foreach ($web_app_data['installments'] as $inst) {
-                $db->create('installments', [
-                    'loan_id' => $loan_id, // Fixed: Original code used person_id instead of loan_id
-                    'amount' => $inst['amount'],
-                    'due_date' => $inst['due_date'],
-                    'is_paid' => $inst['is_paid'] ? 1 : 0
-                ]);
+                $db->create(
+                    table: 'installments',
+                    data: [
+                        'loan_id' => $loan_id, // Fixed: Original code used person_id instead of loan_id
+                        'amount' => $inst['amount'],
+                        'due_date' => $inst['due_date'],
+                        'is_paid' => $inst['is_paid'] ? 1 : 0
+                    ]);
                 $count++;
             }
             $text = "✅ وام «{$loanData['name']}» با موفقیت ثبت شد.\n📊 تعداد اقساط: " . beautifulNumber($count);
@@ -536,7 +583,10 @@ function handleLoansWebAppData(array $person, array $message, $db): void
         $text = "نتیجه ویرایش وام: ";
 
         if (!empty($web_app_data['updates'])) {
-            $result = $db->update('loans', $web_app_data['updates'], ['id' => $web_app_data['id'], 'person_id' => $person['id']]);
+            $result = $db->update(
+                table: 'loans',
+                data: $web_app_data['updates'],
+                conditions: ['id' => $web_app_data['id'], 'person_id' => $person['id']]);
             $text .= $result ? "\nویرایش اطلاعات وام: ✅" : "\nویرایش اطلاعات وام: ❌";
         }
 
@@ -544,26 +594,39 @@ function handleLoansWebAppData(array $person, array $message, $db): void
             foreach ($new_insts as &$new_inst) {
                 $new_inst['loan_id'] = $web_app_data['id']; // Fixed: was person_id
             }
-            $result = $db->upsertBatch('installments', $new_insts);
+            $result = $db->upsertBatch(
+                table: 'installments',
+                dataRows: $new_insts
+            );
             $text .= $result ? "\nویرایش اطلاعات اقساط: ✅" : "\nویرایش اطلاعات اقساط: ❌";
 
-            $deleted_rows = $db->delete('installments', ['loan_id' => $web_app_data['id'], '!due_date' => array_column($new_insts, 'due_date')]);
+            $deleted_rows = $db->delete(
+                table: 'installments',
+                conditions: ['loan_id' => $web_app_data['id'], '!due_date' => array_column($new_insts, 'due_date')]
+            );
             if ($deleted_rows) $text .= "\nتعداد قسط حذف شده: " . beautifulNumber($deleted_rows);
         }
     } elseif (isset($web_app_data['delete']) && $web_app_data['delete']) {
         // Delete loan
-        $result = $db->delete('loans', ['id' => $web_app_data['id']]);
+        $result = $db->delete(
+            table: 'loans',
+            conditions: ['id' => $web_app_data['id']]
+        );
         $text = $result ? '✅ حذف وام با موفقیت انجام شد!' : '❌ خطای پایگاه داده در حذف وام!';
     }
 
     sendTelegramMsg('sendMessage', ['chat_id' => $person['chat_id'], 'text' => $text]);
 
     $person['progress'] = null;
-    $db->update('persons', ['progress' => null], ['id' => $person['id']]);
+    $db->update(
+        table: 'persons',
+        data: ['progress' => null],
+        conditions: ['id' => $person['id']]
+    );
     renderLoansMainView($person, $db);
 }
 
-function handleLoansDeepLink(array $person, array $message, $db): void
+function handleLoansDeepLink(array $person, array $message, DatabaseManager $db): void
 {
     $text = $message['text'];
 
@@ -587,7 +650,11 @@ function handleLoansDeepLink(array $person, array $message, $db): void
 
             $temp_mssg = sendLoadingMessage($person['chat_id'], 'در حال دریافت اطلاعات اقساط ...');
             if ($temp_mssg) {
-                $db->update('persons', ['progress' => json_encode(['viewing_loan' => ['loan_id' => $loan['id']]])], ['id' => $person['id']]);
+                $db->update(
+                    table: 'persons',
+                    data: ['progress' => json_encode(['viewing_loan' => ['loan_id' => $loan['id']]])],
+                    conditions: ['id' => $person['id']]
+                );
 
                 sendTelegramMsg('editMessageText', [
                     'chat_id' => $person['chat_id'],
@@ -602,10 +669,20 @@ function handleLoansDeepLink(array $person, array $message, $db): void
     elseif (preg_match("/^\/start toggleInstPayment_instId(\d+?)_mssgId(\d+?)$/m", $text, $matches)) {
         deleteTelegramMsg($person['chat_id'], $message['message_id']);
 
-        $installment = $db->read('installments i', ['i.id' => $matches[1]], true, 'i.*, l.person_id', 'LEFT JOIN loans l ON i.loan_id = l.id');
+        $installment = $db->read(
+            table: 'installments i',
+            conditions: ['i.id' => $matches[1]],
+            single: true,
+            selectColumns: 'i.*, l.person_id',
+            join: 'LEFT JOIN loans l ON i.loan_id = l.id'
+        );
 
         if ($installment && $installment['person_id'] == $person['id']) {
-            $db->update('installments', ['is_paid' => !$installment['is_paid']], ['id' => $installment['id']]);
+            $db->update(
+                table: 'installments',
+                data: ['is_paid' => !$installment['is_paid']],
+                conditions: ['id' => $installment['id']]
+            );
             $loan = getLoanWithInstallments($installment['loan_id'], $person['id'], $db);
 
             if ($loan) {
@@ -625,14 +702,18 @@ function handleLoansDeepLink(array $person, array $message, $db): void
     }
 }
 
-function renderLoansMainView(array $person, $db): void
+function renderLoansMainView(array $person, DatabaseManager $db): void
 {
     $keyboard = createKeyboardsArray(2, $person['is_admin'], $db);
 
     // Add App Buttons
     $progress = json_decode($person['progress'], true);
     if ($progress && key($progress) === 'viewing_loan') {
-        $loan = $db->read('loans', ['id' => $progress['viewing_loan']['loan_id'], 'person_id' => $person['id']], true);
+        $loan = $db->read(
+            table: 'loans',
+            conditions: ['id' => $progress['viewing_loan']['loan_id'], 'person_id' => $person['id']],
+            single: true
+        );
         if ($loan) {
             array_unshift($keyboard, [createWebAppBtn('✏ ویرایش وام «' . $loan['name'] . '»', '/assets/add_loan.html', ['data' => base64_encode(json_encode($loan))])]);
         }
@@ -645,9 +726,21 @@ function renderLoansMainView(array $person, $db): void
         'reply_markup' => ['keyboard' => $keyboard, 'resize_keyboard' => true, 'is_persistent' => true, 'input_field_placeholder' => '🏦 وام و اقساط']
     ]);
 
-    $loans = $db->read('loans l', ['l.person_id' => $person['id']], false,
-        'l.*, JSON_ARRAYAGG(JSON_OBJECT("id", i.id, "loan_id", i.loan_id, "amount", i.amount, "due_date", i.due_date, "is_paid", i.is_paid)) as installments',
-        'JOIN installments i on i.loan_id = l.id', 'l.id'
+    $loans = $db->read(
+        table: 'loans l',
+        conditions: ['l.person_id' => $person['id']],
+        selectColumns: '
+            l.*,
+            JSON_ARRAYAGG(
+                JSON_OBJECT(
+                    "id", i.id,
+                    "loan_id", i.loan_id,
+                    "amount", i.amount,
+                    "due_date", i.due_date,
+                    "is_paid", i.is_paid
+                )
+            ) as installments',
+        join: 'JOIN installments i on i.loan_id = l.id', groupBy: 'l.id'
     );
 
     if ($loans) {
@@ -668,7 +761,10 @@ function renderLoansMainView(array $person, $db): void
         sendTelegramMsg('sendMessage', ['chat_id' => $person['chat_id'], 'text' => 'هیچ وام یا قسطی برای شما ثبت نشده است!']);
     }
 
-    $db->update('persons', ['last_btn' => 2, 'progress' => null], ['id' => $person['id']]);
+    $db->update(
+        table: 'persons',
+        data: ['last_btn' => 2, 'progress' => null],
+        conditions: ['id' => $person['id']]);
 }
 
 
@@ -677,9 +773,14 @@ function renderLoansMainView(array $person, $db): void
 // ==========================================
 
 #[NoReturn]
-function level_5(array $person, $db, ?array $message = null, ?array $callback_query = null): void
+function level_5(array $person, DatabaseManager $db, ?array $message = null, ?array $callback_query = null): void
 {
-    $asset_types = $db->read('assets', selectColumns: 'asset_type', distinct: true, orderBy: ['asset_type' => 'DESC']);
+    $asset_types = $db->read(
+        table: 'assets',
+        selectColumns: 'asset_type',
+        distinct: true,
+        orderBy: ['asset_type' => 'DESC']
+    );
     if (!$asset_types) {
         sendTelegramMsg('sendMessage', ['chat_id' => $person['chat_id'], 'text' => 'دسته‌بندی‌ای در سیستم یافت نشد!']);
         exit();
@@ -743,7 +844,10 @@ function handleEditFavoriteCallback(array $person, array $query_data, array $ass
             [['text' => '🔙 برگشت 🔙', 'callback_data' => json_encode(['back' => 'favorites_list'])]],
         ];
 
-        $favorites = $db->read('favorites', ['person_id' => $person['id']]);
+        $favorites = $db->read(
+            table: 'favorites',
+            conditions: ['person_id' => $person['id']]
+        );
         if ($favorites) {
             $data['reply_markup']['inline_keyboard'][0][] = ['text' => 'حذف', 'callback_data' => json_encode(['edit_fav' => 'remove'])];
         }
@@ -773,14 +877,18 @@ function handleEditFavoriteCallback(array $person, array $query_data, array $ass
     sendTelegramMsg('editMessageText', $data);
 }
 
-function handleAddFavoriteCallback(array $person, array $query_data, array $asset_types, array $data, $db): void
+function handleAddFavoriteCallback(array $person, array $query_data, array $asset_types, array $data, DatabaseManager $db): void
 {
     $inner_key = array_key_first($query_data['add_fav']);
     $inner_val = $query_data['add_fav'][$inner_key];
 
     if ($inner_key === 'asset_type') {
         $type = array_column($asset_types, 'asset_type')[$inner_val];
-        $assets = $db->read('assets', ['asset_type' => $type], false, '*', null, ['asset_type' => 'DESC']);
+        $assets = $db->read(
+            table: 'assets',
+            conditions: ['asset_type' => $type],
+            orderBy: ['asset_type' => 'DESC']
+        );
 
         $data['text'] = 'گزینه‌ی مد نظر خود را از لیست زیر انتخاب کنید:';
         $data['reply_markup']['inline_keyboard'] = [[['text' => '🔙 برگشت 🔙', 'callback_data' => json_encode(['edit_fav' => 'add'])]]];
@@ -791,7 +899,10 @@ function handleAddFavoriteCallback(array $person, array $query_data, array $asse
         sendTelegramMsg('editMessageText', $data);
 
     } elseif ($inner_key === 'asset') {
-        $result = $db->create('favorites', ['person_id' => $person['id'], 'asset_id' => $inner_val]);
+        $result = $db->create(
+            table: 'favorites',
+            data: ['person_id' => $person['id'], 'asset_id' => $inner_val]
+        );
         sendTelegramMsg('editMessageText', [
             'chat_id' => $person['chat_id'],
             'message_id' => $data['message_id'],
@@ -802,7 +913,7 @@ function handleAddFavoriteCallback(array $person, array $query_data, array $asse
     }
 }
 
-function handleDeleteFavoriteCallback(array $person, array $query_data, array $data, $db): void
+function handleDeleteFavoriteCallback(array $person, array $query_data, array $data, DatabaseManager $db): void
 {
     $inner_key = array_key_first($query_data['del_fav']);
     $inner_val = $query_data['del_fav'][$inner_key];
@@ -816,7 +927,11 @@ function handleDeleteFavoriteCallback(array $person, array $query_data, array $d
         sendTelegramMsg('editMessageText', $data);
 
     } elseif ($inner_key === 'conf') {
-        $result = $db->delete('favorites', ['id' => $inner_val], true);
+        $result = $db->delete(
+            table: 'favorites',
+            conditions: ['id' => $inner_val],
+            resetAutoIncrement: true
+        );
         sendTelegramMsg('editMessageText', [
             'chat_id' => $person['chat_id'],
             'message_id' => $data['message_id'],
@@ -827,23 +942,34 @@ function handleDeleteFavoriteCallback(array $person, array $query_data, array $d
     }
 }
 
-function handleSetLiveCallback(array $person, array $query_data, array $data, $db): void
+function handleSetLiveCallback(array $person, array $query_data, array $data, DatabaseManager $db): void
 {
     $is_active = $query_data['set_live'];
     $result = false;
 
     if ($is_active === true) {
-        $live_mssg = $db->read('special_messages', ['person_id' => $person['id'], 'type' => 'live_price'], true);
+        $live_mssg = $db->read(
+            table: 'special_messages',
+            conditions: ['person_id' => $person['id'], 'type' => 'live_price'],
+            single: true
+        );
         if ($live_mssg) deleteTelegramMsg($person['chat_id'], $live_mssg['message_id']);
 
-        $result = $db->upsert('special_messages', [
-            'person_id' => $person['id'],
-            'type' => 'live_price',
-            'is_active' => true,
-            'message_id' => $data['message_id'],
-        ]);
+        $result = $db->upsert(
+            table: 'special_messages',
+            data: [
+                'person_id' => $person['id'],
+                'type' => 'live_price',
+                'is_active' => true,
+                'message_id' => $data['message_id'],
+            ]
+        );
     } else {
-        $result = $db->delete('special_messages', ['person_id' => $person['id'], 'type' => 'live_price'], true);
+        $result = $db->delete(
+            table: 'special_messages',
+            conditions: ['person_id' => $person['id'], 'type' => 'live_price'],
+            resetAutoIncrement: true
+        );
     }
 
     if ($result) {
@@ -860,7 +986,10 @@ function handlePricesMessage(array $person, array $message, array $asset_types, 
     $types_array = array_column($asset_types, 'asset_type');
 
     if (in_array($text, $types_array)) {
-        $assets = $db->read('assets', ['asset_type' => $text]);
+        $assets = $db->read(
+            table: 'assets',
+            conditions: ['asset_type' => $text]
+        );
         if ($assets) {
             $date = preg_split('/-/u', $assets[0]['date']);
             $date[1] = str_replace(
@@ -908,16 +1037,30 @@ function renderPricesMainView(array $person, array $asset_types, $db): void
         'reply_markup' => ['keyboard' => $keyboard, 'resize_keyboard' => true, 'input_field_placeholder' => 'قیمت‌ها']
     ]);
 
-    $db->update('persons', ['last_btn' => 5, 'progress' => null], ['id' => $person['id']]);
+    $db->update(
+        table: 'persons',
+        data: ['last_btn' => 5, 'progress' => null],
+        conditions: ['id' => $person['id']]);
 }
 
-function renderFavoritesList(array $person, ?int $message_id_to_edit, bool $is_edit, $db): void
+function renderFavoritesList(array $person, ?int $message_id_to_edit, bool $is_edit, DatabaseManager $db): void
 {
     $favorites = getFavoritesList($person['id'], $db);
-    $live_mssg = $db->read('special_messages', ['person_id' => $person['id'], 'type' => 'live_price'], true);
+    $live_mssg = $db->read(
+        table: 'special_messages',
+        conditions: [
+            'person_id' => $person['id'],
+            'type' => 'live_price'
+        ],
+        single: true
+    );
 
     if ($is_edit && $live_mssg) {
-        $db->update('special_messages', ['is_active' => true], ['id' => $live_mssg['id']]);
+        $db->update(
+            table: 'special_messages',
+            data: ['is_active' => true],
+            conditions: ['id' => $live_mssg['id']]
+        );
     }
 
     $inline_keyboard = [
@@ -940,10 +1083,14 @@ function renderFavoritesList(array $person, ?int $message_id_to_edit, bool $is_e
     } else {
         $response = sendTelegramMsg('sendMessage', $data);
         if ($response && $live_mssg) {
-            $db->update('special_messages', [
-                'message_id' => $response['result']['message_id'],
-                'is_active' => true
-            ], ['id' => $live_mssg['id']]);
+            $db->update(
+                table: 'special_messages',
+                data: [
+                    'message_id' => $response['result']['message_id'],
+                    'is_active' => true
+                ],
+                conditions: ['id' => $live_mssg['id']]
+            );
             deleteTelegramMsg($person['chat_id'], $live_mssg['message_id']);
         }
     }
@@ -956,14 +1103,26 @@ function getFavoritesList(int $person_id, DatabaseManager $db): array|false
         conditions: ['person_id' => $person_id],
         selectColumns: 'a.*, f.id as fav_id',
         join: 'JOIN assets a ON a.id=f.asset_id',
-        orderBy: ['asset_type' => 'DESC', 'f.id' => 'ASC']);
+        orderBy: ['asset_type' => 'DESC', 'f.id' => 'ASC']
+    );
 }
 
-function disableLivePriceMessage(array $person, int $message_id, $db): void
+function disableLivePriceMessage(array $person, int $message_id, DatabaseManager $db): void
 {
-    $live_mssg = $db->read('special_messages', ['person_id' => $person['id'], 'type' => 'live_price', 'is_active' => true], true);
+    $live_mssg = $db->read(
+        table: 'special_messages',
+        conditions: [
+            'person_id' => $person['id'],
+            'type' => 'live_price',
+            'is_active' => true
+        ],
+        single: true
+    );
     if ($live_mssg && $live_mssg['message_id'] == $message_id) {
-        $db->update('special_messages', ['is_active' => false], ['id' => $live_mssg['id']]);
+        $db->update(
+            table: 'special_messages',
+            data: ['is_active' => false],
+            conditions: ['id' => $live_mssg['id']]);
     }
 }
 
@@ -973,7 +1132,7 @@ function disableLivePriceMessage(array $person, int $message_id, $db): void
 // ==========================================
 
 #[NoReturn]
-function level_6(array $person, $db, ?array $message = null, ?array $callback_query = null): void
+function level_6(array $person, DatabaseManager $db, ?array $message = null, ?array $callback_query = null): void
 {
     if ($callback_query) {
         answerCallbackQuery($callback_query['id']);
@@ -992,7 +1151,11 @@ function level_6(array $person, $db, ?array $message = null, ?array $callback_qu
                 'input_field_placeholder' => 'هوش مصنوعی',
             ]
         ]);
-        $db->update('persons', ['last_btn' => 6, 'progress' => null], ['id' => $person['id']]);
+        $db->update(
+            table: 'persons',
+            data: ['last_btn' => 6, 'progress' => null],
+            conditions: ['id' => $person['id']]
+        );
     }
     exit();
 }
@@ -1002,11 +1165,34 @@ function level_6(array $person, $db, ?array $message = null, ?array $callback_qu
 //          DATA FETCHING & UI HELPERS
 // ==========================================
 
-function getLoanWithInstallments($loan_id, $person_id, $db)
+function getLoanWithInstallments($loan_id, $person_id, DatabaseManager $db)
 {
-    $loan = $db->read('loans l', ['l.id' => $loan_id, 'l.person_id' => $person_id], true,
-        'l.*, CAST(CONCAT("[", IFNULL(GROUP_CONCAT(JSON_OBJECT("id", i.id, "loan_id", i.loan_id, "amount", i.amount, "due_date", i.due_date, "is_paid", i.is_paid) ORDER BY i.due_date ASC), ""), "]") AS JSON) as installments',
-        'JOIN installments i on i.loan_id = l.id', 'l.id'
+    $loan = $db->read(
+        table: 'loans l',
+        conditions: [
+            'l.id' => $loan_id,
+            'l.person_id' => $person_id
+        ],
+        single: true,
+        selectColumns: '
+            l.*,
+            CAST(
+                CONCAT(
+                    "[", IFNULL(
+                        GROUP_CONCAT(
+                            JSON_OBJECT(
+                                "id", i.id, 
+                                "loan_id", i.loan_id, 
+                                "amount", i.amount, 
+                                "due_date", i.due_date, 
+                                "is_paid", i.is_paid
+                            ) ORDER BY i.due_date ASC
+                        ), ""
+                    ), "]"
+                ) AS JSON
+            ) as installments',
+        join: 'JOIN installments i on i.loan_id = l.id',
+        groupBy: 'l.id'
     );
     if ($loan) $loan['installments'] = json_decode($loan['installments'], true);
     return $loan;
