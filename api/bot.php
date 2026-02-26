@@ -367,19 +367,19 @@ function handleHoldingsWebAppData(array $person, array $message, DatabaseManager
     $action = $web_app_data['action'] ?? null;
 
     if ($action === 'add') {
-        $holding = $web_app_data['holding'];
+        $new_holding = $web_app_data['holding'];
 
         try {
             $db->create(
                 table: 'holdings',
                 data: [
                     "person_id" => $person['id'],
-                    "asset_id" => $holding["asset_id"],
-                    "amount" => $holding["amount"],
-                    "avg_price" => $holding["avg_price"],
-                    "date" => $holding["date"],
-                    "time" => $holding["time"],
-                    "note" => $holding["note"],
+                    "asset_id" => $new_holding["asset_id"],
+                    "amount" => $new_holding["amount"],
+                    "avg_price" => $new_holding["avg_price"],
+                    "date" => $new_holding["date"],
+                    "time" => $new_holding["time"],
+                    "note" => $new_holding["note"],
                 ]);
             sendToTelegram('sendMessage', [
                 'text' => '✅ دارایی جدید با موفقیت ثبت شد.',
@@ -390,17 +390,21 @@ function handleHoldingsWebAppData(array $person, array $message, DatabaseManager
 
         } catch (PDOException $e) {
             if ($e->errorInfo[1] == 1062) {
-                $holding = $db->read(
-                    table: 'holdings',
-                    conditions: [
-                        'person_id' => $person['id'],
-                        "asset_id" => $holding["asset_id"],
-                    ],
-                    single: true
-                );
+
+                // TODO: Add new transaction
+//                $holding = $db->read(
+//                    table: 'holdings',
+//                    conditions: [
+//                        'person_id' => $person['id'],
+//                        "asset_id" => $new_holding["asset_id"],
+//                    ],
+//                    single: true
+//                );
 
                 sendToTelegram('sendMessage', [
-                    'text' => json_encode($holding, JSON_PRETTY_PRINT),
+                    'text' => '
+                        شما از قبل این دارایی را در سیستم ثبت کرده اید.' . "\n" .
+                        'درصورت تمایل برای ثبت تغییرات، دارایی ثبت شده را ویرایش کنید.',
                     'chat_id' => $person['chat_id']
                 ]);
                 exit();
