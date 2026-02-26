@@ -334,69 +334,78 @@ function cancelButton(array $person, $db): void
 #[NoReturn]
 function level_1(array $person, $db, ?array $message = null, ?array $callback_query = null): void
 {
-    if ($callback_query) {
-        handleHoldingsCallback($person, $callback_query, $message, $db);
-    } elseif ($message) {
-        if (isset($message['web_app_data'])) {
+    if ($callback_query) handleHoldingsCallback($person, $callback_query, $message);
+    if ($message) {
+        if (isset($message['web_app_data']))
             handleHoldingsWebAppData($person, $message, $db);
-        } else {
+        else
             handleHoldingsDeepLink($person, $message, $db);
-        }
     } else {
         renderHoldingsMainView($person, $db);
     }
     exit();
 }
 
+#[NoReturn]
 function handleHoldingsCallback(array $person, array $callback_query, array $message): void
 {
     sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
-    $query_data = json_decode($callback_query['data'], true);
+//    $query_data = json_decode($callback_query['data'], true);
 
-    if ($query_data !== 'null') {
-        sendToTelegram('editMessageText', [
-            'chat_id' => $person['chat_id'],
-            'message_id' => $message['message_id'],
-            'text' => 'این پیام منقضی شده است.'
-        ]);
-    }
+    sendToTelegram('editMessageText', [
+        'chat_id' => $person['chat_id'],
+        'message_id' => $message['message_id'],
+        'text' => 'این پیام منقضی شده است.'
+    ]);
+    exit();
 }
 
+#[NoReturn]
 function handleHoldingsWebAppData(array $person, array $message, DatabaseManager $db): void
 {
+    $data_to_send = [
+        'text' => 'پیام نامفهوم است.',
+        'chat_id' => $person['chat_id']
+    ];
+
     $web_app_data = json_decode($message['web_app_data']['data'], true);
     $action = $web_app_data['action'] ?? null;
-    $text = 'پیام نامفهوم است.';
 
     if ($action === 'add') {
         $holding = $web_app_data['holding'];
-        $result = $db->create(
-            table: 'holdings',
-            data: [
-                "person_id" => $person['id'],
-                "asset_id" => $holding["asset_id"],
-                "amount" => $holding["amount"],
-                "avg_price" => $holding["avg_price"],
-                "date" => $holding["date"],
-                "time" => $holding["time"],
-                "note" => $holding["note"],
-            ]);
-        $text = $result ? '✅ دارایی جدید با موفقیت ثبت شد.' : '❌ خطای پایگاه داده در ثبت دارایی جدید.';
+
+        try {
+            $db->create(
+                table: 'holdings',
+                data: [
+                    "person_id" => $person['id'],
+                    "asset_id" => $holding["asset_id"],
+                    "amount" => $holding["amount"],
+                    "avg_price" => $holding["avg_price"],
+                    "date" => $holding["date"],
+                    "time" => $holding["time"],
+                    "note" => $holding["note"],
+                ]);
+            $data_to_send['text'] = '✅ دارایی جدید با موفقیت ثبت شد.';
+        } catch (PDOException $e) {
+//            $data_to_send['text'] = '❌ خطای پایگاه داده در ثبت دارایی جدید.';
+            $data_to_send['text'] = json_encode($e->errorInfo, JSON_PRETTY_PRINT);
+        }
     } elseif ($action === 'edit') {
         $result = $db->update(
             table: 'holdings',
             data: $web_app_data['updates'],
             conditions: ['id' => $web_app_data['id']]);
-        $text = $result ? '✅ دارایی با موفقیت ویرایش ثبت شد.' : '❌ خطای پایگاه داده در ویرایش دارایی.';
+        $data_to_send['text'] = $result ? '✅ دارایی با موفقیت ویرایش ثبت شد.' : '❌ خطای پایگاه داده در ویرایش دارایی.';
     } elseif ($action === 'delete') {
         $result = $db->delete(
             table: 'holdings',
             conditions: ['id' => $web_app_data['id']],
             resetAutoIncrement: true);
-        $text = $result ? '✅ دارایی با موفقیت حذف شد.' : '❌ خطای پایگاه داده درحذف دارایی.';
+        $data_to_send['text'] = $result ? '✅ دارایی با موفقیت حذف شد.' : '❌ خطای پایگاه داده درحذف دارایی.';
     }
 
-    sendToTelegram('sendMessage', ['chat_id' => $person['chat_id'], 'text' => $text]);
+    sendToTelegram('sendMessage', $data_to_send);
 
     // Clear progress and return to main view
     $db->update(
@@ -405,6 +414,7 @@ function handleHoldingsWebAppData(array $person, array $message, DatabaseManager
         conditions: ['id' => $person['id']]);
     $person['progress'] = null;
     renderHoldingsMainView($person, $db);
+    exit();
 }
 
 function handleHoldingsDeepLink(array $person, array $message, DatabaseManager $db): void

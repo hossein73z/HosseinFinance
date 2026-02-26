@@ -34,6 +34,7 @@ class DatabaseManager
      * @param string $user Database username
      * @param string $pass Database password
      * @param int|string $port Database port
+     * @throws Exception If connection fails
      */
     private function __construct(string $host, string $db, string $user, string $pass, int|string $port)
     {
@@ -67,15 +68,12 @@ class DatabaseManager
         } catch (PDOException $e) {
             // Log error internally and throw generic error to prevent leaking creds
             error_log("Database connection failed: " . $e->getMessage());
-            die("Database connection failed. Check server logs.");
+            throw new Exception("Database connection failed. Check server logs.");
         }
     }
 
     /**
      * Gets the singleton instance of the DatabaseManager.
-     *
-     * NOTE: On the FIRST call, you MUST provide $host, $db, $user, and $pass.
-     * On subsequent calls, you can leave them null to retrieve the existing instance.
      *
      * @param string|null $host
      * @param string|null $db
@@ -95,30 +93,21 @@ class DatabaseManager
     ): DatabaseManager
     {
         if (self::$instance === null) {
-            // If instance doesn't exist, we absolutely need credentials
             if (!$host || !$db || !$user) {
                 throw new Exception("DatabaseManager not initialized. Host, Database, and User parameters are required for the first call.");
             }
 
-            // Allow empty password (some local setups), but convert null to string
             $pass = $pass ?? '';
-
             self::$instance = new self($host, $db, $user, $pass, $port);
         }
 
         return self::$instance;
     }
 
-    /**
-     * Prevents cloning of the instance.
-     */
     private function __clone()
     {
     }
 
-    /**
-     * Prevents unserialization.
-     */
     public function __wakeup()
     {
         throw new Exception("Cannot unserialize a singleton.");
@@ -152,33 +141,25 @@ class DatabaseManager
         $params = [];
 
         foreach ($conditions as $key => $value) {
-            // 1. Detect Negation and Strip '!'
             $isNegation = false;
             $column = $key;
 
             if (str_starts_with($key, '!')) {
                 $isNegation = true;
-                $column = substr($key, 1); // Remove the '!'
+                $column = substr($key, 1);
             }
 
-            // 2. Determine SQL syntax (Backticks vs Raw)
             if (str_contains($column, '->') || str_contains($column, '.')) {
                 $columnSql = $column;
             } else {
                 $columnSql = "`$column`";
             }
 
-            // 3. Create safe placeholder name base
-            // We include a "not_" prefix in the placeholder to avoid collisions
-            // if both "id" and "!id" are passed in the same array.
             $sanitizedColumn = preg_replace('/[^a-zA-Z0-9_]/', '', $column);
             $paramPrefix = $isNegation ? 'not_' : '';
 
             if (is_array($value)) {
                 if (empty($value)) {
-                    // Optimization:
-                    // 'id IN []' is IMPOSSIBLE (1=0)
-                    // 'id NOT IN []' is ALWAYS TRUE (1=1) - logic being nothing is in an empty list
                     $whereParts[] = $isNegation ? '1 = 1' : '1 = 0';
                     continue;
                 }
@@ -221,20 +202,19 @@ class DatabaseManager
         return $data;
     }
 
-
     // ------------------------------------------------------------------------
     // --- CRUD Operations ----------------------------------------------------
     // ------------------------------------------------------------------------
 
     /**
      * Executes a raw SQL query with optional parameters.
-     * Useful for setting session variables or running custom queries.
      *
      * @param string $sql The raw SQL query to execute.
      * @param array $params Optional array of parameters to bind.
-     * @return PDOStatement|bool Returns the PDOStatement on success, or false on failure.
+     * @return PDOStatement Returns the PDOStatement on success.
+     * @throws PDOException
      */
-    public function query(string $sql, array $params = []): PDOStatement|bool
+    public function query(string $sql, array $params = []): PDOStatement
     {
         try {
             $stmt = $this->pdo->prepare($sql);
@@ -242,14 +222,14 @@ class DatabaseManager
             return $stmt;
         } catch (PDOException $e) {
             error_log("QUERY operation failed: " . $e->getMessage());
-            return false;
+            throw $e;
         }
     }
 
-    public function create(string $table, array $data): int|bool
+    public function create(string $table, array $data): int
     {
         if (empty($data)) {
-            return false;
+            throw new InvalidArgumentException("Data array cannot be empty for create operation.");
         }
 
         $normalizedData = $this->normalizeDataForDb($data);
@@ -264,14 +244,14 @@ class DatabaseManager
             return (int)$this->pdo->lastInsertId();
         } catch (PDOException $e) {
             error_log("CREATE operation failed for table $table: " . $e->getMessage());
-            return false;
+            throw $e;
         }
     }
 
-    public function createBatch(string $table, array $dataRows): int|bool
+    public function createBatch(string $table, array $dataRows): int
     {
         if (empty($dataRows) || empty($dataRows[0])) {
-            return false;
+            throw new InvalidArgumentException("Data rows cannot be empty for createBatch operation.");
         }
 
         $normalizedDataRows = array_map([$this, 'normalizeDataForDb'], $dataRows);
@@ -294,24 +274,10 @@ class DatabaseManager
             return $stmt->rowCount();
         } catch (PDOException $e) {
             error_log("CREATE BATCH operation failed for table $table: " . $e->getMessage());
-            return false;
+            throw $e;
         }
     }
 
-    /**
-     * @param string $table Table name
-     * @param array $conditions Associative array for WHERE clause
-     * @param bool $single Return a single row?
-     * @param string $selectColumns Columns to select
-     * @param bool $distinct Use DISTINCT?
-     * @param string|array $join Can be a raw string or an array of join definitions
-     * @param string|array $groupBy Field(s) to group by (SQL Level)
-     * @param array $orderBy Order by definitions
-     * @param int|null $limit Limit results (SQL LIMIT)
-     * @param int $offset Offset results (SQL OFFSET)
-     * @param int|null $chunkSize Split the result into numerical chunks. If used with $chunkByColumn, chunks apply inside the groups.
-     * @param string|null $chunkByColumn Group the output array by the value of this column. (Converts 1/0 to "true"/"false").
-     */
     public function read(
         string       $table,
         array        $conditions = [],
@@ -373,13 +339,11 @@ class DatabaseManager
         $sql .= $groupByClause;
         $sql .= $orderByClause;
 
-        // Handle LIMIT/OFFSET for the query
         if ($single) {
             $sql .= " LIMIT 1";
         } elseif ($limit !== null && $limit > 0) {
             $sql .= ($offset > 0) ? " LIMIT $offset, $limit" : " LIMIT $limit";
         } elseif ($offset > 0) {
-            // Big number to accommodate offset without limit
             $sql .= " LIMIT $offset, 18446744073709551615";
         }
 
@@ -400,34 +364,25 @@ class DatabaseManager
             // --- 6. Post-Processing: Grouping by Column ---
             if ($chunkByColumn !== null && $chunkByColumn !== '') {
                 $groupedData = [];
-
                 foreach ($data as $row) {
                     $key = $row[$chunkByColumn] ?? 'undefined';
-
-                    // Explicitly handle Boolean-like values to ensure keys are "true"/"false"
                     if ($key === 1 || $key === '1' || $key === true) {
                         $key = 'true';
                     } elseif ($key === 0 || $key === '0' || $key === false) {
                         $key = 'false';
                     }
-
                     $groupedData[$key][] = $row;
                 }
-
-                // Replace main data with grouped data
                 $data = $groupedData;
             }
 
             // --- 7. Post-Processing: Numerical Chunking ---
             if ($chunkSize !== null && $chunkSize > 0) {
                 if ($chunkByColumn !== null && $chunkByColumn !== '') {
-                    // Case A: Grouped by Column AND Chunked by Size
-                    // We need to chunk the arrays inside the groups
                     foreach ($data as $groupKey => $rows) {
                         $data[$groupKey] = array_chunk($rows, $chunkSize);
                     }
                 } else {
-                    // Case B: Only Chunked by Size (Flat List)
                     $data = array_chunk($data, $chunkSize);
                 }
             }
@@ -436,13 +391,15 @@ class DatabaseManager
 
         } catch (PDOException $e) {
             error_log("READ operation failed: " . $e->getMessage());
-            return false;
+            throw $e;
         }
     }
 
-    public function update(string $table, array $data, array $conditions): int|bool
+    public function update(string $table, array $data, array $conditions): int
     {
-        if (empty($data) || empty($conditions)) return false;
+        if (empty($data) || empty($conditions)) {
+            throw new InvalidArgumentException("Data and conditions cannot be empty for update operation.");
+        }
 
         $normalizedData = $this->normalizeDataForDb($data);
         $setParts = [];
@@ -456,8 +413,7 @@ class DatabaseManager
 
         $where = $this->buildWhere($conditions, 'where_upd');
         if (empty($where['clause'])) {
-            error_log("UPDATE operation failed for table $table: Missing WHERE conditions.");
-            return false;
+            throw new InvalidArgumentException("Missing WHERE conditions for update operation on table $table.");
         }
 
         $sql = "UPDATE `$table` SET $setFields WHERE " . $where['clause'];
@@ -469,13 +425,15 @@ class DatabaseManager
             return $stmt->rowCount();
         } catch (PDOException $e) {
             error_log("UPDATE operation failed for table $table: " . $e->getMessage());
-            return false;
+            throw $e;
         }
     }
 
     public function upsert(string $table, array $data): int|bool
     {
-        if (empty($data)) return false;
+        if (empty($data)) {
+            throw new InvalidArgumentException("Data array cannot be empty for upsert operation.");
+        }
 
         $normalizedData = $this->normalizeDataForDb($data);
         $fields = array_keys($normalizedData);
@@ -498,13 +456,15 @@ class DatabaseManager
             return ($lastId > 0) ? (int)$lastId : true;
         } catch (PDOException $e) {
             error_log("UPSERT operation failed for table $table: " . $e->getMessage());
-            return false;
+            throw $e;
         }
     }
 
-    public function upsertBatch(string $table, array $dataRows): int|bool
+    public function upsertBatch(string $table, array $dataRows): int
     {
-        if (empty($dataRows) || empty($dataRows[0])) return false;
+        if (empty($dataRows) || empty($dataRows[0])) {
+            throw new InvalidArgumentException("Data rows cannot be empty for upsertBatch operation.");
+        }
 
         $normalizedDataRows = array_map([$this, 'normalizeDataForDb'], $dataRows);
         $fields = array_keys($normalizedDataRows[0]);
@@ -535,20 +495,19 @@ class DatabaseManager
             return $stmt->rowCount();
         } catch (PDOException $e) {
             error_log("UPSERT BATCH operation failed for table $table: " . $e->getMessage());
-            return false;
+            throw $e;
         }
     }
 
-    public function delete(string $table, array $conditions, bool $resetAutoIncrement = false): int|bool
+    public function delete(string $table, array $conditions, bool $resetAutoIncrement = false): int
     {
         if (empty($conditions)) {
-            error_log("DELETE operation failed for table $table: Missing WHERE conditions.");
-            return false;
+            throw new InvalidArgumentException("Missing WHERE conditions for delete operation on table $table.");
         }
 
         $where = $this->buildWhere($conditions);
         if (empty($where['clause'])) {
-            return false;
+            throw new InvalidArgumentException("Invalid WHERE conditions for delete operation on table $table.");
         }
 
         $sql = "DELETE FROM `$table` WHERE " . $where['clause'];
@@ -558,6 +517,7 @@ class DatabaseManager
             $stmt->execute($where['params']);
             $rowCount = $stmt->rowCount();
 
+            // We do not re-throw if auto-increment reset fails, since the primary deletion was successful
             if ($rowCount > 0 && $resetAutoIncrement) {
                 try {
                     $resetSql = "ALTER TABLE `$table` AUTO_INCREMENT = 1";
@@ -569,7 +529,7 @@ class DatabaseManager
             return $rowCount;
         } catch (PDOException $e) {
             error_log("DELETE operation failed for table $table: " . $e->getMessage());
-            return false;
+            throw $e;
         }
     }
 }
