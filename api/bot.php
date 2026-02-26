@@ -290,6 +290,7 @@ function choosePath(
 
 /**
  * Logic for 'Back' button.
+ * IMPORTANT: Needs modifications in case of multistep progress
  */
 #[NoReturn]
 function backButton(array $person, DatabaseManager $db): void
@@ -303,14 +304,15 @@ function backButton(array $person, DatabaseManager $db): void
 
     if ($progress) {
         $person['progress'] = null;
-        choosePath(pressed_button: $current_level, message: false, person: $person, db: $db);
+        normalButtonHandler(person: $person, pressed_button: $current_level, db: $db);
     } else {
         $last_level = $db->read(
             table: 'buttons',
             conditions: ['id' => $current_level['belong_to']],
-            single: true);
+            single: true
+        );
         $person['progress'] = null;
-        choosePath(pressed_button: $last_level, person: $person, db: $db);
+        normalButtonHandler(person: $person, pressed_button: $last_level, db: $db);
     }
 }
 
