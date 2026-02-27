@@ -60,6 +60,44 @@ class Button implements JsonSerializable
         return $this->keyboards;
     }
 
+    // --- Setters ---
+
+    public function setId(string $id): self
+    {
+        $this->id = $id;
+        return $this;
+    }
+
+    public function setAttrs(array $attrs): self
+    {
+        $this->attrs = $attrs;
+        return $this;
+    }
+
+    public function setAdminKey(bool $adminKey): self
+    {
+        $this->adminKey = $adminKey;
+        return $this;
+    }
+
+    public function setMessages(?string $messages): self
+    {
+        $this->messages = $messages;
+        return $this;
+    }
+
+    public function setBelongTo(?string $belongTo): self
+    {
+        $this->belongTo = $belongTo;
+        return $this;
+    }
+
+    public function setKeyboards(?array $keyboards): self
+    {
+        $this->keyboards = $keyboards;
+        return $this;
+    }
+
     // --- Helper Methods ---
 
     public function getText(): string
@@ -86,15 +124,12 @@ class Button implements JsonSerializable
 
     // --- JsonSerializable Implementation ---
 
-    /**
-     * Specify data which should be serialized to JSON
-     */
     public function jsonSerialize(): mixed
     {
         return [
             'id' => $this->id,
             'attrs' => $this->attrs,
-            'text' => $this->getText(), // Automatically exposed in JSON for convenience!
+            'text' => $this->getText(),
             'admin_key' => $this->adminKey,
             'messages' => $this->messages,
             'belong_to' => $this->belongTo,

@@ -74,27 +74,68 @@ class Person implements JsonSerializable
         return $this->lastBtn;
     }
 
+    // --- Setters ---
+
+    public function setId(?int $id): self
+    {
+        $this->id = $id;
+        return $this;
+    }
+
+    public function setChatId(int $chatId): self
+    {
+        $this->chatId = $chatId;
+        return $this;
+    }
+
+    public function setFirstName(string $firstName): self
+    {
+        $this->firstName = $firstName;
+        return $this;
+    }
+
+    public function setLastName(?string $lastName): self
+    {
+        $this->lastName = $lastName;
+        return $this;
+    }
+
+    public function setUsername(?string $username): self
+    {
+        $this->username = $username;
+        return $this;
+    }
+
+    public function setProgress(?string $progress): self
+    {
+        $this->progress = $progress;
+        return $this;
+    }
+
+    public function setIsAdmin(bool $isAdmin): self
+    {
+        $this->isAdmin = $isAdmin;
+        return $this;
+    }
+
+    public function setLastBtn(string $lastBtn): self
+    {
+        $this->lastBtn = $lastBtn;
+        return $this;
+    }
+
     // --- Helper Methods ---
 
-    /**
-     * Gets the full name by safely combining first and last name
-     */
     public function getFullName(): string
     {
         return trim($this->firstName . ' ' . ($this->lastName ?? ''));
     }
 
-    /**
-     * Formats an @ username if one exists
-     */
     public function getMention(): string
     {
         return $this->username ? '@' . $this->username : $this->firstName;
     }
 
-    /**
-     * Prepares data for inserting/updating the database
-     */
     public function toDbArray(): array
     {
         return [
@@ -111,9 +152,6 @@ class Person implements JsonSerializable
 
     // --- JsonSerializable Implementation ---
 
-    /**
-     * Specify data which should be serialized to JSON
-     */
     public function jsonSerialize(): mixed
     {
         return [
@@ -121,7 +159,7 @@ class Person implements JsonSerializable
             'chat_id' => $this->chatId,
             'first_name' => $this->firstName,
             'last_name' => $this->lastName,
-            'full_name' => $this->getFullName(), // Automatically exposed in JSON for convenience!
+            'full_name' => $this->getFullName(),
             'username' => $this->username,
             'progress' => $this->progress,
             'is_admin' => $this->isAdmin,
