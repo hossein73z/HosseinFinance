@@ -7,9 +7,9 @@
  * @param int|string $parent_btn_id The ID of the parent button whose keyboard contained the pressed button.
  * @param bool $admin Whether the user is an admin.
  * @param DatabaseManager $db The database manager instance.
- * @return array|null The details of the pressed button, or an empty array if not found.
+ * @return Button|null The Button instance of the pressed button, or null if not found.
  */
-function getPressedButton(string $text, int|string $parent_btn_id, bool $admin, DatabaseManager $db): array|null
+function getPressedButton(string $text, int|string $parent_btn_id, bool $admin, DatabaseManager $db): ?Button
 {
     // Get the IDs of all buttons in the parent's keyboard.
     $ids = getKeyboardsIDs($parent_btn_id, $db);
@@ -17,9 +17,7 @@ function getPressedButton(string $text, int|string $parent_btn_id, bool $admin, 
 
     $admin = ($admin) ? [true, false] : false;
 
-    // Search for a button with the given text among the merged IDs using JSON extraction.
-    // We use the TiDB/MySQL inline JSON extraction operator `->>` (equivalent to JSON_UNQUOTE(JSON_EXTRACT(...))).
-    $pressed_button = $db->read(
+    $pressed_button_row = $db->read(
         table: 'buttons',
         conditions: [
             'id' => $ids['merged'],
@@ -29,8 +27,12 @@ function getPressedButton(string $text, int|string $parent_btn_id, bool $admin, 
         single: true
     );
 
-    if ($pressed_button) return $pressed_button;
-    else return null;
+    // If a row is found, convert the array into a Button object
+    if ($pressed_button_row) {
+        return Button::fromDbRow($pressed_button_row);
+    }
+
+    return null;
 }
 
 /**

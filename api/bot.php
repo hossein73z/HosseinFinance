@@ -25,6 +25,7 @@ require_once 'Libraries/DatabaseManager.php';
 require_once 'Functions/ExternalEndpointsFunctions.php';
 require_once 'Functions/KeyboardFunctions.php';
 require_once 'Functions/StringHelper.php';
+require_once 'Models/Button.php';
 
 // --- INITIALIZATION & SHUTDOWN ---
 
@@ -207,42 +208,42 @@ function callbackHandler(array $person, array $callback_query, DatabaseManager $
 }
 
 #[NoReturn]
-function specialButtonHandler(array $person, array $pressed_button, DatabaseManager $db): void
+function specialButtonHandler(array $person, Button $pressed_button, DatabaseManager $db): void
 {
-    if ($pressed_button['id'] === "s0") backButton($person, $db);
-    if ($pressed_button['id'] === "s1") cancelButton($person, $db);
+    if ($pressed_button->getId() === "s0") backButton($person, $db);
+    if ($pressed_button->getId() === "s1") cancelButton($person, $db);
     exit();
 }
 
 #[NoReturn]
-function normalButtonHandler(array $person, array $pressed_button, DatabaseManager $db): void
+function normalButtonHandler(array $person, Button $pressed_button, DatabaseManager $db): void
 {
-    if ($pressed_button['id'] == 1) level_1(person: $person, db: $db);
-    if ($pressed_button['id'] == 2) level_2(person: $person, db: $db);
-    if ($pressed_button['id'] == 5) level_5(person: $person, db: $db);
-    if ($pressed_button['id'] == 6) level_6(person: $person, db: $db);
+    // Update user's last button to current button and remove their progress
+    $db->update(
+        table: 'persons',
+        data: ['last_btn' => $pressed_button['id'], 'progress' => null],
+        conditions: ['id' => $person['id']]
+    );
+
+    // Route the button to corresponding level
+    if ($pressed_button->getId() == 1) level_1(person: $person, db: $db);
+    if ($pressed_button->getId() == 2) level_2(person: $person, db: $db);
+    if ($pressed_button->getId() == 5) level_5(person: $person, db: $db);
+    if ($pressed_button->getId() == 6) level_6(person: $person, db: $db);
 
     // Default Actions for normal button
     $btnAttrs = json_decode($pressed_button['attrs'], true);
-    $response = sendToTelegram('sendMessage', [
+    sendToTelegram('sendMessage', [
         'text' => $btnAttrs['text'],
         'chat_id' => $person['chat_id'],
         'reply_markup' => [
-            'keyboard' => createKeyboardsArray($pressed_button['id'], $person['is_admin'], $db),
+            'keyboard' => createKeyboardsArray($pressed_button->getId(), $person['is_admin'], $db),
             'resize_keyboard' => true,
             'is_persistent' => true,
             'input_field_placeholder' => $btnAttrs['text'],
         ]
     ]);
 
-    // Only update user's last_btn if the message is sent successfully
-    if ($response) {
-        $db->update(
-            table: 'persons',
-            data: ['last_btn' => $pressed_button['id'], 'progress' => null],
-            conditions: ['id' => $person['id']]
-        );
-    }
     exit();
 }
 
@@ -273,7 +274,7 @@ function nonButtonHandler(array $person, array $message, DatabaseManager $db): v
  */
 #[NoReturn]
 function choosePath(
-    ?array          $pressed_button = null,
+    ?Button         $pressed_button = null,
     ?array          $message = null,
     ?array          $person = null,
     ?array          $callback_query = null,
@@ -301,18 +302,21 @@ function backButton(array $person, DatabaseManager $db): void
         conditions: ['id' => $person['last_btn']],
         single: true
     );
+    $current_btn = Button::fromDbRow($current_level);
 
     if ($progress) {
         $person['progress'] = null;
-        normalButtonHandler(person: $person, pressed_button: $current_level, db: $db);
+        normalButtonHandler(person: $person, pressed_button: $current_btn, db: $db);
     } else {
         $last_level = $db->read(
             table: 'buttons',
             conditions: ['id' => $current_level['belong_to']],
             single: true
         );
+
+        $last_btn = Button::fromDbRow($last_level);
         $person['progress'] = null;
-        normalButtonHandler(person: $person, pressed_button: $last_level, db: $db);
+        normalButtonHandler(person: $person, pressed_button: $last_btn, db: $db);
     }
 }
 
@@ -332,16 +336,44 @@ function cancelButton(array $person, $db): void
 // ==========================================
 
 #[NoReturn]
-function level_1(array $person, $db, ?array $message = null, ?array $callback_query = null): void
+function level_1(
+    array           $person,
+    Button          $pressed_button,
+    DatabaseManager $db,
+    ?array          $message = null,
+    ?array          $callback_query = null): void
 {
-    if ($callback_query) handleHoldingsCallback($person, $callback_query, $message);
-    if ($message) {
-        if (isset($message['web_app_data']))
-            handleHoldingsWebAppData($person, $message, $db);
-        else
-            handleHoldingsDeepLink($person, $message, $db);
-    } else {
-        renderHoldingsMainView($person, $db);
+    $keyboard = createKeyboardsArray(parent_btn_id: $pressed_button->getId(), admin: $person['is_admin'], db: $db);
+    array_unshift($keyboard, [createWebAppBtn('➕ افزودن دارایی جدید', '/assets/add_holding.html')]);
+
+    $data = [
+        'chat_id' => $person['chat_id'],
+        'text' => 'پیام نامفهوم است.',
+        'reply_markup' => [
+            'keyboard' => $keyboard,
+            'resize_keyboard' => true,
+            'is_persistent' => true,
+            'input_field_placeholder' => $pressed_button->getText()
+        ]
+    ];
+
+    if ($callback_query)
+        handleHoldingsCallback($person, $callback_query, $message);
+
+    if ($message && isset($message['web_app_data']))
+        handleHoldingsWebAppData($person, $message, $db);
+    if ($message && !isset($message['web_app_data']))
+        handleHoldingsTextMessage($person, $message, $db);
+
+    if (!$message && !$callback_query) {
+
+        sendAllHoldings($person, $db);
+
+        $db->update(
+            table: 'persons',
+            data: ['last_btn' => 1, 'progress' => null],
+            conditions: ['id' => $person['id']]
+        );
     }
     exit();
 }
@@ -350,7 +382,7 @@ function level_1(array $person, $db, ?array $message = null, ?array $callback_qu
 function handleHoldingsCallback(array $person, array $callback_query, array $message): void
 {
     sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
-//    $query_data = json_decode($callback_query['data'], true);
+    // $query_data = json_decode($callback_query['data'], true);
 
     sendToTelegram('editMessageText', [
         'chat_id' => $person['chat_id'],
@@ -365,6 +397,10 @@ function handleHoldingsWebAppData(array $person, array $message, DatabaseManager
 {
     $web_app_data = json_decode($message['web_app_data']['data'], true);
     $action = $web_app_data['action'] ?? null;
+
+    $keyboard = createKeyboardsArray(1, $person['is_admin'], $db);
+    array_unshift($keyboard, [createWebAppBtn('➕ افزودن دارایی جدید', '/assets/add_holding.html')]);
+
 
     if ($action === 'add') {
         $new_holding = $web_app_data['holding'];
@@ -385,35 +421,26 @@ function handleHoldingsWebAppData(array $person, array $message, DatabaseManager
                 'text' => '✅ دارایی جدید با موفقیت ثبت شد.',
                 'chat_id' => $person['chat_id']
             ]);
-
             exit();
 
         } catch (PDOException $e) {
-            if ($e->errorInfo[1] == 1062) {
-
-                // TODO: Add new transaction
-//                $holding = $db->read(
-//                    table: 'holdings',
-//                    conditions: [
-//                        'person_id' => $person['id'],
-//                        "asset_id" => $new_holding["asset_id"],
-//                    ],
-//                    single: true
-//                );
-
+            if ($e->errorInfo[1] == 1062)
                 sendToTelegram('sendMessage', [
                     'text' => '
                         شما از قبل این دارایی را در سیستم ثبت کرده اید.' . "\n" .
                         'درصورت تمایل برای ثبت تغییرات، دارایی ثبت شده را ویرایش کنید.',
                     'chat_id' => $person['chat_id']
                 ]);
-                exit();
 
-            } else
+            else
                 sendToTelegram('sendMessage', [
                     'text' => '❌ خطای پایگاه داده در ثبت دارایی جدید: ' . $e->errorInfo[2],
                     'chat_id' => $person['chat_id']
                 ]);
+
+            error_log(
+                'Holding: ' . json_encode($new_holding) . "\n" .
+                'Error: ' . json_encode($e->errorInfo, JSON_PRETTY_PRINT));
             exit();
 
         }
@@ -450,12 +477,11 @@ function handleHoldingsWebAppData(array $person, array $message, DatabaseManager
         'chat_id' => $person['chat_id']
     ]);
 
-    $person['progress'] = null;
-    renderHoldingsMainView($person, $db);
     exit();
 }
 
-function handleHoldingsDeepLink(array $person, array $message, DatabaseManager $db): void
+// TODO: Meke it noReturn
+function handleHoldingsTextMessage(array $person, array $message, DatabaseManager $db): void
 {
     $matched = preg_match('/^\/start viewHolding_holdingId(\d+)(_mssgId(\d+))?$/m', $message['text'], $matches);
     $text = 'پیام نامفهوم است!';
@@ -509,23 +535,9 @@ function handleHoldingsDeepLink(array $person, array $message, DatabaseManager $
     sendToTelegram('sendMessage', ['chat_id' => $person['chat_id'], 'text' => $text]);
 }
 
-function renderHoldingsMainView(array $person, DatabaseManager $db): void
+function sendAllHoldings(array $person, DatabaseManager $db): void
 {
     $keyboard = createKeyboardsArray(1, $person['is_admin'], $db);
-
-    // Add App Buttons
-    $progress = json_decode($person['progress'], true);
-    if ($progress && key($progress) === 'view_holding') {
-        $holding = $db->read(
-            table: 'holdings',
-            conditions: ['id' => $progress['view_holding']['holding_id'], 'person_id' => $person['id']],
-            single: true);
-        if ($holding) {
-            array_unshift($keyboard, [
-                createWebAppBtn('✏ ویرایش', '/assets/add_holding.html', ['data' => base64_encode(json_encode($holding))])
-            ]);
-        }
-    }
     array_unshift($keyboard, [createWebAppBtn('➕ افزودن دارایی جدید', '/assets/add_holding.html')]);
 
     sendToTelegram('sendMessage', [
@@ -576,12 +588,92 @@ function renderHoldingsMainView(array $person, DatabaseManager $db): void
     } else {
         sendToTelegram('sendMessage', ['chat_id' => $person['chat_id'], 'text' => 'شما هیچ دارایی‌ای ثبت نکرده‌اید.']);
     }
-
-    $db->update(
-        table: 'persons',
-        data: ['last_btn' => 1, 'progress' => null],
-        conditions: ['id' => $person['id']]);
 }
+
+//function sendAllHoldings(array $person, DatabaseManager $db): void
+//{
+//    $keyboard = createKeyboardsArray(1, $person['is_admin'], $db);
+//
+//    // Add App Buttons
+//    $progress = json_decode($person['progress'], true);
+//    if ($progress && key($progress) === 'view_holding') {
+//        $holding = $db->read(
+//            table: 'holdings h',
+//            conditions: [
+//                'h.id' => $progress['view_holding']['holding_id'],
+//                'h.person_id' => $person['id']
+//            ],
+//            single: true,
+//            selectColumns: '
+//                h.*,
+//                a.name as asset_name,
+//                a.price as current_price,
+//                a.base_currency,
+//                a.exchange_rate as base_rate',
+//            join: 'INNER JOIN assets a ON h.asset_id = a.id'
+//        );
+//        if ($holding) {
+//            array_unshift($keyboard, [
+//                createWebAppBtn('✏ ویرایش ' . $holding['asset_name'], '/assets/add_holding.html', ['data' => base64_encode(json_encode($holding))])
+//            ]);
+//        }
+//    }
+//    array_unshift($keyboard, [createWebAppBtn('➕ افزودن دارایی جدید', '/assets/add_holding.html')]);
+//
+//    sendToTelegram('sendMessage', [
+//        'chat_id' => $person['chat_id'],
+//        'text' => 'دارایی‌ها',
+//        'reply_markup' => [
+//            'keyboard' => $keyboard,
+//            'resize_keyboard' => true,
+//            'is_persistent' => true,
+//            'input_field_placeholder' => 'دارایی‌ها'
+//        ]
+//    ]);
+//
+//    $holdings = $db->read(
+//        table: 'holdings h',
+//        conditions: [
+//            'person_id' => $person['id']
+//        ],
+//        selectColumns: '
+//            h.*,
+//            a.name as asset_name,
+//            a.price as current_price,
+//            a.base_currency,
+//            a.exchange_rate as base_rate',
+//        join: 'INNER JOIN assets a ON h.asset_id = a.id');
+//
+//    if ($holdings) {
+//        $temp_mssg = sendLoadingMessage($person['chat_id'], 'در حال دریافت اطلاعات دارایی‌ها ...');
+//        if ($temp_mssg) {
+//            $text = "دارایی‌های ثبت شده‌ی شما:\n";
+//            $total_profit = 0;
+//
+//            foreach ($holdings as $holding) {
+//                $total_profit += $holding['amount'] * ($holding['current_price'] - $holding['avg_price']) * $holding['base_rate'];
+//                $text .= "\n" . createHoldingDetailText($holding, 'MarkdownV2', ['org_amount', 'org_total_price', 'profit'], $temp_mssg['result']['message_id']);
+//            }
+//
+//            $profit_text = ($total_profit >= 0) ? "🟢 کل سود: " . beautifulNumber($total_profit) . ' ریال' : "🔴 کل ضرر: " . beautifulNumber($total_profit) . ' ریال';
+//            $text .= "\n" . markdownScape($profit_text);
+//
+//            sendToTelegram('editMessageText', [
+//                'chat_id' => $person['chat_id'],
+//                'message_id' => $temp_mssg['result']['message_id'],
+//                'text' => $text,
+//                'parse_mode' => 'MarkdownV2'
+//            ]);
+//        }
+//    } else {
+//        sendToTelegram('sendMessage', ['chat_id' => $person['chat_id'], 'text' => 'شما هیچ دارایی‌ای ثبت نکرده‌اید.']);
+//    }
+//
+//    $db->update(
+//        table: 'persons',
+//        data: ['last_btn' => 1, 'progress' => null],
+//        conditions: ['id' => $person['id']]);
+//}
 
 
 // ==========================================
@@ -1304,7 +1396,19 @@ function sendLoadingMessage(string $chat_id, string $text): array|false
 //          TEXT FORMATTING HELPERS
 // ==========================================
 
-function createHoldingDetailText(array $holding, ?string $markdown = null, array $attributes = ['date', 'org_amount', 'org_price', 'new_price', 'org_total_price', 'new_total_price', 'profit'], ?string $mssg_id = null): string
+function createHoldingDetailText(
+    array   $holding,
+    ?string $markdown = null,
+    array   $attributes = [
+        'date',
+        'org_amount',
+        'org_price',
+        'new_price',
+        'org_total_price',
+        'new_total_price',
+        'profit'
+    ],
+    ?string $mssg_id = null): string
 {
     $date = preg_split('/-/u', $holding['date']);
     $months = ['فروردین', 'اردیبهشت', 'خرداد', 'تیر', 'مرداد', 'شهریور', 'مهر', 'آبان', 'آذر', 'دی', 'بهمن', 'اسفند'];
