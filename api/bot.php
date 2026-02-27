@@ -1411,7 +1411,7 @@ function level_6(Person $person, DatabaseManager $db, ?array $message = null, ?a
 
 function getLoansWithInstallments(array $conditions, DatabaseManager $db): bool|array
 {
-    $loan = $db->read(
+    $loans = $db->read(
         table: 'loans l',
         conditions: $conditions,
         selectColumns: '
@@ -1434,8 +1434,10 @@ function getLoansWithInstallments(array $conditions, DatabaseManager $db): bool|
         join: 'JOIN installments i on i.loan_id = l.id',
         groupBy: 'l.id'
     );
-    if ($loan) $loan['installments'] = json_decode($loan['installments'], true);
-    return $loan;
+    if ($loans)
+        foreach ($loans as &$loan)
+            $loan['installments'] = json_decode($loan['installments'], true);
+    return $loans;
 }
 
 function createWebAppBtn(string $text, string $path, array $params = []): array
