@@ -973,9 +973,6 @@ function sendAllLoans(Person $person, DatabaseManager $db): void
     $loans = getLoanWithInstallments(['l.person_id' => $person->getId()], $db);
 
     if ($loans) {
-        foreach ($loans as &$loan) {
-            $loan['installments'] = json_decode($loan['installments'], true);
-        }
 
         $temp_mssg = sendLoadingMessage($person->getChatId(), 'در حال دریافت اطلاعات وام‌ها ...');
         if ($temp_mssg) {
