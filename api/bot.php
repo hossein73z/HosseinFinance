@@ -221,8 +221,8 @@ function specialButtonHandler(Person $person, Button $pressed_button, DatabaseMa
 function normalButtonHandler(Person $person, Button $pressed_button, DatabaseManager $db): void
 {
     // Route the button to corresponding level
-    if ($pressed_button->getId() == 1) level_1(person: $person, db: $db);
-    if ($pressed_button->getId() == 2) level_2(person: $person, db: $db);
+    if ($pressed_button->getId() == 1) level_1(person: $person, db: $db, pressed_button: $pressed_button);
+    if ($pressed_button->getId() == 2) level_2(person: $person, db: $db, pressed_button: $pressed_button);
     if ($pressed_button->getId() == 5) level_5(person: $person, db: $db);
     if ($pressed_button->getId() == 6) level_6(person: $person, db: $db);
 
@@ -673,7 +673,7 @@ function level_2(
 ): void
 {
     // Initialize button object if null is given
-    if (!$pressed_button) $pressed_button = Button::fromDbRow($db->read('buttons', ['id' => 1], true));
+    if (!$pressed_button) $pressed_button = Button::fromDbRow($db->read('buttons', ['id' => 2], true));
 
     // Create keyboards
     $keyboard = createKeyboardsArray(parent_btn_id: $pressed_button->getId(), admin: $person->isAdmin(), db: $db);
