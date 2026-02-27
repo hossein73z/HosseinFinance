@@ -918,7 +918,7 @@ function handleLoansTextMessage(Person $person, array $data, array $message, Dat
 
         $installment = $db->read(
             table: 'installments i',
-            conditions: ['i.id' => $matches[1], 'i.person_id' => $person->getId()],
+            conditions: ['i.id' => $matches[1], 'l.person_id' => $person->getId()],
             single: true,
             selectColumns: 'i.*, l.person_id',
             join: 'LEFT JOIN loans l ON i.loan_id = l.id'
