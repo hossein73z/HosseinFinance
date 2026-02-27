@@ -105,6 +105,7 @@ function validateWebhookSecurity(string $input): void
 /**
  * Handles normal text messages, commands, and web app data.
  */
+#[NoReturn]
 function handleIncomingMessage(array $message, DatabaseManager $db): void
 {
     $person = getOrCreateUser($message['chat'], $db);
@@ -221,7 +222,7 @@ function normalButtonHandler(array $person, Button $pressed_button, DatabaseMana
     // Update user's last button to current button and remove their progress
     $db->update(
         table: 'persons',
-        data: ['last_btn' => $pressed_button['id'], 'progress' => null],
+        data: ['last_btn' => $pressed_button->getId(), 'progress' => null],
         conditions: ['id' => $person['id']]
     );
 
@@ -232,15 +233,14 @@ function normalButtonHandler(array $person, Button $pressed_button, DatabaseMana
     if ($pressed_button->getId() == 6) level_6(person: $person, db: $db);
 
     // Default Actions for normal button
-    $btnAttrs = json_decode($pressed_button['attrs'], true);
     sendToTelegram('sendMessage', [
-        'text' => $btnAttrs['text'],
+        'text' => $pressed_button->getText(),
         'chat_id' => $person['chat_id'],
         'reply_markup' => [
             'keyboard' => createKeyboardsArray($pressed_button->getId(), $person['is_admin'], $db),
             'resize_keyboard' => true,
             'is_persistent' => true,
-            'input_field_placeholder' => $btnAttrs['text'],
+            'input_field_placeholder' => $pressed_button->getText(),
         ]
     ]);
 
@@ -338,11 +338,12 @@ function cancelButton(array $person, $db): void
 #[NoReturn]
 function level_1(
     array           $person,
-    Button          $pressed_button,
     DatabaseManager $db,
+    ?Button         $pressed_button = null,
     ?array          $message = null,
     ?array          $callback_query = null): void
 {
+    if (!$pressed_button) $pressed_button = Button::fromDbRow($db->read('buttons', ['id' => 1], true));
     $keyboard = createKeyboardsArray(parent_btn_id: $pressed_button->getId(), admin: $person['is_admin'], db: $db);
     array_unshift($keyboard, [createWebAppBtn('➕ افزودن دارایی جدید', '/assets/add_holding.html')]);
 
