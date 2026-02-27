@@ -402,7 +402,6 @@ function handleHoldingsWebAppData(Person $person, array $data, array $message, D
     if ($action === 'add') {
 
         $new_holding = $web_app_data['holding'];
-
         try {
             $db->create(
                 table: 'holdings',
@@ -418,7 +417,6 @@ function handleHoldingsWebAppData(Person $person, array $data, array $message, D
 
             $data['text'] = '✅ دارایی جدید با موفقیت ثبت شد.';
             sendToTelegram('sendMessage', $data);
-            exit();
 
         } catch (PDOException $e) {
             if ($e->errorInfo[1] == 1062) {
@@ -457,52 +455,73 @@ function handleHoldingsWebAppData(Person $person, array $data, array $message, D
                     sendHoldingDetail($holding, $data);
                 }
 
-            } else
+                exit();
+
+            } else {
                 sendToTelegram('sendMessage', [
                     'text' => '❌ خطای پایگاه داده در ثبت دارایی جدید: ' . $e->errorInfo[2],
                     'chat_id' => $person->getChatId()
                 ]);
+                error_log(
+                    'Holding: ' . json_encode($new_holding) . "\n" .
+                    'Error: ' . json_encode($e->errorInfo, JSON_PRETTY_PRINT));
 
+            }
+        }
+        level_1($person, $db);
+    }
+    if ($action === 'edit') {
+        try {
+
+            $db->update(
+                table: 'holdings',
+                data: $web_app_data['updates'],
+                conditions: ['id' => $web_app_data['id']]
+            );
+
+            $data['text'] = '✅ دارایی با موفقیت ویرایش ثبت شد.';
+            sendToTelegram('sendMessage', $data);
+
+        } catch (PDOException $e) {
+            sendToTelegram('sendMessage', [
+                'text' => '❌ خطای پایگاه داده در ویرایش دارایی: ' . $e->errorInfo[2],
+                'chat_id' => $person->getChatId()
+            ]);
             error_log(
-                'Holding: ' . json_encode($new_holding) . "\n" .
+                'Updates: ' . json_encode($web_app_data['updates']) . "\n" .
                 'Error: ' . json_encode($e->errorInfo, JSON_PRETTY_PRINT));
-            exit();
 
         }
+        level_1($person, $db);
+    }
+    if ($action === 'delete') {
+        try {
+            $db->delete(
+                table: 'holdings',
+                conditions: ['id' => $web_app_data['id']],
+                resetAutoIncrement: true
+            );
 
-    } elseif ($action === 'edit') {
-        $result = $db->update(
-            table: 'holdings',
-            data: $web_app_data['updates'],
-            conditions: ['id' => $web_app_data['id']]
-        );
+            $data['text'] = '✅ دارایی با موفقیت حذف شد.';
+            sendToTelegram('sendMessage', $data);
 
-        sendToTelegram('sendMessage', [
-            'text' => $result ? '✅ دارایی با موفقیت ویرایش ثبت شد.' : '❌ خطای پایگاه داده در ویرایش دارایی.',
-            'chat_id' => $person->getChatId()
-        ]);
-        exit();
+        } catch (PDOException $e) {
+            sendToTelegram('sendMessage', [
+                'text' => '❌ خطای پایگاه داده درحذف دارایی: ' . $e->errorInfo[2],
+                'chat_id' => $person->getChatId()
+            ]);
+            error_log(
+                'Updates: ' . json_encode($web_app_data['updates']) . "\n" .
+                'Error: ' . json_encode($e->errorInfo, JSON_PRETTY_PRINT));
 
-    } elseif ($action === 'delete') {
-        $result = $db->delete(
-            table: 'holdings',
-            conditions: ['id' => $web_app_data['id']],
-            resetAutoIncrement: true
-        );
-
-        sendToTelegram('sendMessage', [
-            'text' => $result ? '✅ دارایی با موفقیت حذف شد.' : '❌ خطای پایگاه داده درحذف دارایی.',
-            'chat_id' => $person->getChatId()
-        ]);
-        exit();
+        }
+        level_1($person, $db);
     }
 
-    sendToTelegram('sendMessage', [
-        'text' => 'پیام نامفهوم است.',
-        'chat_id' => $person->getChatId()
-    ]);
+    $data['text'] = 'داده‌های ارسالی قابل پردازش نیستند!';
+    sendToTelegram('sendMessage', $data);
 
-    exit();
+    level_1($person, $db);
 }
 
 // TODO: Meke it noReturn
