@@ -371,7 +371,7 @@ function level_1(
     if ($response) {
         $db->update(
             table: 'persons',
-            data: ['last_btn' => $pressed_button->getId(), 'progress' => null],
+            data: ['last_btn' => $pressed_button->getId()],
             conditions: ['id' => $person->getId()]
         );
         sendAllHoldings($person, $db);
@@ -528,7 +528,6 @@ function handleHoldingsWebAppData(Person $person, array $data, array $message, D
     exit();
 }
 
-// TODO: Meke it noReturn
 #[NoReturn]
 function handleHoldingsTextMessage(Person $person, array $data, array $message, DatabaseManager $db): void
 {
@@ -644,6 +643,8 @@ function sendAllHoldings(Person $person, DatabaseManager $db): void
     } else {
         sendToTelegram('sendMessage', ['chat_id' => $person->getChatId(), 'text' => 'شما هیچ دارایی‌ای ثبت نکرده‌اید.']);
     }
+
+    $db->update('persons', ['progress' => null], ['id' => $person->getId()]);
 }
 
 /**
