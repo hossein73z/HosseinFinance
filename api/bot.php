@@ -220,13 +220,6 @@ function specialButtonHandler(Person $person, Button $pressed_button, DatabaseMa
 #[NoReturn]
 function normalButtonHandler(Person $person, Button $pressed_button, DatabaseManager $db): void
 {
-    // Update user's last button to current button and remove their progress
-    $db->update(
-        table: 'persons',
-        data: ['last_btn' => $pressed_button->getId(), 'progress' => null],
-        conditions: ['id' => $person->getId()]
-    );
-
     // Route the button to corresponding level
     if ($pressed_button->getId() == 1) level_1(person: $person, db: $db);
     if ($pressed_button->getId() == 2) level_2(person: $person, db: $db);
@@ -344,13 +337,17 @@ function level_1(
     ?array          $message = null,
     ?array          $callback_query = null): void
 {
+
+    // Initialize button object if null is given
     if (!$pressed_button) $pressed_button = Button::fromDbRow($db->read('buttons', ['id' => 1], true));
+
+    // Add '➕ افزودن دارایی جدید' button to the keyboard
     $keyboard = createKeyboardsArray(parent_btn_id: $pressed_button->getId(), admin: $person->isAdmin(), db: $db);
     array_unshift($keyboard, [createWebAppBtn('➕ افزودن دارایی جدید', '/assets/add_holding.html')]);
 
     $data = [
         'chat_id' => $person->getChatId(),
-        'text' => 'پیام نامفهوم است.',
+        'text' => $pressed_button->getText(),
         'reply_markup' => [
             'keyboard' => $keyboard,
             'resize_keyboard' => true,
@@ -367,11 +364,16 @@ function level_1(
     if ($message && !isset($message['web_app_data']))
         handleHoldingsTextMessage($person, $data, $message, $db);
 
-    if (!$message && !$callback_query) {
+    // User is just entering the level
+    $data['text'] = $pressed_button->getText();
 
-        $data['text'] = $pressed_button->getText();
-        sendToTelegram('sendMessage', $data);
-
+    $response = sendToTelegram('sendMessage', $data);
+    if ($response) {
+        $db->update(
+            table: 'persons',
+            data: ['last_btn' => $pressed_button->getId(), 'progress' => null],
+            conditions: ['id' => $person->getId()]
+        );
         sendAllHoldings($person, $db);
     }
     exit();
@@ -480,9 +482,10 @@ function handleHoldingsWebAppData(Person $person, array $message, DatabaseManage
 }
 
 // TODO: Meke it noReturn
+#[NoReturn]
 function handleHoldingsTextMessage(Person $person, array $data, array $message, DatabaseManager $db): void
 {
-    $data['text'] = 'پیام نامفهوم است!';
+    sendToTelegram('deleteMessage', ['chat_id' => $person->getChatId(), 'message_id' => $message['message_id']]);
 
     $matched = preg_match('/^\/start viewHolding_holdingId(\d+)(_mssgId(\d+))?$/m', $message['text'], $matches);
     if ($matched && !empty($matches[1])) {
@@ -506,15 +509,15 @@ function handleHoldingsTextMessage(Person $person, array $data, array $message, 
         );
 
         if ($holding) {
-            if ($holdings_mssg_id) {
-                sendToTelegram('deleteMessage', ['chat_id' => $person->getChatId(), 'message_id' => $message['message_id']]);
-                sendToTelegram('deleteMessage', ['chat_id' => $person->getChatId(), 'message_id' => $holdings_mssg_id]);
-            }
 
+            // Delete holdings message
+            sendToTelegram('deleteMessage', ['chat_id' => $person->getChatId(), 'message_id' => $holdings_mssg_id]);
+
+            // Send holding's detail to telegram
             $data['text'] = createHoldingDetailText($holding);
             $keyboard = $data['reply_markup']['keyboard'];
             array_unshift($keyboard, [
-                createWebAppBtn('✏ ویرایش ' . $holding['asset_name'], '/assets/add_holding.html', ['data' => base64_encode(json_encode($holding))])
+                createWebAppBtn('✏ ویرایش ' . beautifulNumber($holding['asset_name'], null), '/assets/add_holding.html', ['data' => base64_encode(json_encode($holding))])
             ]);
             $data['reply_markup']['keyboard'] = $keyboard;
 
@@ -524,11 +527,38 @@ function handleHoldingsTextMessage(Person $person, array $data, array $message, 
                 conditions: ['id' => $person->getId()]
             );
 
-        } else {
-            $data['text'] = 'دارایی با این مشخصه یافت نشد!';
+            sendToTelegram('sendMessage', $data);
+            exit();
+
+        } else $data['text'] = 'دارایی با این مشخصه یافت نشد!';
+    } else $data['text'] = 'پیام نامفهوم است!';
+
+    // Add '✏ ویرایش' button to the keyboard if use is viewing a holding
+    // This works with irreverent texts and wrong holding id
+    $progress = json_decode($person->getProgress(), true);
+    if ($progress && key($progress) === 'view_holding') {
+        $holding = $db->read(
+            table: 'holdings h',
+            conditions: [
+                'h.id' => $progress['view_holding']['holding_id'],
+                'h.person_id' => $person->getId()
+            ],
+            single: true,
+            selectColumns: 'a.name as asset_name',
+            join: 'INNER JOIN assets a ON h.asset_id = a.id'
+        );
+        if ($holding) {
+            array_unshift($data['reply_markup']['keyboard'], [
+                createWebAppBtn(
+                    text: '✏ ویرایش ' . $holding['asset_name'],
+                    path: '/assets/add_holding.html',
+                    params: ['data' => base64_encode(json_encode($holding))])
+            ]);
         }
     }
+
     sendToTelegram('sendMessage', $data);
+    exit();
 }
 
 function sendAllHoldings(Person $person, DatabaseManager $db): void
