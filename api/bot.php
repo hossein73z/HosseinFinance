@@ -963,6 +963,7 @@ function handleLoansTextMessage(Person $person, array $data, array $message, Dat
         }
     }
 
+    $data['text'] = 'پیام نامفهوم است!';
     sendToTelegram('sendMessage', $data);
     exit();
 
