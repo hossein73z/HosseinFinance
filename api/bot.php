@@ -544,7 +544,12 @@ function handleHoldingsTextMessage(Person $person, array $data, array $message, 
                 'h.person_id' => $person->getId()
             ],
             single: true,
-            selectColumns: 'a.name as asset_name',
+            selectColumns: '
+                h.*,
+                a.name as asset_name,
+                a.price as current_price,
+                a.base_currency,
+                a.exchange_rate as base_rate',
             join: 'INNER JOIN assets a ON h.asset_id = a.id'
         );
         if ($holding) {
