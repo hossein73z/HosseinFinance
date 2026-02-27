@@ -360,7 +360,7 @@ function level_1(
         handleHoldingsCallback($person, $callback_query, $message);
 
     if ($message && isset($message['web_app_data']))
-        handleHoldingsWebAppData($person, $message, $db);
+        handleHoldingsWebAppData($person, $data, $message, $db);
     if ($message && !isset($message['web_app_data']))
         handleHoldingsTextMessage($person, $data, $message, $db);
 
@@ -394,16 +394,13 @@ function handleHoldingsCallback(Person $person, array $callback_query, array $me
 }
 
 #[NoReturn]
-function handleHoldingsWebAppData(Person $person, array $message, DatabaseManager $db): void
+function handleHoldingsWebAppData(Person $person, array $data, array $message, DatabaseManager $db): void
 {
     $web_app_data = json_decode($message['web_app_data']['data'], true);
     $action = $web_app_data['action'] ?? null;
 
-    $keyboard = createKeyboardsArray(1, $person->isAdmin(), $db);
-    array_unshift($keyboard, [createWebAppBtn('➕ افزودن دارایی جدید', '/assets/add_holding.html')]);
-
-
     if ($action === 'add') {
+
         $new_holding = $web_app_data['holding'];
 
         try {
@@ -418,22 +415,49 @@ function handleHoldingsWebAppData(Person $person, array $message, DatabaseManage
                     "time" => $new_holding["time"],
                     "note" => $new_holding["note"],
                 ]);
-            sendToTelegram('sendMessage', [
-                'text' => '✅ دارایی جدید با موفقیت ثبت شد.',
-                'chat_id' => $person->getChatId()
-            ]);
+
+            $data['text'] = '✅ دارایی جدید با موفقیت ثبت شد.';
+            sendToTelegram('sendMessage', $data);
             exit();
 
         } catch (PDOException $e) {
-            if ($e->errorInfo[1] == 1062)
-                sendToTelegram('sendMessage', [
-                    'text' => '
-                        شما از قبل این دارایی را در سیستم ثبت کرده اید.' . "\n" .
-                        'درصورت تمایل برای ثبت تغییرات، دارایی ثبت شده را ویرایش کنید.',
-                    'chat_id' => $person->getChatId()
-                ]);
+            if ($e->errorInfo[1] == 1062) {
 
-            else
+                $data['text'] = ' ' .
+                    'شما از قبل این دارایی را در سیستم ثبت کرده اید.' . "\n" .
+                    'درصورت تمایل برای ثبت تغییرات، دارایی ثبت شده را ویرایش کنید.';
+                sendToTelegram('sendMessage', $data);
+
+                $holding = $db->read(
+                    table: 'holdings h',
+                    conditions: [
+                        'h.asset_id' => $new_holding["asset_id"],
+                        'h.person_id' => $person->getId()
+                    ],
+                    single: true,
+                    selectColumns: '
+                        h.*,
+                        a.name as asset_name,
+                        a.price as current_price,
+                        a.base_currency,
+                        a.exchange_rate as base_rate',
+                    join: 'INNER JOIN assets a ON h.asset_id = a.id'
+                );
+
+                if ($holding) {
+
+                    // Update user's progress to 'view_holding'
+                    $db->update(
+                        table: 'persons',
+                        data: ['progress' => json_encode(['view_holding' => ['holding_id' => $holding['id']]])],
+                        conditions: ['id' => $person->getId()]
+                    );
+
+                    // Send holding's detail to telegram
+                    sendHoldingDetail($holding, $data);
+                }
+
+            } else
                 sendToTelegram('sendMessage', [
                     'text' => '❌ خطای پایگاه داده در ثبت دارایی جدید: ' . $e->errorInfo[2],
                     'chat_id' => $person->getChatId()
@@ -513,28 +537,22 @@ function handleHoldingsTextMessage(Person $person, array $data, array $message, 
             // Delete holdings message
             sendToTelegram('deleteMessage', ['chat_id' => $person->getChatId(), 'message_id' => $holdings_mssg_id]);
 
-            // Send holding's detail to telegram
-            $data['text'] = createHoldingDetailText($holding);
-            $keyboard = $data['reply_markup']['keyboard'];
-            array_unshift($keyboard, [
-                createWebAppBtn('✏ ویرایش ' . beautifulNumber($holding['asset_name'], null), '/assets/add_holding.html', ['data' => base64_encode(json_encode($holding))])
-            ]);
-            $data['reply_markup']['keyboard'] = $keyboard;
-
+            // Update user's progress to 'view_holding'
             $db->update(
                 table: 'persons',
                 data: ['progress' => json_encode(['view_holding' => ['holding_id' => $holding['id']]])],
                 conditions: ['id' => $person->getId()]
             );
 
-            sendToTelegram('sendMessage', $data);
+            // Send holding's detail to telegram
+            sendHoldingDetail($holding, $data);
             exit();
 
         } else $data['text'] = 'دارایی با این مشخصه یافت نشد!';
     } else $data['text'] = 'پیام نامفهوم است!';
 
-    // Add '✏ ویرایش' button to the keyboard if use is viewing a holding
-    // This works with irreverent texts and wrong holding id
+    // Add '✏ ویرایش' button to the keyboard if use is viewing a holding.
+    // This works with irreverent texts and wrong holding id.
     $progress = json_decode($person->getProgress(), true);
     if ($progress && key($progress) === 'view_holding') {
         $holding = $db->read(
@@ -605,90 +623,20 @@ function sendAllHoldings(Person $person, DatabaseManager $db): void
     }
 }
 
-//function sendAllHoldings(Person $person, DatabaseManager $db): void
-//{
-//    $keyboard = createKeyboardsArray(1, $person->isAdmin(), $db);
-//
-//    // Add App Buttons
-//    $progress = json_decode($person->getProgress(), true);
-//    if ($progress && key($progress) === 'view_holding') {
-//        $holding = $db->read(
-//            table: 'holdings h',
-//            conditions: [
-//                'h.id' => $progress['view_holding']['holding_id'],
-//                'h.person_id' => $person->getId()
-//            ],
-//            single: true,
-//            selectColumns: '
-//                h.*,
-//                a.name as asset_name,
-//                a.price as current_price,
-//                a.base_currency,
-//                a.exchange_rate as base_rate',
-//            join: 'INNER JOIN assets a ON h.asset_id = a.id'
-//        );
-//        if ($holding) {
-//            array_unshift($keyboard, [
-//                createWebAppBtn('✏ ویرایش ' . $holding['asset_name'], '/assets/add_holding.html', ['data' => base64_encode(json_encode($holding))])
-//            ]);
-//        }
-//    }
-//    array_unshift($keyboard, [createWebAppBtn('➕ افزودن دارایی جدید', '/assets/add_holding.html')]);
-//
-//    sendToTelegram('sendMessage', [
-//        'chat_id' => $person->getChatId(),
-//        'text' => 'دارایی‌ها',
-//        'reply_markup' => [
-//            'keyboard' => $keyboard,
-//            'resize_keyboard' => true,
-//            'is_persistent' => true,
-//            'input_field_placeholder' => 'دارایی‌ها'
-//        ]
-//    ]);
-//
-//    $holdings = $db->read(
-//        table: 'holdings h',
-//        conditions: [
-//            'person_id' => $person->getId()
-//        ],
-//        selectColumns: '
-//            h.*,
-//            a.name as asset_name,
-//            a.price as current_price,
-//            a.base_currency,
-//            a.exchange_rate as base_rate',
-//        join: 'INNER JOIN assets a ON h.asset_id = a.id');
-//
-//    if ($holdings) {
-//        $temp_mssg = sendLoadingMessage($person->getChatId(), 'در حال دریافت اطلاعات دارایی‌ها ...');
-//        if ($temp_mssg) {
-//            $text = "دارایی‌های ثبت شده‌ی شما:\n";
-//            $total_profit = 0;
-//
-//            foreach ($holdings as $holding) {
-//                $total_profit += $holding['amount'] * ($holding['current_price'] - $holding['avg_price']) * $holding['base_rate'];
-//                $text .= "\n" . createHoldingDetailText($holding, 'MarkdownV2', ['org_amount', 'org_total_price', 'profit'], $temp_mssg['result']['message_id']);
-//            }
-//
-//            $profit_text = ($total_profit >= 0) ? "🟢 کل سود: " . beautifulNumber($total_profit) . ' ریال' : "🔴 کل ضرر: " . beautifulNumber($total_profit) . ' ریال';
-//            $text .= "\n" . markdownScape($profit_text);
-//
-//            sendToTelegram('editMessageText', [
-//                'chat_id' => $person->getChatId(),
-//                'message_id' => $temp_mssg['result']['message_id'],
-//                'text' => $text,
-//                'parse_mode' => 'MarkdownV2'
-//            ]);
-//        }
-//    } else {
-//        sendToTelegram('sendMessage', ['chat_id' => $person->getChatId(), 'text' => 'شما هیچ دارایی‌ای ثبت نکرده‌اید.']);
-//    }
-//
-//    $db->update(
-//        table: 'persons',
-//        data: ['last_btn' => 1, 'progress' => null],
-//        conditions: ['id' => $person->getId()]);
-//}
+/**
+ * Automatically adds edit button
+ */
+function sendHoldingDetail(array $holding, array $data): void
+{
+    $data['text'] = createHoldingDetailText($holding);
+    $keyboard = $data['reply_markup']['keyboard'];
+    array_unshift($keyboard, [
+        createWebAppBtn('✏ ویرایش ' . beautifulNumber($holding['asset_name'], null), '/assets/add_holding.html', ['data' => base64_encode(json_encode($holding))])
+    ]);
+    $data['reply_markup']['keyboard'] = $keyboard;
+
+    sendToTelegram('sendMessage', $data);
+}
 
 
 // ==========================================
