@@ -468,7 +468,7 @@ function handleHoldingsWebAppData(Person $person, array $data, array $message, D
 
             }
         }
-        level_1($person, $db);
+        sendAllHoldings($person, $db);
     }
     if ($action === 'edit') {
         try {
@@ -492,7 +492,7 @@ function handleHoldingsWebAppData(Person $person, array $data, array $message, D
                 'Error: ' . json_encode($e->errorInfo, JSON_PRETTY_PRINT));
 
         }
-        level_1($person, $db);
+        sendAllHoldings($person, $db);
     }
     if ($action === 'delete') {
         try {
@@ -515,13 +515,13 @@ function handleHoldingsWebAppData(Person $person, array $data, array $message, D
                 'Error: ' . json_encode($e->errorInfo, JSON_PRETTY_PRINT));
 
         }
-        level_1($person, $db);
+        sendAllHoldings($person, $db);
     }
 
     $data['text'] = 'داده‌های ارسالی قابل پردازش نیستند!';
     sendToTelegram('sendMessage', $data);
 
-    level_1($person, $db);
+    sendAllHoldings($person, $db);
 }
 
 // TODO: Meke it noReturn
