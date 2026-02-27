@@ -283,7 +283,7 @@ function choosePath(
     if ($callback_query)
         callbackHandler($person, $callback_query, $db);
     if ($pressed_button)
-        if (str_starts_with($pressed_button['id'], "s"))
+        if (str_starts_with($pressed_button->getId(), "s"))
             specialButtonHandler(person: $person, pressed_button: $pressed_button, db: $db);
         else normalButtonHandler(person: $person, pressed_button: $pressed_button, db: $db);
     nonButtonHandler(person: $person, message: $message, db: $db);
