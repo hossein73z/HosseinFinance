@@ -649,11 +649,9 @@ function sendAllHoldings(Person $person, DatabaseManager $db): void
 function sendHoldingDetail(array $holding, array $data): void
 {
     $data['text'] = createHoldingDetailText($holding);
-    $keyboard = $data['reply_markup']['keyboard'];
-    array_unshift($keyboard, [
+    array_unshift($data['reply_markup']['keyboard'], [
         createWebAppBtn('✏ ویرایش ' . beautifulNumber($holding['asset_name'], null), '/assets/add_holding.html', ['data' => base64_encode(json_encode($holding))])
     ]);
-    $data['reply_markup']['keyboard'] = $keyboard;
 
     sendToTelegram('sendMessage', $data);
 }
@@ -995,9 +993,7 @@ function sendLoanDetail(array $loan, array $data): void
 {
 
     $data['text'] = 'جزئیات وام «' . $loan['name'] . '»';
-    $keyboard = $data['reply_markup']['keyboard']; // TODO: Merg these three lines into one
-    array_unshift($keyboard, [createWebAppBtn('✏ ویرایش وام «' . $loan['name'] . '»', '/assets/add_loan.html', ['data' => base64_encode(json_encode($loan))])]);
-    $data['reply_markup']['keyboard'] = $keyboard;
+    array_unshift($data['reply_markup']['keyboard'], [createWebAppBtn('✏ ویرایش وام «' . $loan['name'] . '»', '/assets/add_loan.html', ['data' => base64_encode(json_encode($loan))])]);
 
     sendToTelegram('sendMessage', $data);
 
@@ -1271,9 +1267,7 @@ function renderPricesMainView(Person $person, array $asset_types, $db): void
     $keyboard = createKeyboardsArray(5, $person->isAdmin(), $db);
     $types = array_column($asset_types, 'asset_type');
 
-    foreach ($types as $type) {
-        array_unshift($keyboard, [['text' => $type]]);
-    }
+    foreach ($types as $type) array_unshift($keyboard, [['text' => $type]]);
     array_unshift($keyboard, [['text' => '❤ علاقه‌مندی‌ها ❤']]);
 
     sendToTelegram('sendMessage', [
@@ -1560,7 +1554,7 @@ function createLoanDetailText(array $loan, string $mssg_id): string
     $paid_count = $overdue_count = $remaining_count = 0;
     $paid_sum = $overdue_sum = $remaining_sum = 0;
 
-    foreach ($installments as $index => &$inst) {
+    foreach ($installments as &$inst) {
         if ($inst['is_paid'] == 1) {
             $inst['is_paid'] = "🟢";
             $paid_count++;
@@ -1575,6 +1569,7 @@ function createLoanDetailText(array $loan, string $mssg_id): string
             $remaining_sum += $inst['amount'];
         }
     }
+    unset($inst);
 
     $text = "‏*" . markdownScape($loan['name']) . "*:\n" .
         "\n مبلغ وام\: " . markdownScape(beautifulNumber($loan['total_amount'])) .
