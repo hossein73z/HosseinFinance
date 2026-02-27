@@ -894,7 +894,7 @@ function handleLoansTextMessage(Person $person, array $data, array $message, Dat
     $matched = preg_match("/^\/start showLoan_loanId(\d+?)_mssgId(\d+?)$/m", $message['text'], $matches);
     if ($matched && !empty($matches[1])) {
 
-        $loan = getLoanWithInstallments(['l.id' => $matches[1], 'l.person_id' => $person->getId()], $db);
+        $loan = getLoansWithInstallments(['l.id' => $matches[1], 'l.person_id' => $person->getId()], $db)[0];
 
         if ($loan) {
 
@@ -931,7 +931,7 @@ function handleLoansTextMessage(Person $person, array $data, array $message, Dat
                 conditions: ['id' => $installment['id']]
             );
 
-            $loan = getLoanWithInstallments(['l.id' => $installment['loan_id'], 'l.person_id' => $person->getId()], $db);
+            $loan = getLoansWithInstallments(['l.id' => $installment['loan_id'], 'l.person_id' => $person->getId()], $db)[0];
 
             if ($loan) {
                 sendToTelegram('editMessageText', [
@@ -952,7 +952,7 @@ function handleLoansTextMessage(Person $person, array $data, array $message, Dat
     // This works with irreverent texts and wrong loan or installment id.
     $progress = json_decode($person->getProgress(), true);
     if ($progress && key($progress) === 'view_loan') {
-        $loan = getLoanWithInstallments(['l.id' => $progress['view_loan']['loan_id'], 'l.person_id' => $person->getId()], $db);
+        $loan = getLoansWithInstallments(['l.id' => $progress['view_loan']['loan_id'], 'l.person_id' => $person->getId()], $db)[0];
         if ($loan) {
             array_unshift($data['reply_markup']['keyboard'], [
                 createWebAppBtn(
@@ -970,7 +970,7 @@ function handleLoansTextMessage(Person $person, array $data, array $message, Dat
 
 function sendAllLoans(Person $person, DatabaseManager $db): void
 {
-    $loans = getLoanWithInstallments(['l.person_id' => $person->getId()], $db);
+    $loans = getLoansWithInstallments(['l.person_id' => $person->getId()], $db);
 
     if ($loans) {
 
@@ -1409,12 +1409,11 @@ function level_6(Person $person, DatabaseManager $db, ?array $message = null, ?a
 //          DATA FETCHING & UI HELPERS
 // ==========================================
 
-function getLoanWithInstallments(array $conditions, DatabaseManager $db): bool|array
+function getLoansWithInstallments(array $conditions, DatabaseManager $db): bool|array
 {
     $loan = $db->read(
         table: 'loans l',
         conditions: $conditions,
-        single: true,
         selectColumns: '
             l.*,
             CAST(
