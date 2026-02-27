@@ -365,17 +365,14 @@ function level_1(
     if ($message && isset($message['web_app_data']))
         handleHoldingsWebAppData($person, $message, $db);
     if ($message && !isset($message['web_app_data']))
-        handleHoldingsTextMessage($person, $message, $db);
+        handleHoldingsTextMessage($person, $data, $message, $db);
 
     if (!$message && !$callback_query) {
 
-        sendAllHoldings($person, $db);
+        $data['text'] = $pressed_button->getText();
+        sendToTelegram('sendMessage', $data);
 
-        $db->update(
-            table: 'persons',
-            data: ['last_btn' => 1, 'progress' => null],
-            conditions: ['id' => $person->getId()]
-        );
+        sendAllHoldings($person, $db);
     }
     exit();
 }
@@ -483,14 +480,14 @@ function handleHoldingsWebAppData(Person $person, array $message, DatabaseManage
 }
 
 // TODO: Meke it noReturn
-function handleHoldingsTextMessage(Person $person, array $message, DatabaseManager $db): void
+function handleHoldingsTextMessage(Person $person, array $data, array $message, DatabaseManager $db): void
 {
-    $matched = preg_match('/^\/start viewHolding_holdingId(\d+)(_mssgId(\d+))?$/m', $message['text'], $matches);
-    $text = 'پیام نامفهوم است!';
+    $data['text'] = 'پیام نامفهوم است!';
 
+    $matched = preg_match('/^\/start viewHolding_holdingId(\d+)(_mssgId(\d+))?$/m', $message['text'], $matches);
     if ($matched && !empty($matches[1])) {
         $holding_id = $matches[1];
-        $mssg_id_to_delete = $matches[3] ?? null;
+        $holdings_mssg_id = $matches[3] ?? null;
 
         $holding = $db->read(
             table: 'holdings h',
@@ -509,55 +506,36 @@ function handleHoldingsTextMessage(Person $person, array $message, DatabaseManag
         );
 
         if ($holding) {
-            if ($mssg_id_to_delete) {
+            if ($holdings_mssg_id) {
                 sendToTelegram('deleteMessage', ['chat_id' => $person->getChatId(), 'message_id' => $message['message_id']]);
-                sendToTelegram('deleteMessage', ['chat_id' => $person->getChatId(), 'message_id' => $mssg_id_to_delete]);
+                sendToTelegram('deleteMessage', ['chat_id' => $person->getChatId(), 'message_id' => $holdings_mssg_id]);
             }
 
-            $keyboard = createKeyboardsArray(1, $person->isAdmin(), $db);
+            $data['text'] = createHoldingDetailText($holding);
+            $keyboard = $data['reply_markup']['keyboard'];
             array_unshift($keyboard, [
-                createWebAppBtn('✏ ویرایش', '/assets/add_holding.html', ['data' => base64_encode(json_encode($holding))])
+                createWebAppBtn('✏ ویرایش ' . $holding['asset_name'], '/assets/add_holding.html', ['data' => base64_encode(json_encode($holding))])
             ]);
-
-            sendToTelegram('sendMessage', [
-                'chat_id' => $person->getChatId(),
-                'text' => createHoldingDetailText($holding),
-                'reply_markup' => ['keyboard' => $keyboard, 'resize_keyboard' => true, 'is_persistent' => true]
-            ]);
+            $data['reply_markup']['keyboard'] = $keyboard;
 
             $db->update(
                 table: 'persons',
                 data: ['progress' => json_encode(['view_holding' => ['holding_id' => $holding['id']]])],
-                conditions: ['id' => $person->getId()]);
-            return;
+                conditions: ['id' => $person->getId()]
+            );
+
         } else {
-            $text = 'دارایی با این مشخصه یافت نشد!';
+            $data['text'] = 'دارایی با این مشخصه یافت نشد!';
         }
     }
-    sendToTelegram('sendMessage', ['chat_id' => $person->getChatId(), 'text' => $text]);
+    sendToTelegram('sendMessage', $data);
 }
 
 function sendAllHoldings(Person $person, DatabaseManager $db): void
 {
-    $keyboard = createKeyboardsArray(1, $person->isAdmin(), $db);
-    array_unshift($keyboard, [createWebAppBtn('➕ افزودن دارایی جدید', '/assets/add_holding.html')]);
-
-    sendToTelegram('sendMessage', [
-        'chat_id' => $person->getChatId(),
-        'text' => 'دارایی‌ها',
-        'reply_markup' => [
-            'keyboard' => $keyboard,
-            'resize_keyboard' => true,
-            'is_persistent' => true,
-            'input_field_placeholder' => 'دارایی‌ها'
-        ]
-    ]);
-
     $holdings = $db->read(
         table: 'holdings h',
-        conditions: [
-            'person_id' => $person->getId()
-        ],
+        conditions: ['person_id' => $person->getId()],
         selectColumns: '
             h.*,
             a.name as asset_name,
