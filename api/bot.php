@@ -1071,10 +1071,8 @@ function level_5(
         handlePricesCallback($person, $callback_query, $data, $message, $asset_types, $db);
         exit();
     }
-    if ($message) {
-        handlePricesMessage($person, $message, $asset_types, $db);
-        exit();
-    }
+    if ($message)
+        handlePricesTextMessage($person, $data, $message, $asset_types, $db);
 
     // User has just entered the level
     $response = sendToTelegram('sendMessage', $data);
@@ -1273,15 +1271,17 @@ function handleSetLiveCallback(Person $person, array $query_data, array $data, D
     }
 }
 
-function handlePricesMessage(Person $person, array $message, array $asset_types, $db): void
+#[NoReturn]
+function handlePricesTextMessage(Person $person, array $data, array $message, array $asset_types, $db): void
 {
-    $text = $message['text'];
+    sendToTelegram('deleteMessage', ['chat_id' => $person->getChatId(), 'message_id' => $message['message_id']]);
+
     $types_array = array_column($asset_types, 'asset_type');
 
-    if (in_array($text, $types_array)) {
+    if (in_array($message['text'], $types_array)) {
         $assets = $db->read(
             table: 'assets',
-            conditions: ['asset_type' => $text]
+            conditions: ['asset_type' => $message['text']]
         );
         if ($assets) {
             $date = preg_split('/-/u', $assets[0]['date']);
@@ -1307,11 +1307,17 @@ function handlePricesMessage(Person $person, array $message, array $asset_types,
         } else {
             sendToTelegram('sendMessage', ['chat_id' => $person->getChatId(), 'text' => 'این دسته بندی خالی‌ست!']);
         }
-    } elseif ($text === '❤ علاقه‌مندی‌ها ❤') {
-        renderFavoritesList($person, null, false, $db);
-    } else {
-        renderPricesMainView($person, $asset_types, $db);
+        exit();
     }
+    if ($message['text'] === '❤ علاقه‌مندی‌ها ❤') {
+        renderFavoritesList($person, null, false, $db);
+        exit();
+    }
+
+    $data['text'] = 'پیام نامفهوم است!' . "\n" . 'یکی از دسته‌بندی‌های زیر را انتخاب کنید:';
+    sendToTelegram('sendMessage', $data);
+    exit();
+
 }
 
 function renderPricesMainView(Person $person, array $asset_types, $db): void
