@@ -716,20 +716,26 @@ function handleLoansCallback(Person $person, array $callback_query, array $data,
 {
     sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
     $query_data = json_decode($callback_query['data'], true);
+    if (!$query_data) exit();
 
-    if ($query_data && key($query_data) === 'loan_list') {
+    $query_key = array_key_first($query_data);
+    $data['message_id'] = $message['message_id'];
 
-        sendToTelegram('deleteMessage', ['chat_id' => $person->getChatId(), 'message_id' => $message['message_id']]);
+    switch ($query_key) {
+        case 'loan_list':
+            sendToTelegram('deleteMessage', ['chat_id' => $person->getChatId(), 'message_id' => $message['message_id']]);
 
-        $response = sendToTelegram('sendMessage', $data);
-        sendAllLoans($person, $db);
+            sendToTelegram('sendMessage', $data);
+            sendAllLoans($person, $db);
+            break;
+        default:
 
-    } else {
-        sendToTelegram('editMessageText', [
-            'chat_id' => $person->getChatId(),
-            'message_id' => $message['message_id'],
-            'text' => 'این پیام منقضی شده است.'
-        ]);
+            sendToTelegram('editMessageText', [
+                'chat_id' => $person->getChatId(),
+                'message_id' => $message['message_id'],
+                'text' => 'این پیام منقضی شده است.'
+            ]);
+            break;
     }
     exit();
 }
@@ -820,7 +826,7 @@ function handleLoansWebAppData(Person $person, array $data, array $message, Data
             foreach ($new_insts as &$new_inst)
                 $new_inst['loan_id'] = $web_app_data['id'];
 
-            // Update the loan's installments, based on their dates
+            // Update the Existing installments, based on their dates
             try {
                 $db->upsertBatch(
                     table: 'installments',
