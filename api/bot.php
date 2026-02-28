@@ -1154,7 +1154,13 @@ function handleEditFavoriteCallback(Person $person, array $query_data, array $as
             $data['reply_markup']['inline_keyboard'][] = [['text' => $type, 'callback_data' => json_encode(['add_fav' => ['asset_type' => $index]])]];
         }
     } elseif ($value === 'remove') {
-        $favorites = getFavoritesList($person->getId(), $db);
+        $favorites = $db->read(
+            table: 'favorites f',
+            conditions: ['person_id' => $person->getId()],
+            selectColumns: 'a.*, f.id as fav_id',
+            join: 'JOIN assets a ON a.id=f.asset_id',
+            orderBy: ['asset_type' => 'DESC', 'f.id' => 'ASC']
+        );
         if ($favorites) {
             $data['text'] = 'کدام گزینه را می‌خواهید حذف کنید؟';
             $data['reply_markup']['inline_keyboard'] = [[['text' => '🔙 برگشت 🔙', 'callback_data' => json_encode(['edit_fav' => null])]]];
@@ -1342,7 +1348,13 @@ function renderPricesMainView(Person $person, array $asset_types, $db): void
 
 function renderFavoritesList(Person $person, ?int $message_id_to_edit, bool $is_edit, DatabaseManager $db): void
 {
-    $favorites = getFavoritesList($person->getId(), $db);
+    $favorites = $db->read(
+        table: 'favorites f',
+        conditions: ['person_id' => $person->getId()],
+        selectColumns: 'a.*, f.id as fav_id',
+        join: 'JOIN assets a ON a.id=f.asset_id',
+        orderBy: ['asset_type' => 'DESC', 'f.id' => 'ASC']
+    );
     $live_mssg = $db->read(
         table: 'special_messages',
         conditions: [
@@ -1391,17 +1403,6 @@ function renderFavoritesList(Person $person, ?int $message_id_to_edit, bool $is_
             sendToTelegram('deleteMessage', ['chat_id' => $person->getChatId(), 'message_id' => $live_mssg['message_id']]);
         }
     }
-}
-
-function getFavoritesList(int $person_id, DatabaseManager $db): array|false
-{
-    return $db->read(
-        table: 'favorites f',
-        conditions: ['person_id' => $person_id],
-        selectColumns: 'a.*, f.id as fav_id',
-        join: 'JOIN assets a ON a.id=f.asset_id',
-        orderBy: ['asset_type' => 'DESC', 'f.id' => 'ASC']
-    );
 }
 
 function disableLivePriceMessage(Person $person, int $message_id, DatabaseManager $db): void
