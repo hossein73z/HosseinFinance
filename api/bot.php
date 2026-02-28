@@ -223,7 +223,7 @@ function normalButtonHandler(Person $person, Button $pressed_button, DatabaseMan
     // Route the button to corresponding level
     if ($pressed_button->getId() == 1) level_1(person: $person, db: $db, pressed_button: $pressed_button);
     if ($pressed_button->getId() == 2) level_2(person: $person, db: $db, pressed_button: $pressed_button);
-    if ($pressed_button->getId() == 5) level_5(person: $person, db: $db);
+    if ($pressed_button->getId() == 5) level_5(person: $person, db: $db, pressed_button: $pressed_button);
     if ($pressed_button->getId() == 6) level_6(person: $person, db: $db);
 
     // Default Actions for normal button
@@ -1020,12 +1020,35 @@ function sendLoanDetail(array $loan, array $data): void
 }
 
 // ==========================================
-//          LEVEL 5: PRICES / FAVORITES
+//          LEVEL 5: PRICES
 // ==========================================
 
 #[NoReturn]
-function level_5(Person $person, DatabaseManager $db, ?array $message = null, ?array $callback_query = null): void
+function level_5(
+    Person          $person,
+    DatabaseManager $db,
+    ?Button         $pressed_button = null,
+    ?array          $message = null,
+    ?array          $callback_query = null
+): void
 {
+    // Initialize button object if null is given
+    if (!$pressed_button) $pressed_button = Button::fromDbRow($db->read('buttons', ['id' => 2], true));
+
+    // Create keyboards
+    $keyboard = createKeyboardsArray(parent_btn_id: $pressed_button->getId(), admin: $person->isAdmin(), db: $db);
+
+    $data = [
+        'chat_id' => $person->getChatId(),
+        'text' => $pressed_button->getText(),
+        'reply_markup' => [
+            'keyboard' => $keyboard,
+            'resize_keyboard' => true,
+            'is_persistent' => true,
+            'input_field_placeholder' => $pressed_button->getText()
+        ]
+    ];
+
     $asset_types = $db->read(
         table: 'assets',
         selectColumns: 'asset_type',
@@ -1033,15 +1056,28 @@ function level_5(Person $person, DatabaseManager $db, ?array $message = null, ?a
         orderBy: ['asset_type' => 'DESC']
     );
     if (!$asset_types) {
-        sendToTelegram('sendMessage', ['chat_id' => $person->getChatId(), 'text' => 'دسته‌بندی‌ای در سیستم یافت نشد!']);
+        $data['text'] = 'دسته‌بندی‌ای در سیستم یافت نشد!';
+        sendToTelegram('sendMessage', $data);
         exit();
     }
 
     if ($callback_query) {
-        handlePricesCallback($person, $callback_query, $message, $asset_types, $db);
-    } elseif ($message) {
+        handlePricesCallback($person, $callback_query, $data, $message, $asset_types, $db);
+        exit();
+    }
+    if ($message) {
         handlePricesMessage($person, $message, $asset_types, $db);
-    } else {
+        exit();
+    }
+
+    // User has just entered the level
+    $response = sendToTelegram('sendMessage', $data);
+    if ($response) {
+        $db->update(
+            table: 'persons',
+            data: ['last_btn' => $pressed_button->getId()],
+            conditions: ['id' => $person->getId()]
+        );
         renderPricesMainView($person, $asset_types, $db);
     }
     exit();
