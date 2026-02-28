@@ -678,24 +678,40 @@ function level_2(
 ): void
 {
     // Initialize button object if null is given
-    if (!$pressed_button) $pressed_button = Button::fromDbRow($db->read('buttons', ['id' => 2], true));
+    $current_button = $pressed_button ?? Button::fromDbRow($db->read('buttons', ['id' => 2], true));
 
     // Create keyboards
-    $keyboard = createKeyboardsArray(parent_btn_id: $pressed_button->getId(), admin: $person->isAdmin(), db: $db);
+    $keyboard = createKeyboardsArray(parent_btn_id: $current_button->getId(), admin: $person->isAdmin(), db: $db);
 
     // Add '➕ افزودن وام جدید' button to the keyboard
     array_unshift($keyboard, [createWebAppBtn('➕ افزودن وام جدید', '/assets/add_loan.html')]);
 
     $data = [
         'chat_id' => $person->getChatId(),
-        'text' => $pressed_button->getText(),
+        'text' => $current_button->getText(),
         'reply_markup' => [
             'keyboard' => $keyboard,
             'resize_keyboard' => true,
             'is_persistent' => true,
-            'input_field_placeholder' => $pressed_button->getText()
+            'input_field_placeholder' => $current_button->getText()
         ]
     ];
+
+    if ($pressed_button) {
+        // Send initial message
+        $response = sendToTelegram('sendMessage', $data);
+        if ($response) {
+            $db->update(
+                table: 'persons',
+                data: ['last_btn' => $current_button->getId()],
+                conditions: ['id' => $person->getId()]
+            );
+
+            // Send informative message
+            sendAllLoans($person, $db);
+        }
+        exit();
+    }
 
     if ($callback_query)
         handleLoansCallback($person, $callback_query, $data, $message, $db);
@@ -704,18 +720,6 @@ function level_2(
         handleLoansWebAppData($person, $data, $message, $db);
     if ($message && !isset($message['web_app_data']))
         handleLoansTextMessage($person, $data, $message, $db);
-
-    // User has just entered the level
-    $response = sendToTelegram('sendMessage', $data);
-    if ($response) {
-        $db->update(
-            table: 'persons',
-            data: ['last_btn' => $pressed_button->getId()],
-            conditions: ['id' => $person->getId()]
-        );
-        sendAllLoans($person, $db);
-    }
-    exit();
 }
 
 #[NoReturn]
