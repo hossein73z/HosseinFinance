@@ -806,45 +806,49 @@ function handleLoansWebAppData(Person $person, array $data, array $message, Data
                 conditions: ['id' => $web_app_data['id'], 'person_id' => $person->getId()]);
             $data['text'] .= "\nویرایش اطلاعات وام: ✅";
 
-            if ($new_insts) {
-
-                // Update the loans installments
-                try {
-                    $db->upsertBatch(
-                        table: 'installments',
-                        dataRows: $new_insts
-                    );
-                    $data['text'] .= "\nویرایش اطلاعات اقساط: ✅";
-                } catch (Exception $e) {
-                    $data['text'] .= "\nویرایش اطلاعات اقساط: ❌";
-                    error_log(
-                        'New Installments: ' . json_encode($new_insts) . "\n" .
-                        'Error: ' . $e->getMessage()
-                    );
-                }
-
-                // Delete redundant installments
-                try {
-                    $deleted_rows = $db->delete(
-                        table: 'installments',
-                        conditions: ['loan_id' => $web_app_data['id'], '!due_date' => array_column($new_insts, 'due_date')]
-                    );
-                    $data['text'] .= "\nتعداد قسط حذف شده: " . beautifulNumber($deleted_rows);
-                } catch (Exception $e) {
-                    $data['text'] .= "\nحذف اقساط با خطا مواجه شد! ";
-                    error_log(
-                        'delete Installment: ' . json_encode(array_column($new_insts, 'due_date')) . "\n" .
-                        'Error: ' . $e->getMessage()
-                    );
-                }
-            }
-
         } catch (Exception $e) {
             $data['text'] .= "\nویرایش اطلاعات وام: ❌";
             error_log(
                 'Loan Updates: ' . json_encode($web_app_data['updates']) . "\n" .
                 'Error: ' . $e->getMessage()
             );
+        }
+
+        if ($new_insts) {
+
+            // Add 'loan_id' to installments
+            foreach ($new_insts as &$new_inst)
+                $new_inst['loan_id'] = $web_app_data['id'];
+
+            // Update the loan's installments, based on their dates
+            try {
+                $db->upsertBatch(
+                    table: 'installments',
+                    dataRows: $new_insts
+                );
+                $data['text'] .= "\nویرایش اطلاعات اقساط: ✅";
+            } catch (Exception $e) {
+                $data['text'] .= "\nویرایش اطلاعات اقساط: ❌";
+                error_log(
+                    'New Installments: ' . json_encode($new_insts) . "\n" .
+                    'Error: ' . $e->getMessage()
+                );
+            }
+
+            // Delete redundant installments
+            try {
+                $deleted_rows = $db->delete(
+                    table: 'installments',
+                    conditions: ['loan_id' => $web_app_data['id'], '!due_date' => array_column($new_insts, 'due_date')]
+                );
+                $data['text'] .= "\nتعداد قسط حذف شده: " . beautifulNumber($deleted_rows);
+            } catch (Exception $e) {
+                $data['text'] .= "\nحذف اقساط با خطا مواجه شد! ";
+                error_log(
+                    'delete Installment: ' . json_encode(array_column($new_insts, 'due_date')) . "\n" .
+                    'Error: ' . $e->getMessage()
+                );
+            }
         }
 
         sendToTelegram('sendMessage', $data);
