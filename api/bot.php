@@ -227,7 +227,7 @@ function normalButtonHandler(Person $person, Button $pressed_button, DatabaseMan
     if ($pressed_button->getId() == 6) level_6(person: $person, db: $db);
 
     // Default Actions for normal button
-    sendToTelegram('sendMessage', [
+    $response = sendToTelegram('sendMessage', [
         'text' => $pressed_button->getText(),
         'chat_id' => $person->getChatId(),
         'reply_markup' => [
@@ -237,6 +237,12 @@ function normalButtonHandler(Person $person, Button $pressed_button, DatabaseMan
             'input_field_placeholder' => $pressed_button->getText(),
         ]
     ]);
+
+    if ($response) $db->update(
+        table: 'persons',
+        data: ['last_btn' => $pressed_button->getId()],
+        conditions: ['id' => $person->getId()]
+    );
 
     exit();
 }
