@@ -214,6 +214,7 @@ function specialButtonHandler(Person $person, Button $pressed_button, DatabaseMa
 {
     if ($pressed_button->getId() === "s0") backButton($person, $db);
     if ($pressed_button->getId() === "s1") cancelButton($person, $db);
+    if ($pressed_button->getId() === "s2") exit(); // TODO Send favorites and add button
     exit();
 }
 
@@ -1110,18 +1111,6 @@ function level_5(
     }
     if ($message)
         handlePricesTextMessage($person, $data, $message, $asset_types, $db);
-
-    // User has just entered the level
-    $response = sendToTelegram('sendMessage', $data);
-    if ($response) {
-        $db->update(
-            table: 'persons',
-            data: ['last_btn' => $pressed_button->getId()],
-            conditions: ['id' => $person->getId()]
-        );
-        renderPricesMainView($person, $asset_types, $db);
-    }
-    exit();
 }
 
 function handlePricesCallback(Person $person, array $callback_query, array $message, array $asset_types, DatabaseManager $db): void
@@ -1350,10 +1339,6 @@ function handlePricesTextMessage(Person $person, array $data, array $message, ar
         } else {
             sendToTelegram('sendMessage', ['chat_id' => $person->getChatId(), 'text' => 'این دسته بندی خالی‌ست!']);
         }
-        exit();
-    }
-    if ($message['text'] === '❤ علاقه‌مندی‌ها ❤') {
-        renderFavoritesList($person, null, false, $db);
         exit();
     }
 
