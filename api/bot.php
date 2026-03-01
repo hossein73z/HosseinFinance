@@ -1088,7 +1088,7 @@ function level_5(
 
     if ($pressed_button) {
 
-        // Update user's level
+        // Update user's level and progress
         $db->update(
             table: 'persons',
             data: [
@@ -1101,7 +1101,7 @@ function level_5(
         // Send initial message
         sendToTelegram('sendMessage', $data);
 
-        // Send informative message
+        // Send favorites message
         sendFavorites($person, $db);
     }
 
