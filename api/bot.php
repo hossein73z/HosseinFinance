@@ -1309,29 +1309,11 @@ function handlePricesTextMessage(array $data, array $message, array $asset_types
 {
     if (in_array($message['text'], $asset_types)) {
 
+        $data['reply_to_message_id'] = $message['message_id'];
+
         $assets = $db->read('assets', ['asset_type' => $message['text']]);
-        if ($assets) {
-            $date = preg_split('/-/u', $assets[0]['date']);
-            $date[1] = str_replace(
-                ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'],
-                ['فروردین', 'اردیبهشت', 'خرداد', 'تیر', 'مرداد', 'شهریور', 'مهر', 'آبان', 'آذر', 'دی', 'بهمن', 'اسفند'],
-                $date[1]
-            );
-
-            $text = "آخرین قیمت ها در $date[2] $date[1] $date[0] ساعت " . $assets[0]['time'] . "\n";
-            $text = beautifulNumber($text, null);
-
-            foreach ($assets as $asset) {
-                $asset['price'] = beautifulNumber($asset['price']);
-                $asset['name'] = beautifulNumber($asset['name'], null);
-                $asset['base_currency'] = beautifulNumber($asset['base_currency'], null);
-                $text .= "\n$asset[name]: $asset[price] $asset[base_currency]";
-            }
-
-            $data['text'] = $text;
-            $data['reply_to_message_id'] = $message['message_id'];
-
-        } else $data['text'] = 'این دسته بندی خالی‌ست!';
+        if ($assets) $data['text'] = createPricesText($assets);
+        else $data['text'] = 'این دسته بندی خالی‌ست!';
 
         sendToTelegram('sendMessage', $data);
         exit();
