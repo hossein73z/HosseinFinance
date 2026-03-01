@@ -1436,6 +1436,34 @@ function disableLivePriceMessage(Person $person, int $message_id, DatabaseManage
     }
 }
 
+/**
+ * @param Person $person
+ * @param DatabaseManager $db
+ * @return void
+ * TODO: Add markdown and inline keyboard
+ */
+function sendFavorites(Person $person, DatabaseManager $db): void
+{
+    $favorites = $db->read(
+        table: 'favorites f',
+        conditions: ['person_id' => $person->getId()],
+        selectColumns: 'a.*, f.id as fav_id',
+        join: 'JOIN assets a ON a.id=f.asset_id',
+        orderBy: ['asset_type' => 'DESC', 'f.id' => 'ASC']
+    );
+
+    if ($favorites) {
+
+        $temp_mssg = sendLoadingMessage($person->getChatId(), 'در حال دریافت اطلاعات لیست علاقه‌مندی‌ها ...');
+        if ($temp_mssg) {
+            sendToTelegram('editMessageText', [
+                'chat_id' => $person->getChatId(),
+                'message_id' => $temp_mssg['result']['message_id'],
+                'text' => createFavoritesText($favorites),
+            ]);
+        }
+    } else sendToTelegram('sendMessage', ['chat_id' => $person->getChatId(), 'text' => 'هیچ وام یا قسطی برای شما ثبت نشده است!']);
+}
 
 // ==========================================
 //          LEVEL 6: ARTIFICIAL INTELLIGENCE
