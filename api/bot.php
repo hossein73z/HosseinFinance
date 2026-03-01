@@ -1272,30 +1272,36 @@ function handleDeleteFavoriteCallback(Person $person, array $query_data, array $
  */
 function changeLiveMessageState(Person $person, bool $activate, int|string $message_id, DatabaseManager $db): bool|null
 {
-    if ($activate) {
+    $db_result = false;
+    try {
 
-        $db_result = $db->upsert(
-            table: 'special_messages',
-            data: [
-                'person_id' => $person->getId(),
-                'type' => 'live_price',
-                'is_active' => true,
-                'message_id' => $message_id,
-            ]
-        );
-    }
+        if ($activate) {
 
-    if (!$activate) {
+            $db_result = $db->upsert(
+                table: 'special_messages',
+                data: [
+                    'person_id' => $person->getId(),
+                    'type' => 'live_price',
+                    'is_active' => true,
+                    'message_id' => $message_id,
+                ]
+            );
+        }
 
-        $db_result = $db->upsert(
-            table: 'special_messages',
-            data: [
-                'person_id' => $person->getId(),
-                'type' => 'live_price',
-                'is_active' => false,
-                'message_id' => $message_id,
-            ]
-        );
+        if (!$activate) {
+
+            $db_result = $db->upsert(
+                table: 'special_messages',
+                data: [
+                    'person_id' => $person->getId(),
+                    'type' => 'live_price',
+                    'is_active' => false,
+                    'message_id' => $message_id,
+                ]
+            );
+        }
+    } catch (Exception $e) {
+        error_log('Database error in `changeLiveMessageState`: ' . $e->getMessage());
     }
 
     if ($db_result) return $activate;
