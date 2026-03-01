@@ -1099,11 +1099,8 @@ function level_5(
                 conditions: ['id' => $person->getId()]
             );
 
-            // Send informative message
-            sendFavorites($person, $db);
-        }
-        exit();
-
+        // Send informative message
+        sendFavorites($person, $db);
     }
 
     if ($callback_query) {
@@ -1405,11 +1402,15 @@ function disableLivePriceMessage(Person $person, int $message_id, DatabaseManage
 }
 
 /**
+ * Only sends the favorites message with inline keyboard (or an error).
+ * Doesn't send the initial message containing bottom keyboard.
+ *
  * @param Person $person
  * @param DatabaseManager $db
  * @return void
  * TODO: Add markdown and inline keyboard
  */
+#[NoReturn]
 function sendFavorites(Person $person, DatabaseManager $db): void
 {
     $favorites = $db->read(
@@ -1424,13 +1425,19 @@ function sendFavorites(Person $person, DatabaseManager $db): void
 
         $temp_mssg = sendLoadingMessage($person->getChatId(), 'در حال دریافت اطلاعات لیست علاقه‌مندی‌ها ...');
         if ($temp_mssg) {
+
+            $temp_mssg_id = $temp_mssg['result']['message_id'];
             sendToTelegram('editMessageText', [
                 'chat_id' => $person->getChatId(),
-                'message_id' => $temp_mssg['result']['message_id'],
+                'message_id' => $temp_mssg_id,
                 'text' => createFavoritesText($favorites),
+                'reply_markup' => ['inline_keyboard' => createFavoritesInlineKeyboard($person, $temp_mssg_id, $db)]
             ]);
         }
-    } else sendToTelegram('sendMessage', ['chat_id' => $person->getChatId(), 'text' => 'هیچ وام یا قسطی برای شما ثبت نشده است!']);
+
+    } else sendToTelegram('sendMessage', ['chat_id' => $person->getChatId(), 'text' => 'لیست علاقه‌مندی‌های شما خالی‌ست!']);
+
+    exit();
 }
 
 // ==========================================
