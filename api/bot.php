@@ -1695,13 +1695,23 @@ function createLoanDetailText(array $loan, string $mssg_id): string
 }
 
 /**
- * @param array $assets Array of assets, ordered by `asset_type`
- * @return string
+ * @param array|null $assets Array of assets, must be ordered by `asset_type`
+ * @param int|string|null $person_id Used to fetch favorites if `$assets` is null
+ * @param DatabaseManager|null $db Used to fetch favorites if `$assets` is null
+ * @return string Well-structured text for favorites message
  */
-function createFavoritesText(array $assets): string
+function createFavoritesText(?array $assets, int|string|null $person_id, ?DatabaseManager $db): string
 {
-    $text = '';
+    $assets = $assets ?? $db->read(
+        table: 'favorites f',
+        conditions: ['person_id' => $person_id],
+        selectColumns: 'a.*, f.id as fav_id',
+        join: 'JOIN assets a ON a.id=f.asset_id',
+        orderBy: ['asset_type' => 'DESC', 'f.id' => 'ASC']
+    );
+
     if ($assets) {
+        $text = '';
         $asset_type = '';
         foreach ($assets as $asset) {
             if ($asset['asset_type'] != $asset_type) {
