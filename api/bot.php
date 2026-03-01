@@ -369,7 +369,10 @@ function level_1(
         if ($response) {
             $db->update(
                 table: 'persons',
-                data: ['last_btn' => $pressed_button->getId()],
+                data: [
+                    'last_btn' => $pressed_button->getId(),
+                    'progress'=> null,
+                ],
                 conditions: ['id' => $person->getId()]
             );
             sendAllHoldings($person, $db);
@@ -703,7 +706,10 @@ function level_2(
         if ($response) {
             $db->update(
                 table: 'persons',
-                data: ['last_btn' => $current_button->getId()],
+                data: [
+                    'last_btn' => $current_button->getId(),
+                    'progress'=> null,
+                ],
                 conditions: ['id' => $person->getId()]
             );
 
