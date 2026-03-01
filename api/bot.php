@@ -1326,26 +1326,6 @@ function handlePricesTextMessage(array $data, array $message, array $asset_types
 
 }
 
-function renderPricesMainView(Person $person, array $asset_types, $db): void
-{
-    $keyboard = createKeyboardsArray(5, $person->isAdmin(), $db);
-    $types = array_column($asset_types, 'asset_type');
-
-    foreach ($types as $type) array_unshift($keyboard, [['text' => $type]]);
-    array_unshift($keyboard, [['text' => '❤ علاقه‌مندی‌ها ❤']]);
-
-    sendToTelegram('sendMessage', [
-        'chat_id' => $person->getChatId(),
-        'text' => "دسته‌بندی مورد نظر را انتخاب کنید:",
-        'reply_markup' => ['keyboard' => $keyboard, 'resize_keyboard' => true, 'input_field_placeholder' => 'قیمت‌ها']
-    ]);
-
-    $db->update(
-        table: 'persons',
-        data: ['last_btn' => 5, 'progress' => null],
-        conditions: ['id' => $person->getId()]);
-}
-
 function renderFavoritesList(Person $person, ?int $message_id_to_edit, bool $is_edit, DatabaseManager $db): void
 {
     $favorites = $db->read(
