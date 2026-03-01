@@ -1087,28 +1087,26 @@ function level_5(
     $data['reply_markup']['keyboard'] = $keyboard;
 
     if ($pressed_button) {
+
+        // Update user's level
+        $db->update(
+            table: 'persons',
+            data: [
+                'last_btn' => $current_button->getId(),
+                'progress' => null,
+            ],
+            conditions: ['id' => $person->getId()]
+        );
+
         // Send initial message
-        $response = sendToTelegram('sendMessage', $data);
-        if ($response) {
-            $db->update(
-                table: 'persons',
-                data: [
-                    'last_btn' => $current_button->getId(),
-                    'progress' => null,
-                ],
-                conditions: ['id' => $person->getId()]
-            );
+        sendToTelegram('sendMessage', $data);
 
         // Send informative message
         sendFavorites($person, $db);
     }
 
-    if ($callback_query) {
-        handlePricesCallback($person, $callback_query, $data, $message, $asset_types, $db);
-        exit();
-    }
-    if ($message)
-        handlePricesTextMessage($data, $message, $asset_types, $db);
+    if ($callback_query) handlePricesCallback($person, $callback_query, $data, $message, $asset_types, $db);
+    if ($message) handlePricesTextMessage($data, $message, $asset_types, $db);
 }
 
 function handlePricesCallback(Person $person, array $callback_query, array $message, array $asset_types, DatabaseManager $db): void
