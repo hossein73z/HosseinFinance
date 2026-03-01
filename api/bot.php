@@ -733,6 +733,7 @@ function level_2(
 function handleLoansCallback(Person $person, array $callback_query, array $data, array $message, $db): void
 {
     sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
+
     $query_data = json_decode($callback_query['data'], true);
     if (!$query_data) exit();
 
