@@ -1685,6 +1685,37 @@ function createFavoritesText(array $assets): string
 }
 
 /**
+ * Checks the database for current message
+ * to see if it's registered for live message
+ *
+ * @param Person $person
+ * @param int $message_id The ID of current message to be checked for live update
+ * @param DatabaseManager $db
+ * @return array[] Array of array of inline buttons for favorites message
+ */
+function createFavoritesInlineKeyboard(Person $person, int $message_id, DatabaseManager $db): array
+{
+    $live_mssg = $db->read(
+        table: 'special_messages',
+        conditions: [
+            'person_id' => $person->getId(),
+            'type' => 'live_price',
+            'is_active' => true,
+            'data->>"$.message_id"' => $message_id, //TODO: Must be tested to see if works
+        ],
+        single: true
+    );
+
+    return [
+        ($live_mssg)
+            ? [['text' => 'توقف نمایش زنده ⏸', 'callback_data' => json_encode(['set_live' => false])]]
+            : [['text' => 'نمایش زنده قیمت‌ها ▶', 'callback_data' => json_encode(['set_live' => true])]],
+        [['text' => 'هشدار قیمت', 'callback_data' => json_encode(['price_alert' => null])]],
+        [['text' => 'ویرایش لیست', 'callback_data' => json_encode(['edit_fav' => null])]],
+    ];
+}
+
+/**
  * @param array $assets Array of assets
  * @return string
  */
