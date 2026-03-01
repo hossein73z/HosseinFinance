@@ -1519,13 +1519,15 @@ function sendLoadingMessage(string $chat_id, string $text): array|false
     ]);
 }
 
-function deleteLiveMessage(Person $person, DatabaseManager $db): bool
+function clearOldLiveMessage(Person $person, int|string $message_id, DatabaseManager $db): bool
 {
     $live_mssg = $db->read(
         table: 'special_messages',
         conditions: [
             'person_id' => $person->getId(),
             'type' => 'live_price',
+            'is_active' => true,
+            '!data->>"$.message_id"' => $message_id, //TODO: Must be tested to see if works
         ],
         single: true
     );
