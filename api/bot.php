@@ -1077,6 +1077,24 @@ function level_5(
         $data['text'] = 'دسته‌بندی‌ای در سیستم یافت نشد!';
         sendToTelegram('sendMessage', $data);
         exit();
+
+    } else $types_array = array_column($asset_types, 'asset_type');
+
+    if ($pressed_button) {
+        // Send initial message
+        $response = sendToTelegram('sendMessage', $data);
+        if ($response) {
+            $db->update(
+                table: 'persons',
+                data: [
+                    'last_btn' => $current_button->getId(),
+                    'progress' => null,
+                ],
+                conditions: ['id' => $person->getId()]
+            );
+        }
+        exit();
+
     }
 
     if ($callback_query) {
