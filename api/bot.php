@@ -1411,30 +1411,17 @@ function disableLivePriceMessage(Person $person, int $message_id, DatabaseManage
 #[NoReturn]
 function sendFavorites(Person $person, DatabaseManager $db): void
 {
-    $favorites = $db->read(
-        table: 'favorites f',
-        conditions: ['person_id' => $person->getId()],
-        selectColumns: 'a.*, f.id as fav_id',
-        join: 'JOIN assets a ON a.id=f.asset_id',
-        orderBy: ['asset_type' => 'DESC', 'f.id' => 'ASC']
-    );
+    $temp_mssg = sendLoadingMessage($person->getChatId(), 'در حال دریافت اطلاعات لیست علاقه‌مندی‌ها ...');
+    if ($temp_mssg) {
 
-    if ($favorites) {
-
-        $temp_mssg = sendLoadingMessage($person->getChatId(), 'در حال دریافت اطلاعات لیست علاقه‌مندی‌ها ...');
-        if ($temp_mssg) {
-
-            $temp_mssg_id = $temp_mssg['result']['message_id'];
-            sendToTelegram('editMessageText', [
-                'chat_id' => $person->getChatId(),
-                'message_id' => $temp_mssg_id,
-                'text' => createFavoritesText($favorites),
-                'reply_markup' => ['inline_keyboard' => createFavoritesInlineKeyboard($person, $temp_mssg_id, $db)]
-            ]);
-        }
-
-    } else sendToTelegram('sendMessage', ['chat_id' => $person->getChatId(), 'text' => 'لیست علاقه‌مندی‌های شما خالی‌ست!']);
-
+        $temp_mssg_id = $temp_mssg['result']['message_id'];
+        sendToTelegram('editMessageText', [
+            'chat_id' => $person->getChatId(),
+            'message_id' => $temp_mssg_id,
+            'text' => createFavoritesText(null, $person->getId(), $db),
+            'reply_markup' => ['inline_keyboard' => createFavoritesInlineKeyboard($person, $temp_mssg_id, $db)]
+        ]);
+    }
     exit();
 }
 
