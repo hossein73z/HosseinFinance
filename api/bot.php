@@ -1261,42 +1261,46 @@ function handleDeleteFavoriteCallback(Person $person, array $query_data, array $
     }
 }
 
-function handleSetLiveCallback(Person $person, array $query_data, array $data, DatabaseManager $db): void
+/**
+ * Activate/Inactivate current message in the database as `live_price`.
+ *
+ * @param Person $person
+ * @param bool $activate
+ * @param array $query_message
+ * @param DatabaseManager $db
+ * @return bool|null Activation state on success and `null` on database error
+ */
+function changeLiveMessageState(Person $person, bool $activate, array $query_message, DatabaseManager $db): bool|null
 {
-    $is_active = $query_data['set_live'];
-    $result = false;
+    if ($activate) {
 
-    if ($is_active === true) {
-        $live_mssg = $db->read(
-            table: 'special_messages',
-            conditions: ['person_id' => $person->getId(), 'type' => 'live_price'],
-            single: true
-        );
-        if ($live_mssg) sendToTelegram('deleteMessage', ['chat_id' => $person->getChatId(), 'message_id' => $live_mssg['message_id']]);
-
-        $result = $db->upsert(
+        $db_result = $db->upsert(
             table: 'special_messages',
             data: [
                 'person_id' => $person->getId(),
                 'type' => 'live_price',
                 'is_active' => true,
-                'message_id' => $data['message_id'],
+                'message_id' => $query_message['message_id'],
             ]
-        );
-    } else {
-        $result = $db->delete(
-            table: 'special_messages',
-            conditions: ['person_id' => $person->getId(), 'type' => 'live_price'],
-            resetAutoIncrement: true
         );
     }
 
-    if ($result) {
-        renderFavoritesList($person, $data['message_id'], true, $db);
-    } else {
-        $data['text'] = 'خطای پایگاه داده';
-        sendToTelegram('editMessageText', $data);
+    if (!$activate) {
+
+        $db_result = $db->upsert(
+            table: 'special_messages',
+            data: [
+                'person_id' => $person->getId(),
+                'type' => 'live_price',
+                'is_active' => false,
+                'message_id' => $query_message['message_id'],
+            ]
+        );
     }
+
+    if ($db_result) return $activate;
+    else return null;
+
 }
 
 #[NoReturn]
