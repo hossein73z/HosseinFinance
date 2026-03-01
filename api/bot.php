@@ -1662,22 +1662,26 @@ function createLoanDetailText(array $loan, string $mssg_id): string
     return $text;
 }
 
-function createFavoritesText($favorites): string
+/**
+ * @param array $assets Array of assets, ordered by `asset_type`
+ * @return string
+ */
+function createFavoritesText(array $assets): string
 {
     $text = '';
-    if ($favorites) {
+    if ($assets) {
         $asset_type = '';
-        foreach ($favorites as $favorite) {
-            if ($favorite['asset_type'] != $asset_type) {
-                $asset_type = $favorite['asset_type'];
-                $date = preg_split('/-/u', $favorite['date']);
+        foreach ($assets as $asset) {
+            if ($asset['asset_type'] != $asset_type) {
+                $asset_type = $asset['asset_type'];
+                $date = preg_split('/-/u', $asset['date']);
                 $date[1] = str_replace(
                     ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'],
                     ['فروردین', 'اردیبهشت', 'خرداد', 'تیر', 'مرداد', 'شهریور', 'مهر', 'آبان', 'آذر', 'دی', 'بهمن', 'اسفند'],
                     $date[1]);
-                $text .= beautifulNumber("\nآخرین قیمت های «$favorite[asset_type]» در " . "$date[2] $date[1] $date[0]" . " ساعت " . $favorite['time'] . "\n", null);
+                $text .= beautifulNumber("\nآخرین قیمت های «$asset[asset_type]» در " . "$date[2] $date[1] $date[0]" . " ساعت " . $asset['time'] . "\n", null);
             }
-            $text .= "   -- " . beautifulNumber($favorite['name'], null) . ': ' . beautifulNumber($favorite['price']) . "\n";
+            $text .= "   -- " . beautifulNumber($asset['name'], null) . ': ' . beautifulNumber($asset['price']) . "\n";
         }
     } else $text = 'لیست علاقه‌مندی‌های شما خالیست!';
 
