@@ -1460,7 +1460,7 @@ function level_6(Person $person, DatabaseManager $db, ?array $message = null, ?a
 
 
 // ==========================================
-//          DATA FETCHING & UI HELPERS
+//          DATA HANDLING & UI HELPERS
 // ==========================================
 
 function getLoansWithInstallments(array $conditions, DatabaseManager $db): bool|array
@@ -1513,6 +1513,21 @@ function sendLoadingMessage(string $chat_id, string $text): array|false
         'text' => $text,
         'reply_markup' => ['inline_keyboard' => [[['text' => '...', 'callback_data' => 'null']]]]
     ]);
+}
+
+function deleteLiveMessage(Person $person, DatabaseManager $db): bool
+{
+    $live_mssg = $db->read(
+        table: 'special_messages',
+        conditions: [
+            'person_id' => $person->getId(),
+            'type' => 'live_price',
+        ],
+        single: true
+    );
+    if ($live_mssg) sendToTelegram('deleteMessage', ['chat_id' => $person->getChatId(), 'message_id' => $live_mssg['message_id']]);
+
+    return boolval($live_mssg);
 }
 
 /**
