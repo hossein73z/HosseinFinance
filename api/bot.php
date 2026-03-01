@@ -1110,7 +1110,7 @@ function level_5(
         exit();
     }
     if ($message)
-        handlePricesTextMessage($person, $data, $message, $asset_types, $db);
+        handlePricesTextMessage($data, $message, $asset_types, $db);
 }
 
 function handlePricesCallback(Person $person, array $callback_query, array $message, array $asset_types, DatabaseManager $db): void
@@ -1304,17 +1304,11 @@ function handleSetLiveCallback(Person $person, array $query_data, array $data, D
 }
 
 #[NoReturn]
-function handlePricesTextMessage(Person $person, array $data, array $message, array $asset_types, $db): void
+function handlePricesTextMessage(array $data, array $message, array $asset_types, DatabaseManager $db): void
 {
-    sendToTelegram('deleteMessage', ['chat_id' => $person->getChatId(), 'message_id' => $message['message_id']]);
+    if (in_array($message['text'], $asset_types)) {
 
-    $types_array = array_column($asset_types, 'asset_type');
-
-    if (in_array($message['text'], $types_array)) {
-        $assets = $db->read(
-            table: 'assets',
-            conditions: ['asset_type' => $message['text']]
-        );
+        $assets = $db->read('assets', ['asset_type' => $message['text']]);
         if ($assets) {
             $date = preg_split('/-/u', $assets[0]['date']);
             $date[1] = str_replace(
@@ -1323,25 +1317,26 @@ function handlePricesTextMessage(Person $person, array $data, array $message, ar
                 $date[1]
             );
 
-            $reply = "آخرین قیمت ها در $date[2] $date[1] $date[0] ساعت " . $assets[0]['time'] . "\n";
-            $reply = beautifulNumber($reply, null);
+            $text = "آخرین قیمت ها در $date[2] $date[1] $date[0] ساعت " . $assets[0]['time'] . "\n";
+            $text = beautifulNumber($text, null);
 
             foreach ($assets as $asset) {
-                $price = beautifulNumber($asset['price']);
-                $reply .= "\n{$asset['name']} : {$price} {$asset['base_currency']}";
+                $asset['price'] = beautifulNumber($asset['price']);
+                $asset['name'] = beautifulNumber($asset['name'], null);
+                $asset['base_currency'] = beautifulNumber($asset['base_currency'], null);
+                $text .= "\n$asset[name]: $asset[price] $asset[base_currency]";
             }
 
-            sendToTelegram('sendMessage', [
-                'chat_id' => $person->getChatId(),
-                'text' => $reply,
-                'reply_to_message_id' => $message['message_id']
-            ]);
-        } else {
-            sendToTelegram('sendMessage', ['chat_id' => $person->getChatId(), 'text' => 'این دسته بندی خالی‌ست!']);
-        }
+            $data['text'] = $text;
+            $data['reply_to_message_id'] = $message['message_id'];
+
+        } else $data['text'] = 'این دسته بندی خالی‌ست!';
+
+        sendToTelegram('sendMessage', $data);
         exit();
     }
 
+    // Send default message of this level
     $data['text'] = 'پیام نامفهوم است!' . "\n" . 'یکی از دسته‌بندی‌های زیر را انتخاب کنید:';
     sendToTelegram('sendMessage', $data);
     exit();
