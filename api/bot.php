@@ -1266,11 +1266,11 @@ function handleDeleteFavoriteCallback(Person $person, array $query_data, array $
  *
  * @param Person $person
  * @param bool $activate
- * @param array $query_message
+ * @param int|string $message_id
  * @param DatabaseManager $db
  * @return bool|null Activation state on success and `null` on database error
  */
-function changeLiveMessageState(Person $person, bool $activate, array $query_message, DatabaseManager $db): bool|null
+function changeLiveMessageState(Person $person, bool $activate, int|string $message_id, DatabaseManager $db): bool|null
 {
     if ($activate) {
 
@@ -1280,7 +1280,7 @@ function changeLiveMessageState(Person $person, bool $activate, array $query_mes
                 'person_id' => $person->getId(),
                 'type' => 'live_price',
                 'is_active' => true,
-                'message_id' => $query_message['message_id'],
+                'message_id' => $message_id,
             ]
         );
     }
@@ -1293,7 +1293,7 @@ function changeLiveMessageState(Person $person, bool $activate, array $query_mes
                 'person_id' => $person->getId(),
                 'type' => 'live_price',
                 'is_active' => false,
-                'message_id' => $query_message['message_id'],
+                'message_id' => $message_id,
             ]
         );
     }
