@@ -1092,6 +1092,9 @@ function level_5(
                 ],
                 conditions: ['id' => $person->getId()]
             );
+
+            // Send informative message
+            sendFavorites($person, $db);
         }
         exit();
 
