@@ -1129,7 +1129,23 @@ function handlePricesCallback(Person $person, array $callback_query, array $mess
             handleDeleteFavoriteCallback($person, $query_data, $data, $db);
             break;
         case 'set_live':
-            handleSetLiveCallback($person, $query_data, $data, $db);
+            clearOldLiveMessage($person, $message['message_id'], $db);
+            $db_result = changeLiveMessageState($person, $query_data['set_live'], $message['message_id'], $db);
+
+            if ($db_result)
+                sendToTelegram('editMessageText', [
+                    'chat_id' => $person->getChatId(),
+                    'message_id' => $message['message_id'],
+                    'text' => createFavoritesText(null, $person->getId(), $db),
+                    'reply_markup' => ['inline_keyboard' => createFavoritesInlineKeyboard($person, $message['message_id'], $db)]
+                ]);
+            else
+                sendToTelegram('editMessageText', [
+                    'chat_id' => $person->getChatId(),
+                    'message_id' => $message['message_id'],
+                    'text' => '❌ خطای پایگاه داده!',
+                ]);
+
             break;
         case 'price_alert':
             // Logic for price alerts can be added here
