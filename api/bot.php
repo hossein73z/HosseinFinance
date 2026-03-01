@@ -1078,7 +1078,11 @@ function level_5(
         sendToTelegram('sendMessage', $data);
         exit();
 
-    } else $types_array = array_column($asset_types, 'asset_type');
+    } else $asset_types = array_column($asset_types, 'asset_type');
+
+    // Add asset types to level 5 keyboard
+    foreach ($asset_types as $asset_type) array_unshift($keyboard, [['text' => $asset_type]]);
+    $data['reply_markup']['keyboard'] = $keyboard;
 
     if ($pressed_button) {
         // Send initial message
