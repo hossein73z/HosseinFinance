@@ -1721,3 +1721,29 @@ function createFavoritesText(array $assets): string
 
     return $text;
 }
+
+/**
+ * @param array $assets Array of assets
+ * @return string
+ */
+function createPricesText(array $assets): string
+{
+    $date = preg_split('/-/u', $assets[0]['date']);
+    $date[1] = str_replace(
+        ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'],
+        ['فروردین', 'اردیبهشت', 'خرداد', 'تیر', 'مرداد', 'شهریور', 'مهر', 'آبان', 'آذر', 'دی', 'بهمن', 'اسفند'],
+        $date[1]
+    );
+
+    $text = "آخرین قیمت ها در $date[2] $date[1] $date[0] ساعت " . $assets[0]['time'] . "\n";
+    $text = beautifulNumber($text, null);
+
+    // Create price texts and add them to the text
+    foreach ($assets as $asset) {
+        $asset['price'] = beautifulNumber($asset['price']);
+        $asset['name'] = beautifulNumber($asset['name'], null);
+        $asset['base_currency'] = beautifulNumber($asset['base_currency'], null);
+        $text .= "\n$asset[name]: $asset[price] $asset[base_currency]";
+    }
+    return $text;
+}
