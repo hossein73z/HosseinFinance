@@ -1194,9 +1194,9 @@ function handleEditFavoriteCallback(Person $person, array $query_data, array $as
     } elseif ($value === 'remove') {
         $favorites = $db->read(
             table: 'favorites f',
-            conditions: ['person_id' => $person->getId()],
+            conditions: ['f.person_id' => $person->getId()],
             selectColumns: 'a.*, f.id as fav_id',
-            join: 'JOIN assets a ON a.id=f.asset_id',
+            join: 'JOIN assets a ON a.name=f.asset_name',
             orderBy: ['asset_type' => 'DESC', 'f.id' => 'ASC']
         );
         if ($favorites) {
@@ -1336,9 +1336,9 @@ function renderFavoritesList(Person $person, ?int $message_id_to_edit, bool $is_
 {
     $favorites = $db->read(
         table: 'favorites f',
-        conditions: ['person_id' => $person->getId()],
+        conditions: ['f.person_id' => $person->getId()],
         selectColumns: 'a.*, f.id as fav_id',
-        join: 'JOIN assets a ON a.id=f.asset_id',
+        join: 'JOIN assets a ON a.name=f.asset_name',
         orderBy: ['asset_type' => 'DESC', 'f.id' => 'ASC']
     );
     $live_mssg = $db->read(
@@ -1719,9 +1719,9 @@ function createFavoritesText(?array $assets, int|string|null $person_id, ?Databa
 {
     $assets = $assets ?? $db->read(
         table: 'favorites f',
-        conditions: ['person_id' => $person_id],
+        conditions: ['f.person_id' => $person_id],
         selectColumns: 'a.*, f.id as fav_id',
-        join: 'JOIN assets a ON a.id=f.asset_id',
+        join: 'JOIN assets a ON a.name=f.asset_name',
         orderBy: ['asset_type' => 'DESC', 'f.id' => 'ASC']
     );
 
