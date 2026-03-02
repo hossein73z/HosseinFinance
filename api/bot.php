@@ -1280,13 +1280,13 @@ function handleDeleteFavoriteCallback(Person $person, array $query_data, array $
 /**
  * Activate/Inactivate current message in the database as `live_price`.
  *
- * @param Person $person
+ * @param int|string $person_id
  * @param bool $activate
  * @param int|string $message_id The ID of the message to set as live price message
  * @param DatabaseManager $db
  * @return bool|null Activation state on success or `null` on database error
  */
-function changeLiveMessageState(Person $person, bool $activate, int|string $message_id, DatabaseManager $db): bool|null
+function changeLiveMessageState(int|string $person_id, bool $activate, int|string $message_id, DatabaseManager $db): bool|null
 {
     $db_result = false;
     try {
@@ -1294,7 +1294,7 @@ function changeLiveMessageState(Person $person, bool $activate, int|string $mess
         $db_result = $db->upsert(
             table: 'special_messages',
             data: [
-                'person_id' => $person->getId(),
+                'person_id' => $person_id,
                 'type' => 'live_price',
                 'is_active' => $activate,
                 'message_id' => $message_id,
