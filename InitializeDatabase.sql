@@ -1,4 +1,6 @@
-CREATE TABLE IF NOT EXISTS `test`.`persons`
+USE test;
+
+CREATE TABLE IF NOT EXISTS `persons`
 (
     id         INT AUTO_INCREMENT NOT NULL PRIMARY KEY,
     chat_id    BIGINT             NOT NULL UNIQUE,
@@ -10,7 +12,7 @@ CREATE TABLE IF NOT EXISTS `test`.`persons`
     last_btn   VARCHAR(10)        NOT NULL DEFAULT '0'
 ) DEFAULT CHARSET = utf8mb4;
 
-CREATE TABLE IF NOT EXISTS `test`.`buttons`
+CREATE TABLE IF NOT EXISTS `buttons`
 (
     id        VARCHAR(36) PRIMARY KEY,
     attrs     TEXT    NOT NULL,
@@ -19,26 +21,26 @@ CREATE TABLE IF NOT EXISTS `test`.`buttons`
     belong_to VARCHAR(36)      DEFAULT NULL,
     keyboards TEXT             DEFAULT NULL
 ) DEFAULT CHARSET = utf8mb4;
-INSERT INTO `test`.buttons (id, attrs, admin_key, messages, belong_to, keyboards)
+INSERT INTO buttons (id, attrs, admin_key, messages, belong_to, keyboards)
 VALUES ('0', '{"text": "صفحه اصلی"}', 0, null, null, '[["1", "2"], ["3"], ["4"]]');
-INSERT INTO `test`.buttons (id, attrs, admin_key, messages, belong_to, keyboards)
+INSERT INTO buttons (id, attrs, admin_key, messages, belong_to, keyboards)
 VALUES ('1', '{"text": "دارایی‌ها"}', 0, null, '0', '[["s0"]]');
-INSERT INTO `test`.buttons (id, attrs, admin_key, messages, belong_to, keyboards)
+INSERT INTO buttons (id, attrs, admin_key, messages, belong_to, keyboards)
 VALUES ('2', '{"text": "🏦 وام و اقساط"}', 0, null, '0', '[["s0"]]');
-INSERT INTO `test`.buttons (id, attrs, admin_key, messages, belong_to, keyboards)
+INSERT INTO buttons (id, attrs, admin_key, messages, belong_to, keyboards)
 VALUES ('3', '{"text": "ابزارها"}', 0, null, '0', '[["5"], ["6"], ["s0"]]');
-INSERT INTO `test`.buttons (id, attrs, admin_key, messages, belong_to, keyboards)
+INSERT INTO buttons (id, attrs, admin_key, messages, belong_to, keyboards)
 VALUES ('4', '{"text": "بخش مدیریت"}', 1, null, '0', '[["s0"]]');
-INSERT INTO `test`.buttons (id, attrs, admin_key, messages, belong_to, keyboards)
-VALUES ('5', '{"text": "قیمت‌ها"}', 0, null, '3', '[["s0"]]');
-INSERT INTO `test`.buttons (id, attrs, admin_key, messages, belong_to, keyboards)
+INSERT INTO buttons (id, attrs, admin_key, messages, belong_to, keyboards)
+VALUES ('5', '{"text": "قیمت‌ها"}', 0, null, '3', '[["s2"], ["s0"]]');
+INSERT INTO buttons (id, attrs, admin_key, messages, belong_to, keyboards)
 VALUES ('6', '{"text": "هوش مصنوعی"}', 0, null, '3', '[["s0"]]');
-INSERT INTO `test`.buttons (id, attrs, admin_key, messages, belong_to, keyboards)
+INSERT INTO buttons (id, attrs, admin_key, messages, belong_to, keyboards)
 VALUES ('s0', '{"text": "🔙 برگشت 🔙"}', 0, null, null, null);
-INSERT INTO `test`.buttons (id, attrs, admin_key, messages, belong_to, keyboards)
+INSERT INTO buttons (id, attrs, admin_key, messages, belong_to, keyboards)
 VALUES ('s1', '{"text": "❌ لغو ❌"}', 0, null, null, null);
 
-CREATE TABLE IF NOT EXISTS `test`.`assets`
+CREATE TABLE IF NOT EXISTS `assets`
 (
     id            INT AUTO_INCREMENT PRIMARY KEY,
     name          VARCHAR(191)   NOT NULL UNIQUE,
@@ -50,7 +52,7 @@ CREATE TABLE IF NOT EXISTS `test`.`assets`
     time          VARCHAR(8)              DEFAULT NULL
 ) DEFAULT CHARSET = utf8mb4;
 
-CREATE TABLE IF NOT EXISTS `test`.`holdings`
+CREATE TABLE IF NOT EXISTS `holdings`
 (
     id        INT AUTO_INCREMENT PRIMARY KEY,
     person_id INT            NOT NULL,
@@ -66,7 +68,7 @@ CREATE TABLE IF NOT EXISTS `test`.`holdings`
     FOREIGN KEY (asset_id) REFERENCES assets (id) ON DELETE RESTRICT
 ) DEFAULT CHARSET = utf8mb4;
 
-CREATE TABLE IF NOT EXISTS `test`.favorites
+CREATE TABLE IF NOT EXISTS favorites
 (
     id         INT AUTO_INCREMENT PRIMARY KEY,
     person_id  INT          NOT NULL,
@@ -77,7 +79,7 @@ CREATE TABLE IF NOT EXISTS `test`.favorites
     FOREIGN KEY (asset_name) REFERENCES assets (name) ON DELETE RESTRICT
 ) DEFAULT CHARSET = utf8mb4;
 
-CREATE TABLE IF NOT EXISTS `test`.`alerts`
+CREATE TABLE IF NOT EXISTS `alerts`
 (
     id             BIGINT AUTO_INCREMENT PRIMARY KEY,
     person_id      INT                         NOT NULL,
@@ -96,7 +98,7 @@ CREATE TABLE IF NOT EXISTS `test`.`alerts`
     FOREIGN KEY (asset_name) REFERENCES assets (name) ON DELETE RESTRICT
 ) DEFAULT CHARSET = utf8mb4;
 
-CREATE TABLE IF NOT EXISTS `test`.`transactions`
+CREATE TABLE IF NOT EXISTS `transactions`
 (
     id        BIGINT AUTO_INCREMENT PRIMARY KEY,
     person_id INT            NOT NULL,
@@ -113,7 +115,7 @@ CREATE TABLE IF NOT EXISTS `test`.`transactions`
     FOREIGN KEY (person_id) REFERENCES persons (id) ON DELETE CASCADE
 ) DEFAULT CHARSET = utf8mb4;
 
-CREATE TABLE IF NOT EXISTS `test`.`loans`
+CREATE TABLE IF NOT EXISTS `loans`
 (
     id            INT AUTO_INCREMENT PRIMARY KEY,
     person_id     INT                   NOT NULL,
@@ -126,7 +128,7 @@ CREATE TABLE IF NOT EXISTS `test`.`loans`
     FOREIGN KEY (person_id) REFERENCES persons (id) ON DELETE CASCADE
 ) DEFAULT CHARSET = utf8mb4;
 
-CREATE TABLE IF NOT EXISTS `test`.`installments`
+CREATE TABLE IF NOT EXISTS `installments`
 (
     id       INT AUTO_INCREMENT PRIMARY KEY,
     loan_id  INT            NOT NULL,
@@ -138,7 +140,7 @@ CREATE TABLE IF NOT EXISTS `test`.`installments`
     FOREIGN KEY (loan_id) REFERENCES loans (id) ON DELETE CASCADE
 ) DEFAULT CHARSET = utf8mb4;
 
-CREATE TABLE IF NOT EXISTS `test`.`special_messages`
+CREATE TABLE IF NOT EXISTS `special_messages`
 (
     id         INT AUTO_INCREMENT PRIMARY KEY,
     person_id  INT         NOT NULL,
@@ -151,23 +153,23 @@ CREATE TABLE IF NOT EXISTS `test`.`special_messages`
     FOREIGN KEY (person_id) REFERENCES persons (id) ON DELETE CASCADE
 ) DEFAULT CHARSET = utf8mb4;
 
-alter table `test`.persons
+alter table persons
     auto_increment 0;
-alter table `test`.buttons
+alter table buttons
     auto_increment 0;
-alter table `test`.assets
+alter table assets
     auto_increment 0;
-alter table `test`.holdings
+alter table holdings
     auto_increment 0;
-alter table `test`.favorites
+alter table favorites
     auto_increment 0;
-alter table `test`.alerts
+alter table alerts
     auto_increment 0;
-alter table `test`.transactions
+alter table transactions
     auto_increment 0;
-alter table `test`.loans
+alter table loans
     auto_increment 0;
-alter table `test`.installments
+alter table installments
     auto_increment 0;
-alter table `test`.special_messages
+alter table special_messages
     auto_increment 0;
