@@ -1715,15 +1715,20 @@ function createLoanDetailText(array $loan, string $mssg_id): string
  * @param DatabaseManager|null $db Used to fetch favorites if `$assets` is null
  * @return string Well-structured text for favorites message
  */
-function createFavoritesText(?array $assets, int|string|null $person_id, ?DatabaseManager $db): string
+function createFavoritesText(?array $assets, int|string|null $person_id = null, ?DatabaseManager $db = null): string
 {
-    $assets = $assets ?? $db->read(
-        table: 'favorites f',
-        conditions: ['f.person_id' => $person_id],
-        selectColumns: 'a.*, f.id as fav_id',
-        join: 'JOIN assets a ON a.name=f.asset_name',
-        orderBy: ['asset_type' => 'DESC', 'f.id' => 'ASC']
-    );
+    try {
+        $assets = $assets ?? $db->read(
+            table: 'favorites f',
+            conditions: ['f.person_id' => $person_id],
+            selectColumns: 'a.*, f.id as fav_id',
+            join: 'JOIN assets a ON a.name=f.asset_name',
+            orderBy: ['asset_type' => 'DESC', 'f.id' => 'ASC']
+        );
+    } catch (Exception $e) {
+        error_log('createFavoritesText: ' . $e->getMessage());
+        exit();
+    }
 
     if ($assets) {
         $text = '';
