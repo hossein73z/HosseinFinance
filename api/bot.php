@@ -1140,8 +1140,8 @@ function handlePricesCallback(Person $person, array $callback_query, array $data
             break;
         case 'set_live':
             // TODO: Last checkup before moving on
-            clearOldLiveMessage($person, $message['message_id'], $db);
-            $db_result = changeLiveMessageState($person->getId(), $query_data['set_live'], $message['message_id'], $db);
+            deleteOldLiveMessage($person, $message['message_id'], $db);
+            $db_result = setLiveMessage($person->getId(), $query_data['set_live'], $message['message_id'], $db);
 
             if ($db_result !== null)
                 sendToTelegram('editMessageText', [
@@ -1302,7 +1302,7 @@ function handleDeleteFavoriteCallback(Person $person, array $query_data, array $
  * @param DatabaseManager $db
  * @return bool|null Activation state on success or `null` on database error
  */
-function changeLiveMessageState(int|string $person_id, bool $activate, int|string $message_id, DatabaseManager $db): bool|null
+function setLiveMessage(int|string $person_id, bool $activate, int|string $message_id, DatabaseManager $db): bool|null
 {
     $db_result = false;
     try {
@@ -1543,7 +1543,7 @@ function sendLoadingMessage(string $chat_id, string $text): array|false
     ]);
 }
 
-function clearOldLiveMessage(Person $person, int|string $message_id, DatabaseManager $db): bool
+function deleteOldLiveMessage(Person $person, int|string $message_id, DatabaseManager $db): bool
 {
     $live_mssg = $db->read(
         table: 'special_messages',
