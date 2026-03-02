@@ -1119,7 +1119,11 @@ function handlePricesCallback(Person $person, array $callback_query, array $data
     sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
 
     $query_data = json_decode($callback_query['data'], true);
-    if (!$query_data) return;
+    if (!$query_data)
+        sendToTelegram('deleteMessage', [
+            'chat_id' => $person->getChatId(),
+            'message_id' => $message['message_id'],
+        ]);
 
     $query_key = array_key_first($query_data);
     $data['message_id'] = $message['message_id'];
