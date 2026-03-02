@@ -1139,7 +1139,6 @@ function handlePricesCallback(Person $person, array $callback_query, array $data
             handleDeleteFavoriteCallback($person, $query_data, $data, $db);
             break;
         case 'set_live':
-            // TODO: Last checkup before moving on
             deleteOldLiveMessage($person, $message['message_id'], $db);
             $db_result = setLiveMessage($person->getId(), $query_data['set_live'], $message['message_id'], $db);
 
