@@ -1534,7 +1534,7 @@ function clearOldLiveMessage(Person $person, int|string $message_id, DatabaseMan
             'person_id' => $person->getId(),
             'type' => 'live_price',
             'is_active' => true,
-            '!data->>"$.message_id"' => $message_id, //TODO: Must be tested to see if works
+            '!message_id' => $message_id,
         ],
         single: true
     );
@@ -1560,7 +1560,7 @@ function createFavoritesInlineKeyboard(Person $person, int $message_id, Database
             'person_id' => $person->getId(),
             'type' => 'live_price',
             'is_active' => true,
-            'data->>"$.message_id"' => $message_id, //TODO: Must be tested to see if works
+            'message_id' => $message_id,
         ],
         single: true
     );
