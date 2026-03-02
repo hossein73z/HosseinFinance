@@ -1426,29 +1426,30 @@ function disableLivePriceMessage(Person $person, int $message_id, DatabaseManage
 }
 
 /**
- * Only sends the favorites message with inline keyboard (or an error).
+ * Edits a message and adds favorites text and inline keyboard.
  * Doesn't send the initial message containing bottom keyboard.
  * Doesn't delete any message or set change live price updates.
  *
  * @param Person $person
  * @param DatabaseManager $db
+ * @param int|string|null $message_id ID of the message to be edited. If `null`, a new message is sent and immediately edited
  * @return void
+ *
  * TODO: Add markdown
  */
 #[NoReturn]
-function sendFavorites(Person $person, DatabaseManager $db): void
+function sendFavorites(Person $person, DatabaseManager $db, int|string|null $message_id = null): void
 {
-    $temp_mssg = sendLoadingMessage($person->getChatId(), 'در حال دریافت اطلاعات لیست علاقه‌مندی‌ها ...');
-    if ($temp_mssg) {
+    $message_id = ($message_id !== null)
+        ? $message_id
+        : sendLoadingMessage($person->getChatId(), 'در حال دریافت اطلاعات لیست علاقه‌مندی‌ها ...')['result']['message_id'];
 
-        $temp_mssg_id = $temp_mssg['result']['message_id'];
-        sendToTelegram('editMessageText', [
-            'chat_id' => $person->getChatId(),
-            'message_id' => $temp_mssg_id,
-            'text' => createFavoritesText(null, $person->getId(), $db),
-            'reply_markup' => ['inline_keyboard' => createFavoritesInlineKeyboard($person, $temp_mssg_id, $db)]
-        ]);
-    }
+    sendToTelegram('editMessageText', [
+        'chat_id' => $person->getChatId(),
+        'message_id' => $message_id,
+        'text' => createFavoritesText(null, $person->getId(), $db),
+        'reply_markup' => ['inline_keyboard' => createFavoritesInlineKeyboard($person, $message_id, $db)]
+    ]);
     exit();
 }
 
