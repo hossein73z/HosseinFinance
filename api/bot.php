@@ -1109,18 +1109,20 @@ function level_5(
         sendFavorites($person, $db);
     }
 
-    if ($callback_query) handlePricesCallback($person, $callback_query, $data, $message, $asset_types, $db);
     if ($message) handlePricesTextMessage($data, $message, $asset_types, $db);
+    if ($callback_query) handlePricesCallback($person, $callback_query, $data, $message, $asset_types, $db);
 }
 
-function handlePricesCallback(Person $person, array $callback_query, array $message, array $asset_types, DatabaseManager $db): void
+#[NoReturn]
+function handlePricesCallback(Person $person, array $callback_query, array $data, array $message, array $asset_types, DatabaseManager $db): void
 {
     sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
+
     $query_data = json_decode($callback_query['data'], true);
     if (!$query_data) return;
 
     $query_key = array_key_first($query_data);
-    $data = ['chat_id' => $person->getChatId(), 'message_id' => $message['message_id']];
+    $data['message_id'] = $message['message_id'];
 
     switch ($query_key) {
         case 'edit_fav':
@@ -1137,7 +1139,7 @@ function handlePricesCallback(Person $person, array $callback_query, array $mess
             clearOldLiveMessage($person, $message['message_id'], $db);
             $db_result = changeLiveMessageState($person, $query_data['set_live'], $message['message_id'], $db);
 
-            if ($db_result)
+            if ($db_result !== null)
                 sendToTelegram('editMessageText', [
                     'chat_id' => $person->getChatId(),
                     'message_id' => $message['message_id'],
@@ -1161,10 +1163,15 @@ function handlePricesCallback(Person $person, array $callback_query, array $mess
             }
             break;
         default:
-            $data['text'] = 'این پیام منقضی شده است.';
-            sendToTelegram('editMessageText', $data);
+
+            sendToTelegram('editMessageText', [
+                'chat_id' => $person->getChatId(),
+                'message_id' => $message['message_id'],
+                'text' => 'این پیام منقضی شده است.'
+            ]);
             break;
     }
+    exit();
 }
 
 function handleEditFavoriteCallback(Person $person, array $query_data, array $asset_types, array $data, $db): void
