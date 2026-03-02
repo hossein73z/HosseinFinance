@@ -1434,7 +1434,6 @@ function disableLivePriceMessage(Person $person, int $message_id, DatabaseManage
  * @param DatabaseManager $db
  * @return void
  * TODO: Add markdown
- * TODO: Stop old live message
  */
 #[NoReturn]
 function sendFavorites(Person $person, DatabaseManager $db): void
