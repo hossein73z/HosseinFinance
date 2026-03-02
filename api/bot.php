@@ -1140,23 +1140,10 @@ function handlePricesCallback(Person $person, array $callback_query, array $data
             break;
         case 'set_live':
             deleteOldLiveMessage($person, $message['message_id'], $db);
-            $db_result = setLiveMessage($person->getId(), $query_data['set_live'], $message['message_id'], $db);
-
-            if ($db_result !== null)
-                sendToTelegram('editMessageText', [
-                    'chat_id' => $person->getChatId(),
-                    'message_id' => $message['message_id'],
-                    'text' => createFavoritesText(null, $person->getId(), $db),
-                    'reply_markup' => ['inline_keyboard' => createFavoritesInlineKeyboard($person, $message['message_id'], $db)]
-                ]);
-            else
-                sendToTelegram('editMessageText', [
-                    'chat_id' => $person->getChatId(),
-                    'message_id' => $message['message_id'],
-                    'text' => '❌ خطای پایگاه داده!',
-                ]);
-
+            setLiveMessage($person->getId(), $query_data['set_live'], $message['message_id'], $db);
+            sendFavorites($person, $db, $message['message_id']);
             break;
+
         case 'price_alert':
             // Logic for price alerts can be added here
             break;
@@ -1437,7 +1424,6 @@ function disableLivePriceMessage(Person $person, int $message_id, DatabaseManage
  *
  * TODO: Add markdown
  */
-#[NoReturn]
 function sendFavorites(Person $person, DatabaseManager $db, int|string|null $message_id = null): void
 {
     $message_id = ($message_id !== null)
@@ -1450,7 +1436,6 @@ function sendFavorites(Person $person, DatabaseManager $db, int|string|null $mes
         'text' => createFavoritesText(null, $person->getId(), $db),
         'reply_markup' => ['inline_keyboard' => createFavoritesInlineKeyboard($person, $message_id, $db)]
     ]);
-    exit();
 }
 
 // ==========================================
