@@ -39,6 +39,8 @@ INSERT INTO buttons (id, attrs, admin_key, messages, belong_to, keyboards)
 VALUES ('s0', '{"text": "🔙 برگشت 🔙"}', 0, null, null, null);
 INSERT INTO buttons (id, attrs, admin_key, messages, belong_to, keyboards)
 VALUES ('s1', '{"text": "❌ لغو ❌"}', 0, null, null, null);
+INSERT INTO buttons (id, attrs, admin_key, messages, belong_to, keyboards)
+VALUES ('s2', '{"text": "❤ علاقه‌مندی‌ها ❤"}', 0, null, null, null);
 
 CREATE TABLE IF NOT EXISTS `assets`
 (
