@@ -1141,7 +1141,7 @@ function handlePricesCallback(Person $person, array $callback_query, array $data
         case 'set_live':
             // TODO: Last checkup before moving on
             clearOldLiveMessage($person, $message['message_id'], $db);
-            $db_result = changeLiveMessageState($person, $query_data['set_live'], $message['message_id'], $db);
+            $db_result = changeLiveMessageState($person->getId(), $query_data['set_live'], $message['message_id'], $db);
 
             if ($db_result !== null)
                 sendToTelegram('editMessageText', [
