@@ -1429,6 +1429,7 @@ function disableLivePriceMessage(Person $person, int $message_id, DatabaseManage
 /**
  * Only sends the favorites message with inline keyboard (or an error).
  * Doesn't send the initial message containing bottom keyboard.
+ * Doesn't delete any message or set change live price updates.
  *
  * @param Person $person
  * @param DatabaseManager $db
