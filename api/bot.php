@@ -192,6 +192,8 @@ function getOrCreateUser(array $chat, DatabaseManager $db): Person
 #[NoReturn]
 function callbackHandler(Person $person, array $callback_query, DatabaseManager $db): void
 {
+    // TODO: Callback queries move user to corresponding level instead of removing the message
+
     $message = $callback_query['message'];
 
     if ($person->getLastBtn() == 1) level_1(person: $person, db: $db, message: $message, callback_query: $callback_query);
@@ -251,6 +253,8 @@ function normalButtonHandler(Person $person, Button $pressed_button, DatabaseMan
 #[NoReturn]
 function nonButtonHandler(Person $person, array $message, DatabaseManager $db): void
 {
+    // TODO: Misplaced deep links move user to the corresponding level instead of showing error
+
     if ($person->getLastBtn() == 1) level_1(person: $person, db: $db, message: $message);
     if ($person->getLastBtn() == 2) level_2(person: $person, db: $db, message: $message);
     if ($person->getLastBtn() == 5) level_5(person: $person, db: $db, message: $message);
@@ -1129,6 +1133,7 @@ function handlePricesCallback(Person $person, array $callback_query, array $mess
             handleDeleteFavoriteCallback($person, $query_data, $data, $db);
             break;
         case 'set_live':
+            // TODO: Last checkup before moving on
             clearOldLiveMessage($person, $message['message_id'], $db);
             $db_result = changeLiveMessageState($person, $query_data['set_live'], $message['message_id'], $db);
 
@@ -1417,7 +1422,8 @@ function disableLivePriceMessage(Person $person, int $message_id, DatabaseManage
  * @param Person $person
  * @param DatabaseManager $db
  * @return void
- * TODO: Add markdown and inline keyboard
+ * TODO: Add markdown
+ * TODO: Stop old live message
  */
 #[NoReturn]
 function sendFavorites(Person $person, DatabaseManager $db): void
