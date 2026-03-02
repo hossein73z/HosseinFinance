@@ -1147,10 +1147,8 @@ function handlePricesCallback(Person $person, array $callback_query, array $data
         case 'price_alert':
             // Logic for price alerts can be added here
             break;
-        case 'back':
-            if ($query_data['back'] === 'favorites_list') {
-                renderFavoritesList($person, $data['message_id'], true, $db);
-            }
+        case 'show_favorites':
+            sendFavorites($person, $db, $message['message_id']);
             break;
         default:
 
