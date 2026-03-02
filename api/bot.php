@@ -1567,6 +1567,8 @@ function deleteOldLiveMessage(Person $person, int|string $message_id, DatabaseMa
  * @param int $message_id The ID of current message to be checked for live update
  * @param DatabaseManager $db
  * @return array[] Array of array of inline buttons for favorites message
+ *
+ * TODO: manage inline buttons for no registered favorite
  */
 function createFavoritesInlineKeyboard(Person $person, int $message_id, DatabaseManager $db): array
 {
