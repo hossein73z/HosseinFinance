@@ -1318,7 +1318,7 @@ function handlePricesTextMessage(array $data, array $message, array $asset_types
         $data['reply_to_message_id'] = $message['message_id'];
 
         $assets = $db->read('assets', ['asset_type' => $message['text']]);
-        if ($assets) $data['text'] = createPricesText($assets);
+        if ($assets) $data['text'] = createPricesTextForSingleAssetType($assets);
         else $data['text'] = 'این دسته بندی خالی‌ست!';
 
         sendToTelegram('sendMessage', $data);
@@ -1754,7 +1754,7 @@ function createFavoritesText(?array $assets, int|string|null $person_id = null, 
  * @param array $assets Array of assets
  * @return string
  */
-function createPricesText(array $assets): string
+function createPricesTextForSingleAssetType(array $assets): string
 {
     $date = preg_split('/-/u', $assets[0]['date']);
     $date[1] = str_replace(
