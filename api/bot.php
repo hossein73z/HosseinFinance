@@ -1282,42 +1282,27 @@ function handleDeleteFavoriteCallback(Person $person, array $query_data, array $
  *
  * @param Person $person
  * @param bool $activate
- * @param int|string $message_id
+ * @param int|string $message_id The ID of the message to set as live price message
  * @param DatabaseManager $db
- * @return bool|null Activation state on success and `null` on database error
+ * @return bool|null Activation state on success or `null` on database error
  */
 function changeLiveMessageState(Person $person, bool $activate, int|string $message_id, DatabaseManager $db): bool|null
 {
     $db_result = false;
     try {
 
-        if ($activate) {
+        $db_result = $db->upsert(
+            table: 'special_messages',
+            data: [
+                'person_id' => $person->getId(),
+                'type' => 'live_price',
+                'is_active' => $activate,
+                'message_id' => $message_id,
+            ]
+        );
 
-            $db_result = $db->upsert(
-                table: 'special_messages',
-                data: [
-                    'person_id' => $person->getId(),
-                    'type' => 'live_price',
-                    'is_active' => true,
-                    'message_id' => $message_id,
-                ]
-            );
-        }
-
-        if (!$activate) {
-
-            $db_result = $db->upsert(
-                table: 'special_messages',
-                data: [
-                    'person_id' => $person->getId(),
-                    'type' => 'live_price',
-                    'is_active' => false,
-                    'message_id' => $message_id,
-                ]
-            );
-        }
     } catch (Exception $e) {
-        error_log('Database error in `changeLiveMessageState`: ' . $e->getMessage());
+        error_log('changeLiveMessageState: ' . $e->getMessage());
     }
 
     if ($db_result) return $activate;
