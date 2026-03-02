@@ -376,7 +376,7 @@ function level_1(
                 table: 'persons',
                 data: [
                     'last_btn' => $pressed_button->getId(),
-                    'progress'=> null,
+                    'progress' => null,
                 ],
                 conditions: ['id' => $person->getId()]
             );
@@ -713,7 +713,7 @@ function level_2(
                 table: 'persons',
                 data: [
                     'last_btn' => $current_button->getId(),
-                    'progress'=> null,
+                    'progress' => null,
                 ],
                 conditions: ['id' => $person->getId()]
             );
