@@ -216,7 +216,7 @@ function specialButtonHandler(Person $person, Button $pressed_button, DatabaseMa
 {
     if ($pressed_button->getId() === "s0") backButton($person, $db);
     if ($pressed_button->getId() === "s1") cancelButton($person, $db);
-    if ($pressed_button->getId() === "s2") exit(); // TODO Send favorites and add button
+    if ($pressed_button->getId() === "s2") sendFavorites($person, $db);
     exit();
 }
 
