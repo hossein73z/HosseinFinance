@@ -1156,10 +1156,10 @@ function handlePricesCallback(Person $person, array $callback_query, array $mess
                     [['text' => '🔙 برگشت 🔙', 'callback_data' => json_encode(['edit_fav' => null])]]
                 ];
 
-                foreach ($asset_types as $index => $asset_type) {
+                foreach ($asset_types as $asset_type) {
                     $data['reply_markup']['inline_keyboard'] = array_unshift(
                         $data['reply_markup']['inline_keyboard'],
-                        [['text' => $asset_type, 'callback_data' => json_encode(['add_fav' => ['asset_type' => $index]])]] //TODO: Test if can handle the length of type name
+                        [['text' => $asset_type, 'callback_data' => json_encode(['new_fav_type' => $asset_type])]]
                     );
                 }
 
@@ -1202,8 +1202,49 @@ function handlePricesCallback(Person $person, array $callback_query, array $mess
             }
 
             break;
+        case 'new_fav_type':
+
+            $assets = $db->read(
+                table: 'assets',
+                conditions: ['asset_type' => $query_data['new_fav_type']],
+                orderBy: ['asset_type' => 'DESC']
+            );
+
+            if ($assets) {
+                $data['text'] = 'گزینه‌ی مد نظر خود را از لیست زیر انتخاب کنید:';
+                $data['reply_markup']['inline_keyboard'] = [[['text' => '🔙 برگشت 🔙', 'callback_data' => json_encode(['edit_fav' => 'add'])]]];
+
+                foreach ($assets as $asset) {
+                    $data['reply_markup']['inline_keyboard'][] = [['text' => $asset['name'], 'callback_data' => json_encode(['add_fav' => ['asset' => $asset['id']]])]];
+                }
+
+            } else exit();
+
+            sendToTelegram('editMessageText', $data);
+            exit();
+
         case 'add_fav':
-//            handleAddFavoriteCallback($person, $query_data, $asset_types, $data, $db);
+
+            if (array_key_first($query_data['add_fav']) === 'type') {
+
+                $asset_type = $asset_types[$query_data['add_fav']['type']];
+                $assets = $db->read(
+                    table: 'assets',
+                    conditions: ['asset_type' => $asset_type],
+                    orderBy: ['asset_type' => 'DESC']
+                );
+
+                if ($assets) {
+                    $data['text'] = 'گزینه‌ی مد نظر خود را از لیست زیر انتخاب کنید:';
+                    $data['reply_markup']['inline_keyboard'] = [[['text' => '🔙 برگشت 🔙', 'callback_data' => json_encode(['edit_fav' => 'add'])]]];
+
+                    foreach ($assets as $asset) {
+                        $data['reply_markup']['inline_keyboard'][] = [['text' => $asset['name'], 'callback_data' => json_encode(['add_fav' => ['asset' => $asset['id']]])]];
+                    }
+                    sendToTelegram('editMessageText', $data);
+                } else exit();
+
+            }
             break;
         case 'del_fav':
 //            handleDeleteFavoriteCallback($person, $query_data, $data, $db);
