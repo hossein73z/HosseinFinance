@@ -1237,8 +1237,37 @@ function handlePricesCallback(Person $person, array $callback_query, array $mess
 
             break;
         case 'del_fav':
-//            handleDeleteFavoriteCallback($person, $query_data, $data, $db);
-            break;
+
+            $favorite_id = $query_data['del_fav'];
+
+            $data['text'] = 'آیا از حذف اطمینان دارید؟';
+            $data['reply_markup']['inline_keyboard'] = [[
+                ['text' => 'لغو', 'callback_data' => json_encode(['edit_fav' => 'remove'])],
+                ['text' => 'تایید', 'callback_data' => json_encode(['conf_del_fav' => $favorite_id])],
+            ]];
+            sendToTelegram('editMessageText', $data);
+            exit();
+
+        // Delete favorite from the database and send the favorites message to the user
+        case 'conf_del_fav':
+
+            $favorite_id = $query_data['conf_del_fav'];
+            try {
+                $db->delete(
+                    table: 'favorites',
+                    conditions: ['id' => $favorite_id],
+                    resetAutoIncrement: true
+                );
+                $data['text'] = '✅ حذف موفقیت آمیز بود!';
+            } catch (Exception $e) {
+                error_log('Error adding new favorite: ' . $e->getMessage());
+                $data['text'] = '❌ خطای پایگاه داده!';
+            }
+
+            sendToTelegram('editMessageText', $data);
+            sendFavorites($person, $db);
+            exit();
+
         case 'set_live':
             deleteOldLiveMessage($person, $message['message_id'], $db);
             setLiveMessage($person->getId(), $query_data['set_live'], $message['message_id'], $db);
