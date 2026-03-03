@@ -1207,7 +1207,7 @@ function handlePricesCallback(Person $person, array $callback_query, array $mess
                 foreach ($assets as $asset)
                     $data['reply_markup']['inline_keyboard'] = array_unshift(
                         $data['reply_markup']['inline_keyboard'],
-                        [['text' => $asset['name'], 'callback_data' => json_encode(['add_fav' => ['asset' => $asset['id']]])]]
+                        [['text' => $asset['name'], 'callback_data' => json_encode(['new_fav_id' => $asset['id']])]]
                     );
 
             } else exit();
@@ -1215,28 +1215,26 @@ function handlePricesCallback(Person $person, array $callback_query, array $mess
             sendToTelegram('editMessageText', $data);
             exit();
 
-        case 'add_fav':
+        case 'new_fav_id':
 
-            if (array_key_first($query_data['add_fav']) === 'type') {
-
-                $asset_type = $asset_types[$query_data['add_fav']['type']];
-                $assets = $db->read(
-                    table: 'assets',
-                    conditions: ['asset_type' => $asset_type],
-                    orderBy: ['asset_type' => 'DESC']
+            $asset_id = $query_data['new_fav_id'];
+            try {
+                $db->create(
+                    table: 'favorites',
+                    data: [
+                        'person_id' => $person->getId(),
+                        'asset_id' => $asset_id
+                    ]
                 );
-
-                if ($assets) {
-                    $data['text'] = 'گزینه‌ی مد نظر خود را از لیست زیر انتخاب کنید:';
-                    $data['reply_markup']['inline_keyboard'] = [[['text' => '🔙 برگشت 🔙', 'callback_data' => json_encode(['edit_fav' => 'add'])]]];
-
-                    foreach ($assets as $asset) {
-                        $data['reply_markup']['inline_keyboard'][] = [['text' => $asset['name'], 'callback_data' => json_encode(['add_fav' => ['asset' => $asset['id']]])]];
-                    }
-                    sendToTelegram('editMessageText', $data);
-                } else exit();
-
+                $data['text'] = '✅ علاقه‌مندی جدید افزوده شد!';
+            } catch (Exception $e) {
+                error_log('Error adding new favorite: ' . $e->getMessage());
+                $data['text'] = '❌ خطای پایگاه داده!';
             }
+
+            sendToTelegram('editMessageText', $data);
+            sendFavorites($person, $db);
+
             break;
         case 'del_fav':
 //            handleDeleteFavoriteCallback($person, $query_data, $data, $db);
