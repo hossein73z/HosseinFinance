@@ -1121,6 +1121,7 @@ function handlePricesCallback(Person $person, array $callback_query, array $mess
     $data = [
         'chat_id' => $person->getChatId(),
         'message_id' => $message['message_id'],
+        'text' => '📢 خطای ناشناخته!',
     ];
 
     $query_data = json_decode($callback_query['data'], true);
@@ -1142,10 +1143,7 @@ function handlePricesCallback(Person $person, array $callback_query, array $mess
                     [['text' => 'افزودن', 'callback_data' => json_encode(['edit_fav' => 'add'])]],
                     [['text' => '🔙 برگشت 🔙', 'callback_data' => json_encode(['show_favorites' => null])]],
                 ];
-                sendToTelegram('editMessageText', $data);
                 setLiveMessage($person->getId(), false, $message['message_id'], $db);
-                exit();
-
             }
 
             // Show list of asset types for adding new asset
@@ -1162,11 +1160,6 @@ function handlePricesCallback(Person $person, array $callback_query, array $mess
                         [['text' => $asset_type, 'callback_data' => json_encode(['new_fav_type' => $asset_type])]]
                     );
                 }
-
-                sendToTelegram('editMessageText', $data);
-                setLiveMessage($person->getId(), false, $message['message_id'], $db);
-                exit();
-
             }
 
             // Show list of favorites to choose for deletion
@@ -1194,14 +1187,11 @@ function handlePricesCallback(Person $person, array $callback_query, array $mess
                         );
                     }
                 } else $data['text'] = 'لیست علاقه‌مندی‌های شما خالی‌ست!';
-
-                sendToTelegram('editMessageText', $data);
-                setLiveMessage($person->getId(), false, $message['message_id'], $db);
-                exit();
-
             }
 
-            break;
+            sendToTelegram('editMessageText', $data);
+            exit();
+
         case 'new_fav_type':
 
             $assets = $db->read(
