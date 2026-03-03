@@ -1204,9 +1204,11 @@ function handlePricesCallback(Person $person, array $callback_query, array $mess
                 $data['text'] = 'گزینه‌ی مد نظر خود را از لیست زیر انتخاب کنید:';
                 $data['reply_markup']['inline_keyboard'] = [[['text' => '🔙 برگشت 🔙', 'callback_data' => json_encode(['edit_fav' => 'add'])]]];
 
-                foreach ($assets as $asset) {
-                    $data['reply_markup']['inline_keyboard'][] = [['text' => $asset['name'], 'callback_data' => json_encode(['add_fav' => ['asset' => $asset['id']]])]];
-                }
+                foreach ($assets as $asset)
+                    $data['reply_markup']['inline_keyboard'] = array_unshift(
+                        $data['reply_markup']['inline_keyboard'],
+                        [['text' => $asset['name'], 'callback_data' => json_encode(['add_fav' => ['asset' => $asset['id']]])]]
+                    );
 
             } else exit();
 
