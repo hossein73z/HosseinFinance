@@ -1110,33 +1110,103 @@ function level_5(
     }
 
     if ($message) handlePricesTextMessage($data, $message, $asset_types, $db);
-    if ($callback_query) handlePricesCallback($person, $callback_query, $data, $message, $asset_types, $db);
+    if ($callback_query) handlePricesCallback($person, $callback_query, $message, $asset_types, $db);
 }
 
 #[NoReturn]
-function handlePricesCallback(Person $person, array $callback_query, array $data, array $message, array $asset_types, DatabaseManager $db): void
+function handlePricesCallback(Person $person, array $callback_query, array $message, array $asset_types, DatabaseManager $db): void
 {
     sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
 
+    $data = [
+        'chat_id' => $person->getChatId(),
+        'message_id' => $message['message_id'],
+    ];
+
     $query_data = json_decode($callback_query['data'], true);
     if (!$query_data)
-        sendToTelegram('deleteMessage', [
-            'chat_id' => $person->getChatId(),
-            'message_id' => $message['message_id'],
-        ]);
+        sendToTelegram('deleteMessage', $data);
 
     $query_key = array_key_first($query_data);
-    $data['message_id'] = $message['message_id'];
-
     switch ($query_key) {
         case 'edit_fav':
-            handleEditFavoriteCallback($person, $query_data, $asset_types, $data, $db);
+
+            $action = $query_data['edit_fav'];
+
+            // Show main menu for editing favorites
+            if ($action === null) {
+
+                $data['text'] = 'عملیات مورد نظر را انتخاب کنید:';
+                $data['reply_markup']['inline_keyboard'] = [
+                    [['text' => 'حذف', 'callback_data' => json_encode(['edit_fav' => 'remove'])]], // TODO: Think of something for when user has no favorites
+                    [['text' => 'افزودن', 'callback_data' => json_encode(['edit_fav' => 'add'])]],
+                    [['text' => '🔙 برگشت 🔙', 'callback_data' => json_encode(['show_favorites' => null])]],
+                ];
+                sendToTelegram('editMessageText', $data);
+                setLiveMessage($person->getId(), false, $message['message_id'], $db);
+                exit();
+
+            }
+
+            // Show list of asset types for adding new asset
+            if ($action === 'add') {
+
+                $data['text'] = 'یکی از دسته‌بندی‌های زیر را انتخاب کنید:';
+                $data['reply_markup']['inline_keyboard'] = [
+                    [['text' => '🔙 برگشت 🔙', 'callback_data' => json_encode(['edit_fav' => null])]]
+                ];
+
+                foreach ($asset_types as $index => $asset_type) {
+                    $data['reply_markup']['inline_keyboard'] = array_unshift(
+                        $data['reply_markup']['inline_keyboard'],
+                        [['text' => $asset_type, 'callback_data' => json_encode(['add_fav' => ['asset_type' => $index]])]] //TODO: Test if can handle the length of type name
+                    );
+                }
+
+                sendToTelegram('editMessageText', $data);
+                setLiveMessage($person->getId(), false, $message['message_id'], $db);
+                exit();
+
+            }
+
+            // Show list of favorites to choose for deletion
+            if ($action === 'remove') {
+
+                $favorites = $db->read(
+                    table: 'favorites f',
+                    conditions: ['f.person_id' => $person->getId()],
+                    selectColumns: 'a.*, f.id as fav_id',
+                    join: 'JOIN assets a ON a.name=f.asset_name',
+                    orderBy: ['asset_type' => 'DESC', 'f.id' => 'ASC']
+                );
+                $data['reply_markup']['inline_keyboard'] = [
+                    [['text' => '🔙 برگشت 🔙', 'callback_data' => json_encode(['edit_fav' => null])]]
+                ];
+                if ($favorites) {
+
+                    $data['text'] = 'کدام گزینه را می‌خواهید حذف کنید؟';
+
+                    // Create inline buttons for favorites
+                    foreach ($favorites as $favorite) {
+                        $data['reply_markup']['inline_keyboard'] = array_unshift(
+                            $data['reply_markup']['inline_keyboard'],
+                            [['text' => $favorite['asset_name'], 'callback_data' => json_encode(['del_fav' => ['fav_id' => $favorite['id']]])]]
+                        );
+                    }
+                } else $data['text'] = 'لیست علاقه‌مندی‌های شما خالی‌ست!';
+
+                sendToTelegram('editMessageText', $data);
+                setLiveMessage($person->getId(), false, $message['message_id'], $db);
+                exit();
+
+            }
+
             break;
         case 'add_fav':
-            handleAddFavoriteCallback($person, $query_data, $asset_types, $data, $db);
+//            handleAddFavoriteCallback($person, $query_data, $asset_types, $data, $db);
             break;
         case 'del_fav':
-            handleDeleteFavoriteCallback($person, $query_data, $data, $db);
+//            handleDeleteFavoriteCallback($person, $query_data, $data, $db);
             break;
         case 'set_live':
             deleteOldLiveMessage($person, $message['message_id'], $db);
@@ -1160,56 +1230,6 @@ function handlePricesCallback(Person $person, array $callback_query, array $data
             break;
     }
     exit();
-}
-
-function handleEditFavoriteCallback(Person $person, array $query_data, array $asset_types, array $data, $db): void
-{
-    $value = $query_data['edit_fav'];
-
-    if ($value === null) {
-        $data['text'] = 'عملیات مورد نظر را انتخاب کنید:';
-        $data['reply_markup']['inline_keyboard'] = [
-            [['text' => 'افزودن', 'callback_data' => json_encode(['edit_fav' => 'add'])]],
-            [['text' => '🔙 برگشت 🔙', 'callback_data' => json_encode(['back' => 'favorites_list'])]],
-        ];
-
-        $favorites = $db->read(
-            table: 'favorites',
-            conditions: ['person_id' => $person->getId()]
-        );
-        if ($favorites) {
-            $data['reply_markup']['inline_keyboard'][0][] = ['text' => 'حذف', 'callback_data' => json_encode(['edit_fav' => 'remove'])];
-        }
-
-        disableLivePriceMessage($person, $data['message_id'], $db);
-
-    } elseif ($value === 'add') {
-        $data['text'] = 'یکی از دسته‌بندی‌های زیر را انتخاب کنید:';
-        $data['reply_markup']['inline_keyboard'] = [[['text' => '🔙 برگشت 🔙', 'callback_data' => json_encode(['edit_fav' => null])]]];
-
-        $types = array_column($asset_types, 'asset_type');
-        foreach ($types as $index => $type) {
-            $data['reply_markup']['inline_keyboard'][] = [['text' => $type, 'callback_data' => json_encode(['add_fav' => ['asset_type' => $index]])]];
-        }
-    } elseif ($value === 'remove') {
-        $favorites = $db->read(
-            table: 'favorites f',
-            conditions: ['f.person_id' => $person->getId()],
-            selectColumns: 'a.*, f.id as fav_id',
-            join: 'JOIN assets a ON a.name=f.asset_name',
-            orderBy: ['asset_type' => 'DESC', 'f.id' => 'ASC']
-        );
-        if ($favorites) {
-            $data['text'] = 'کدام گزینه را می‌خواهید حذف کنید؟';
-            $data['reply_markup']['inline_keyboard'] = [[['text' => '🔙 برگشت 🔙', 'callback_data' => json_encode(['edit_fav' => null])]]];
-
-            foreach ($favorites as $fav) {
-                $data['reply_markup']['inline_keyboard'][] = [['text' => $fav['asset_name'] ?? $fav['name'], 'callback_data' => json_encode(['del_fav' => ['fav_id' => $fav['id']]])]];
-            }
-        }
-    }
-
-    sendToTelegram('editMessageText', $data);
 }
 
 function handleAddFavoriteCallback(Person $person, array $query_data, array $asset_types, array $data, DatabaseManager $db): void
