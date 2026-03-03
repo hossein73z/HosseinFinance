@@ -1036,7 +1036,7 @@ function sendLoanDetail(array $loan, array $data): void
         $data['message_id'] = $temp_mssg['result']['message_id'];
         $data['text'] = createLoanDetailText($loan, $temp_mssg['result']['message_id']);
         $data['parse_mode'] = 'MarkdownV2';
-        $data['reply_markup'] = ['inline_keyboard' => [[['text' => 'برگشت به لیست وام‌ها', 'callback_data' => json_encode(['loan_list' => null])]]]];;
+        $data['reply_markup'] = ['inline_keyboard' => [[['text' => 'برگشت به لیست وام‌ها', 'callback_data' => json_encode(['loan_list' => null])]]]];
 
         sendToTelegram('editMessageText', $data);
     }
@@ -1121,15 +1121,18 @@ function handlePricesCallback(Person $person, array $callback_query, array $mess
     $data = [
         'chat_id' => $person->getChatId(),
         'message_id' => $message['message_id'],
-        'text' => '📢 خطای ناشناخته!',
     ];
 
     $query_data = json_decode($callback_query['data'], true);
     if (!$query_data)
         sendToTelegram('deleteMessage', $data);
 
+    $data['text'] = '📢 خطای ناشناخته!';
+
     $query_key = array_key_first($query_data);
     switch ($query_key) {
+
+        // Show menu to add/remove a favorite asset
         case 'edit_fav':
 
             $action = $query_data['edit_fav'];
@@ -1179,11 +1182,10 @@ function handlePricesCallback(Person $person, array $callback_query, array $mess
 
                     $data['text'] = 'کدام گزینه را می‌خواهید حذف کنید؟';
 
-                    // Create inline buttons for favorites
                     foreach ($favorites as $favorite) {
                         $data['reply_markup']['inline_keyboard'] = array_unshift(
                             $data['reply_markup']['inline_keyboard'],
-                            [['text' => $favorite['asset_name'], 'callback_data' => json_encode(['del_fav' => ['fav_id' => $favorite['id']]])]]
+                            [['text' => $favorite['asset_name'], 'callback_data' => json_encode(['del_fav' => $favorite['id']])]]
                         );
                     }
                 } else $data['text'] = 'لیست علاقه‌مندی‌های شما خالی‌ست!';
@@ -1192,7 +1194,12 @@ function handlePricesCallback(Person $person, array $callback_query, array $mess
             sendToTelegram('editMessageText', $data);
             exit();
 
+        // Show list of assets in a specific type for user to add to their favorites
         case 'new_fav_type':
+
+            $data['reply_markup']['inline_keyboard'] = [
+                [['text' => '🔙 برگشت 🔙', 'callback_data' => json_encode(['edit_fav' => 'add'])]]
+            ];
 
             $assets = $db->read(
                 table: 'assets',
@@ -1202,7 +1209,6 @@ function handlePricesCallback(Person $person, array $callback_query, array $mess
 
             if ($assets) {
                 $data['text'] = 'گزینه‌ی مد نظر خود را از لیست زیر انتخاب کنید:';
-                $data['reply_markup']['inline_keyboard'] = [[['text' => '🔙 برگشت 🔙', 'callback_data' => json_encode(['edit_fav' => 'add'])]]];
 
                 foreach ($assets as $asset)
                     $data['reply_markup']['inline_keyboard'] = array_unshift(
@@ -1210,11 +1216,12 @@ function handlePricesCallback(Person $person, array $callback_query, array $mess
                         [['text' => $asset['name'], 'callback_data' => json_encode(['new_fav_id' => $asset['id']])]]
                     );
 
-            } else exit();
+            } else $data['text'] = 'دسته‌بندی مورد نظر خالی‌ست!';
 
             sendToTelegram('editMessageText', $data);
             exit();
 
+        // Add new favorite to the table and send the favorites message to the user
         case 'new_fav_id':
 
             $asset_id = $query_data['new_fav_id'];
@@ -1234,8 +1241,9 @@ function handlePricesCallback(Person $person, array $callback_query, array $mess
 
             sendToTelegram('editMessageText', $data);
             sendFavorites($person, $db);
+            exit();
 
-            break;
+        // Show confirmation message for deleting a favorite
         case 'del_fav':
 
             $favorite_id = $query_data['del_fav'];
@@ -1268,56 +1276,29 @@ function handlePricesCallback(Person $person, array $callback_query, array $mess
             sendFavorites($person, $db);
             exit();
 
+        // Start showing live price updates on the current message
         case 'set_live':
             deleteOldLiveMessage($person, $message['message_id'], $db);
             setLiveMessage($person->getId(), $query_data['set_live'], $message['message_id'], $db);
             sendFavorites($person, $db, $message['message_id']);
-            break;
+            exit();
 
+        // Logic for price alerts can be added here
         case 'price_alert':
-            // Logic for price alerts can be added here
-            break;
+            exit();
+
+        // Acts as back button and shows the favorites message
         case 'show_favorites':
             sendFavorites($person, $db, $message['message_id']);
-            break;
-        default:
+            exit();
 
+        default:
             sendToTelegram('editMessageText', [
                 'chat_id' => $person->getChatId(),
                 'message_id' => $message['message_id'],
                 'text' => 'این پیام منقضی شده است.'
             ]);
-            break;
-    }
-    exit();
-}
-
-function handleDeleteFavoriteCallback(Person $person, array $query_data, array $data, DatabaseManager $db): void
-{
-    $inner_key = array_key_first($query_data['del_fav']);
-    $inner_val = $query_data['del_fav'][$inner_key];
-
-    if ($inner_key === 'fav_id') {
-        $data['text'] = 'آیا از حذف اطمینان دارید؟';
-        $data['reply_markup']['inline_keyboard'] = [[
-            ['text' => 'لغو', 'callback_data' => json_encode(['edit_fav' => 'remove'])],
-            ['text' => 'تایید', 'callback_data' => json_encode(['del_fav' => ['conf' => $inner_val]])],
-        ]];
-        sendToTelegram('editMessageText', $data);
-
-    } elseif ($inner_key === 'conf') {
-        $result = $db->delete(
-            table: 'favorites',
-            conditions: ['id' => $inner_val],
-            resetAutoIncrement: true
-        );
-        sendToTelegram('editMessageText', [
-            'chat_id' => $person->getChatId(),
-            'message_id' => $data['message_id'],
-            'text' => $result ? '✅ حذف موفقیت آمیز بود!' : '❌ خطای پایگاه داده!'
-        ]);
-
-        renderFavoritesList($person, null, false, $db);
+            exit();
     }
 }
 
@@ -1761,7 +1742,7 @@ function createLoanDetailText(array $loan, string $mssg_id): string
         $num = beautifulNumber(intval($index) + 1, null);
         $date = beautifulNumber($inst['due_date'], null);
         $amt = beautifulNumber($inst['amount']);
-        $link = "https://t.me/" . BOT_ID . "?start=toggleInstPayment_instId{$inst['id']}_mssgId{$mssg_id}";
+        $link = "https://t.me/" . BOT_ID . "?start=toggleInstPayment_instId{$inst['id']}_mssgId$mssg_id";
 
         $text .= "\n‏    $num\) {$inst['is_paid']}  $date:  $amt    [تغییر وضعیت پرداخت]($link)";
     }
