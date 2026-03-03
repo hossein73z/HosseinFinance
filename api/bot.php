@@ -1232,42 +1232,6 @@ function handlePricesCallback(Person $person, array $callback_query, array $mess
     exit();
 }
 
-function handleAddFavoriteCallback(Person $person, array $query_data, array $asset_types, array $data, DatabaseManager $db): void
-{
-    $inner_key = array_key_first($query_data['add_fav']);
-    $inner_val = $query_data['add_fav'][$inner_key];
-
-    if ($inner_key === 'asset_type') {
-        $type = array_column($asset_types, 'asset_type')[$inner_val];
-        $assets = $db->read(
-            table: 'assets',
-            conditions: ['asset_type' => $type],
-            orderBy: ['asset_type' => 'DESC']
-        );
-
-        $data['text'] = 'گزینه‌ی مد نظر خود را از لیست زیر انتخاب کنید:';
-        $data['reply_markup']['inline_keyboard'] = [[['text' => '🔙 برگشت 🔙', 'callback_data' => json_encode(['edit_fav' => 'add'])]]];
-
-        foreach ($assets as $asset) {
-            $data['reply_markup']['inline_keyboard'][] = [['text' => $asset['name'], 'callback_data' => json_encode(['add_fav' => ['asset' => $asset['id']]])]];
-        }
-        sendToTelegram('editMessageText', $data);
-
-    } elseif ($inner_key === 'asset') {
-        $result = $db->create(
-            table: 'favorites',
-            data: ['person_id' => $person->getId(), 'asset_id' => $inner_val]
-        );
-        sendToTelegram('editMessageText', [
-            'chat_id' => $person->getChatId(),
-            'message_id' => $data['message_id'],
-            'text' => $result ? '✅ علاقه‌مندی جدید افزوده شد!' : '❌ خطای پایگاه داده!'
-        ]);
-
-        renderFavoritesList($person, null, false, $db); // Send as new message
-    }
-}
-
 function handleDeleteFavoriteCallback(Person $person, array $query_data, array $data, DatabaseManager $db): void
 {
     $inner_key = array_key_first($query_data['del_fav']);
