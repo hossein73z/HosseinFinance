@@ -771,7 +771,7 @@
     const API_URL = 'https://hossein-finance.vercel.app/api/ExternalConnections/api.php';
     const urlParams = new URLSearchParams(window.location.search);
     const SECRET_KEY = urlParams.get('k');
-    const PERSON_ID = urlParams.get('id');
+    const USER_ID = urlParams.get('id');
 
     let allLoans = [];
     let currentLoanId = null;
@@ -952,7 +952,7 @@
     }
 
     async function fetchData() {
-        if (!PERSON_ID) {
+        if (!USER_ID) {
             tg.showAlert("شناسه شخص یافت نشد.");
             hideLoading();
             return;
@@ -961,7 +961,7 @@
 
         const payload = {
             "operation": "read", "table": "loans",
-            "conditions": {"person_id": PERSON_ID},
+            "conditions": {"user_id": USER_ID},
             "selectColumns": "loans.*, JSON_ARRAYAGG(JSON_OBJECT('id', installments.id, 'amount', installments.amount, 'due_date', installments.due_date, 'is_paid', installments.is_paid)) as installments",
             "join": "LEFT JOIN installments ON loans.id=installments.loan_id",
             "groupBy": "loans.id"

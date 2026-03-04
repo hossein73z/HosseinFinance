@@ -1,6 +1,6 @@
 USE test;
 
-CREATE TABLE IF NOT EXISTS `persons`
+CREATE TABLE IF NOT EXISTS `users`
 (
     id         INT AUTO_INCREMENT NOT NULL PRIMARY KEY,
     chat_id    BIGINT             NOT NULL UNIQUE,
@@ -57,7 +57,7 @@ CREATE TABLE IF NOT EXISTS `assets`
 CREATE TABLE IF NOT EXISTS `holdings`
 (
     id        INT AUTO_INCREMENT PRIMARY KEY,
-    person_id INT            NOT NULL,
+    user_id   INT            NOT NULL,
     asset_id  INT            NOT NULL,
     amount    NUMERIC(18, 8) NOT NULL DEFAULT 0.0,
     note      TEXT,
@@ -65,26 +65,26 @@ CREATE TABLE IF NOT EXISTS `holdings`
     date      TEXT                    DEFAULT NULL,
     time      TEXT                    DEFAULT NULL,
 
-    UNIQUE KEY idx_unique_holding (person_id, asset_id),
-    FOREIGN KEY (person_id) REFERENCES persons (id) ON DELETE CASCADE,
+    UNIQUE KEY idx_unique_holding (user_id, asset_id),
+    FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
     FOREIGN KEY (asset_id) REFERENCES assets (id) ON DELETE RESTRICT
 ) DEFAULT CHARSET = utf8mb4;
 
 CREATE TABLE IF NOT EXISTS favorites
 (
     id         INT AUTO_INCREMENT PRIMARY KEY,
-    person_id  INT          NOT NULL,
+    user_id    INT          NOT NULL,
     asset_name VARCHAR(191) NOT NULL,
 
-    UNIQUE KEY idx_unique_favorite (person_id, asset_name),
-    FOREIGN KEY (person_id) REFERENCES persons (id) ON DELETE CASCADE,
+    UNIQUE KEY idx_unique_favorite (user_id, asset_name),
+    FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
     FOREIGN KEY (asset_name) REFERENCES assets (name) ON DELETE RESTRICT
 ) DEFAULT CHARSET = utf8mb4;
 
 CREATE TABLE IF NOT EXISTS `alerts`
 (
     id             BIGINT AUTO_INCREMENT PRIMARY KEY,
-    person_id      INT                         NOT NULL,
+    user_id        INT                         NOT NULL,
     asset_name     VARCHAR(191)                NOT NULL UNIQUE,
     target_price   NUMERIC(18, 8)              NOT NULL,
     trigger_type   ENUM ('up', 'down', 'both') NOT NULL DEFAULT 'both',
@@ -95,39 +95,39 @@ CREATE TABLE IF NOT EXISTS `alerts`
     triggered_time VARCHAR(8)                           DEFAULT NULL,
     note           TEXT,
 
-    UNIQUE INDEX idx_unique_alert (asset_name, person_id, target_price),
-    FOREIGN KEY (person_id) REFERENCES persons (id) ON DELETE CASCADE,
+    UNIQUE INDEX idx_unique_alert (asset_name, user_id, target_price),
+    FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
     FOREIGN KEY (asset_name) REFERENCES assets (name) ON DELETE RESTRICT
 ) DEFAULT CHARSET = utf8mb4;
 
 CREATE TABLE IF NOT EXISTS `transactions`
 (
-    id        BIGINT AUTO_INCREMENT PRIMARY KEY,
-    person_id INT            NOT NULL,
-    asset_id  INT            NOT NULL,
-    category  VARCHAR(50)    NOT NULL,
-    date      VARCHAR(10)    DEFAULT NULL,
-    time      VARCHAR(8)     DEFAULT NULL,
-    price     NUMERIC(18, 8) NOT NULL,
-    amount    NUMERIC(18, 8) NOT NULL,
-    fee       NUMERIC(18, 8) DEFAULT 0.0,
-    note      TEXT,
+    id       BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id  INT            NOT NULL,
+    asset_id INT            NOT NULL,
+    category VARCHAR(50)    NOT NULL,
+    date     VARCHAR(10)    DEFAULT NULL,
+    time     VARCHAR(8)     DEFAULT NULL,
+    price    NUMERIC(18, 8) NOT NULL,
+    amount   NUMERIC(18, 8) NOT NULL,
+    fee      NUMERIC(18, 8) DEFAULT 0.0,
+    note     TEXT,
 
     FOREIGN KEY (asset_id) REFERENCES assets (id) ON DELETE RESTRICT,
-    FOREIGN KEY (person_id) REFERENCES persons (id) ON DELETE CASCADE
+    FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
 ) DEFAULT CHARSET = utf8mb4;
 
 CREATE TABLE IF NOT EXISTS `loans`
 (
     id            INT AUTO_INCREMENT PRIMARY KEY,
-    person_id     INT                   NOT NULL,
+    user_id       INT                   NOT NULL,
     name          VARCHAR(191)          NOT NULL,
     total_amount  NUMERIC(18, 8)        NOT NULL,
     received_date VARCHAR(10) DEFAULT NULL,
     alert_offset  INT         DEFAULT 0 NOT NULL,
     created_at    TIMESTAMP   DEFAULT CURRENT_TIMESTAMP,
 
-    FOREIGN KEY (person_id) REFERENCES persons (id) ON DELETE CASCADE
+    FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
 ) DEFAULT CHARSET = utf8mb4;
 
 CREATE TABLE IF NOT EXISTS `installments`
@@ -145,17 +145,17 @@ CREATE TABLE IF NOT EXISTS `installments`
 CREATE TABLE IF NOT EXISTS `special_messages`
 (
     id         INT AUTO_INCREMENT PRIMARY KEY,
-    person_id  INT         NOT NULL,
+    user_id    INT         NOT NULL,
     type       VARCHAR(10) NOT NULL,
     is_active  BOOLEAN     NOT NULL DEFAULT 0,
     message_id NUMERIC(6)  NOT NULL,
     data       text,
 
-    UNIQUE INDEX idx_unique_installment (person_id, type),
-    FOREIGN KEY (person_id) REFERENCES persons (id) ON DELETE CASCADE
+    UNIQUE INDEX idx_unique_installment (user_id, type),
+    FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
 ) DEFAULT CHARSET = utf8mb4;
 
-alter table persons
+alter table users
     auto_increment 0;
 alter table buttons
     auto_increment 0;

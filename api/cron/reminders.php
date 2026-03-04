@@ -30,8 +30,8 @@ try {
             ],
             [
                 'type' => 'INNER',
-                'table' => 'persons p',
-                'on' => 'l.person_id = p.id'
+                'table' => 'users p',
+                'on' => 'l.user_id = p.id'
             ]
         ],
         orderBy: ['due_date' => 'ASC']

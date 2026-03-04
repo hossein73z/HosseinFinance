@@ -293,14 +293,14 @@ function addPriceToDatabase(array $matches, string $asset_type, string $date, st
                     floatval($alert['target_price']) < min(floatval($asset_price), floatval($alert['price']))) continue;
             }
 
-            $person = $db->read('persons', ['id' => $alert['person_id']], true);
+            $user = $db->read('users', ['id' => $alert['user_id']], true);
 
             $alert_icon = '';
             if ($alert['trigger_type'] == 'up') $alert_icon = '⏫ ';
             if ($alert['trigger_type'] == 'down') $alert_icon = '⏬ ';
             if ($alert['trigger_type'] == 'both') $alert_icon = '↕️ ';
             $response = sendToTelegram('sendMessage', [
-                'chat_id' => $person['chat_id'],
+                'chat_id' => $user['chat_id'],
                 'text' =>
                     "هشدار قیمت برای " . "«" . beautifulNumber(trim($match), null) . "»" . " فعال شد." . "\n" .
                     "قیمت هشدار: " . $alert_icon . beautifulNumber($alert['target_price']) . "\n" .
@@ -319,7 +319,7 @@ function addPriceToDatabase(array $matches, string $asset_type, string $date, st
         table: 'special_messages sm',
         conditions: ['sm.type' => 'live_price'],
         selectColumns: 'sm.*, p.chat_id',
-        join: 'JOIN persons p ON p.id = sm.person_id'
+        join: 'JOIN users p ON p.id = sm.user_id'
     );
 
     if ($live_mssgs) foreach ($live_mssgs as $live_mssg) {
@@ -327,7 +327,7 @@ function addPriceToDatabase(array $matches, string $asset_type, string $date, st
         if ($live_mssg['is_active']) {
             $favorites = $db->read(
                 table: 'favorites f',
-                conditions: ['person_id' => $live_mssg['person_id']],
+                conditions: ['user_id' => $live_mssg['user_id']],
                 selectColumns: 'a.*',
                 join: 'JOIN assets a ON a.id=f.asset_id',
                 orderBy: ['asset_type' => 'DESC', 'id' => 'ASC']);

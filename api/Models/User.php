@@ -1,6 +1,6 @@
 <?php
 
-class Person implements JsonSerializable
+class User implements JsonSerializable
 {
     public function __construct(
         private ?int    $id,
@@ -16,7 +16,7 @@ class Person implements JsonSerializable
     }
 
     /**
-     * Factory method to easily create a Person instance from a database row
+     * Factory method to easily create a User instance from a database row
      */
     public static function fromDbRow(array $row): self
     {
