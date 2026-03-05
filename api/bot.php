@@ -1673,9 +1673,9 @@ function createLoanDetailText(array $loan, string $mssg_id): string
 
 /**
  * @param array|null $assets Array of assets, must be ordered by `asset_type`
- * @param int|string|null $user_id Used to fetch favorites if `$assets` is null
- * @param DatabaseManager|null $db Used to fetch favorites if `$assets` is null
- * @return string Well-structured text for favorites message
+ * @param int|string|null $user_id Used to fetch favorites only if `$assets` is null
+ * @param DatabaseManager|null $db Used to fetch favorites only if `$assets` is null
+ * @return string Well-structured text for favorites' (Or error) message
  */
 function createFavoritesText(?array $assets, int|string|null $user_id = null, ?DatabaseManager $db = null): string
 {
