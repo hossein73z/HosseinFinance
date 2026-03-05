@@ -281,7 +281,7 @@ function nonButtonHandler(User $user, array $message, DatabaseManager $db): void
 function choosePath(
     ?Button         $pressed_button = null,
     ?array          $message = null,
-    ?User         $user = null,
+    ?User           $user = null,
     ?array          $callback_query = null,
     DatabaseManager $db = null): void
 {
@@ -342,7 +342,7 @@ function cancelButton(User $user, $db): void
 
 #[NoReturn]
 function level_1(
-    User          $user,
+    User            $user,
     DatabaseManager $db,
     ?Button         $pressed_button = null,
     ?array          $message = null,
@@ -678,7 +678,7 @@ function sendHoldingDetail(array $holding, array $data): void
 
 #[NoReturn]
 function level_2(
-    User          $user,
+    User            $user,
     DatabaseManager $db,
     ?Button         $pressed_button = null,
     ?array          $message = null,
@@ -1048,7 +1048,7 @@ function sendLoanDetail(array $loan, array $data): void
 
 #[NoReturn]
 function level_5(
-    User          $user,
+    User            $user,
     DatabaseManager $db,
     ?Button         $pressed_button = null,
     ?array          $message = null,
@@ -1142,7 +1142,7 @@ function handlePricesCallback(User $user, array $callback_query, array $message,
 
                 $data['text'] = 'عملیات مورد نظر را انتخاب کنید:';
                 $data['reply_markup']['inline_keyboard'] = [
-                    [['text' => 'حذف', 'callback_data' => json_encode(['edit_fav' => 'remove'])]], // TODO: Think of something for when user has no favorites
+                    [['text' => 'حذف', 'callback_data' => json_encode(['edit_fav' => 'remove'])]],
                     [['text' => 'افزودن', 'callback_data' => json_encode(['edit_fav' => 'add'])]],
                     [['text' => '🔙 برگشت 🔙', 'callback_data' => json_encode(['show_favorites' => null])]],
                 ];
@@ -1188,7 +1188,7 @@ function handlePricesCallback(User $user, array $callback_query, array $message,
                             [['text' => $favorite['asset_name'], 'callback_data' => json_encode(['del_fav' => $favorite['id']])]]
                         );
                     }
-                } else $data['text'] = 'لیست علاقه‌مندی‌های شما خالی‌ست!';
+                } else $data['text'] = 'لیست علاقه‌مندی‌های شما خالی‌ست!'; // TODO: Answer the callback with a message instead of changing text
             }
 
             sendToTelegram('editMessageText', $data);
@@ -1384,15 +1384,30 @@ function handlePricesTextMessage(array $data, array $message, array $asset_types
  */
 function sendFavorites(User $user, DatabaseManager $db, int|string|null $message_id = null): void
 {
-    $message_id = ($message_id !== null)
-        ? $message_id
-        : sendLoadingMessage($user->getChatId(), 'در حال دریافت اطلاعات لیست علاقه‌مندی‌ها ...')['result']['message_id'];
+    $message_id = ($message_id !== null) ?
+        $message_id :
+        sendLoadingMessage($user->getChatId(), 'در حال دریافت اطلاعات لیست علاقه‌مندی‌ها ...')['result']['message_id'];
+
+    try {
+        $favorites = $db->read(
+            table: 'favorites f',
+            conditions: ['f.user_id' => $user->getId()],
+            selectColumns: 'a.*, f.id as fav_id',
+            join: 'JOIN assets a ON a.name=f.asset_name',
+            orderBy: ['asset_type' => 'DESC', 'f.id' => 'ASC']
+        );
+    } catch (Exception $e) {
+        error_log('createFavoritesText: ' . $e->getMessage());
+        $favorites = null;
+    }
 
     sendToTelegram('editMessageText', [
         'chat_id' => $user->getChatId(),
         'message_id' => $message_id,
-        'text' => createFavoritesText(null, $user->getId(), $db),
-        'reply_markup' => ['inline_keyboard' => createFavoritesInlineKeyboard($user, $message_id, $db)]
+        'text' => createFavoritesText($favorites),
+        'reply_markup' => [
+            'inline_keyboard' => createFavoritesInlineKeyboard($user->getId(), $message_id, $db, boolval($favorites))
+        ]
     ]);
 }
 
@@ -1504,22 +1519,25 @@ function deleteOldLiveMessage(User $user, int|string $message_id, DatabaseManage
 }
 
 /**
- * Checks the database for current message
- * to see if it's registered for live message
+ * Creates an array of array of inline buttons for favorites' message.
  *
- * @param User $user
+ * @param int|string $user_id
  * @param int $message_id The ID of current message to be checked for live update
  * @param DatabaseManager $db
- * @return array[] Array of array of inline buttons for favorites message
- *
- * TODO: manage inline buttons for no registered favorite
+ * @param bool|null $has_favorites If `null`, The function automatically checks the database for any registered favorites
+ * @return array[]
  */
-function createFavoritesInlineKeyboard(User $user, int $message_id, DatabaseManager $db): array
+
+function createFavoritesInlineKeyboard(
+    int|string      $user_id,
+    int             $message_id,
+    DatabaseManager $db,
+    ?bool           $has_favorites = null): array
 {
     $live_mssg = $db->read(
         table: 'special_messages',
         conditions: [
-            'user_id' => $user->getId(),
+            'user_id' => $user_id,
             'type' => 'live_price',
             'is_active' => true,
             'message_id' => $message_id,
@@ -1527,13 +1545,22 @@ function createFavoritesInlineKeyboard(User $user, int $message_id, DatabaseMana
         single: true
     );
 
-    return [
-        ($live_mssg)
-            ? [['text' => 'توقف نمایش زنده ⏸', 'callback_data' => json_encode(['set_live' => false])]]
-            : [['text' => 'نمایش زنده قیمت‌ها ▶', 'callback_data' => json_encode(['set_live' => true])]],
-//        [['text' => 'هشدار قیمت', 'callback_data' => json_encode(['price_alert' => null])]],
-        [['text' => 'ویرایش لیست', 'callback_data' => json_encode(['edit_fav' => null])]],
-    ];
+    $has_favorites = $has_favorites ?? boolval($db->read(
+        table: 'favorites f',
+        conditions: ['f.user_id' => $user_id],
+        selectColumns: 'a.*, f.id as fav_id',
+        join: 'JOIN assets a ON a.name=f.asset_name',
+        orderBy: ['asset_type' => 'DESC', 'f.id' => 'ASC']
+    ));
+
+    if ($has_favorites) $inline_keyboard[] = ($live_mssg) ?
+        [['text' => 'توقف نمایش زنده ⏸', 'callback_data' => json_encode(['set_live' => false])]] :
+        [['text' => 'نمایش زنده قیمت‌ها ▶', 'callback_data' => json_encode(['set_live' => true])]];
+
+    $inline_keyboard[] = [['text' => 'هشدار قیمت', 'callback_data' => json_encode(['price_alert' => null])]];
+    $inline_keyboard[] = [['text' => 'ویرایش لیست', 'callback_data' => json_encode(['edit_fav' => null])]];
+
+    return $inline_keyboard;
 }
 
 
@@ -1672,24 +1699,34 @@ function createLoanDetailText(array $loan, string $mssg_id): string
 }
 
 /**
+ * Creates a well-structured text for favorites' message.
+ * If `$assets` is `null`, both `$user_id` and `$db` are required.
+ *
  * @param array|null $assets Array of assets, must be ordered by `asset_type`
- * @param int|string|null $user_id Used to fetch favorites only if `$assets` is null
- * @param DatabaseManager|null $db Used to fetch favorites only if `$assets` is null
- * @return string Well-structured text for favorites' (Or error) message
+ * @param int|string|null $user_id Used to fetch favorites **only** if `$assets` is `null`
+ * @param DatabaseManager|null $db Used to fetch favorites **only** if `$assets` is `null`
+ * @return string|null `null` on wrong inputs
  */
-function createFavoritesText(?array $assets, int|string|null $user_id = null, ?DatabaseManager $db = null): string
+function createFavoritesText(?array $assets, int|string|null $user_id = null, ?DatabaseManager $db = null): string|null
 {
-    try {
-        $assets = $assets ?? $db->read(
-            table: 'favorites f',
-            conditions: ['f.user_id' => $user_id],
-            selectColumns: 'a.*, f.id as fav_id',
-            join: 'JOIN assets a ON a.name=f.asset_name',
-            orderBy: ['asset_type' => 'DESC', 'f.id' => 'ASC']
-        );
-    } catch (Exception $e) {
-        error_log('createFavoritesText: ' . $e->getMessage());
-        exit();
+    if ($assets === null) {
+        if ($db && $user_id) {
+            try {
+                $assets = $db->read(
+                    table: 'favorites f',
+                    conditions: ['f.user_id' => $user_id],
+                    selectColumns: 'a.*, f.id as fav_id',
+                    join: 'JOIN assets a ON a.name=f.asset_name',
+                    orderBy: ['asset_type' => 'DESC', 'f.id' => 'ASC']
+                );
+            } catch (Exception $e) {
+                error_log('createFavoritesText: ' . $e->getMessage());
+                exit();
+            }
+        } else {
+            error_log('createFavoritesText: Required inputs are wrong`');
+            exit();
+        }
     }
 
     if ($assets) {
