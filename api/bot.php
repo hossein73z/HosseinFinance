@@ -1302,6 +1302,28 @@ function handlePricesCallback(User $user, array $callback_query, array $message,
     }
 }
 
+#[NoReturn]
+function handlePricesTextMessage(array $data, array $message, array $asset_types, DatabaseManager $db): void
+{
+    if (in_array($message['text'], $asset_types)) {
+
+        $data['reply_to_message_id'] = $message['message_id'];
+
+        $assets = $db->read('assets', ['asset_type' => $message['text']]);
+        if ($assets) $data['text'] = createPricesTextForSingleAssetType($assets);
+        else $data['text'] = 'این دسته بندی خالی‌ست!';
+
+        sendToTelegram('sendMessage', $data);
+        exit();
+    }
+
+    // Send default message of this level
+    $data['text'] = 'پیام نامفهوم است!' . "\n" . 'یکی از دسته‌بندی‌های زیر را انتخاب کنید:';
+    sendToTelegram('sendMessage', $data);
+    exit();
+
+}
+
 /**
  * Activate/Inactivate current message in the database as `live_price`.
  *
@@ -1348,28 +1370,6 @@ function setLiveMessage(int|string $user_id, bool $activate, int|string $message
 
 }
 
-#[NoReturn]
-function handlePricesTextMessage(array $data, array $message, array $asset_types, DatabaseManager $db): void
-{
-    if (in_array($message['text'], $asset_types)) {
-
-        $data['reply_to_message_id'] = $message['message_id'];
-
-        $assets = $db->read('assets', ['asset_type' => $message['text']]);
-        if ($assets) $data['text'] = createPricesTextForSingleAssetType($assets);
-        else $data['text'] = 'این دسته بندی خالی‌ست!';
-
-        sendToTelegram('sendMessage', $data);
-        exit();
-    }
-
-    // Send default message of this level
-    $data['text'] = 'پیام نامفهوم است!' . "\n" . 'یکی از دسته‌بندی‌های زیر را انتخاب کنید:';
-    sendToTelegram('sendMessage', $data);
-    exit();
-
-}
-
 /**
  * Edits a message and adds favorites text and inline keyboard.
  * Doesn't send the initial message containing bottom keyboard.
@@ -1411,12 +1411,62 @@ function sendFavorites(User $user, DatabaseManager $db, int|string|null $message
     ]);
 }
 
+/**
+ * Creates an array of array of inline buttons for favorites' message.
+ *
+ * @param int|string $user_id
+ * @param int $message_id The ID of current message to be checked for live update
+ * @param DatabaseManager $db
+ * @param bool|null $has_favorites If `null`, The function automatically checks the database for any registered favorites
+ * @return array[]
+ */
+
+function createFavoritesInlineKeyboard(
+    int|string      $user_id,
+    int             $message_id,
+    DatabaseManager $db,
+    ?bool           $has_favorites = null): array
+{
+    $live_mssg = $db->read(
+        table: 'special_messages',
+        conditions: [
+            'user_id' => $user_id,
+            'type' => 'live_price',
+            'is_active' => true,
+            'message_id' => $message_id,
+        ],
+        single: true
+    );
+
+    $has_favorites = $has_favorites ?? boolval($db->read(
+        table: 'favorites f',
+        conditions: ['f.user_id' => $user_id],
+        selectColumns: 'a.*, f.id as fav_id',
+        join: 'JOIN assets a ON a.name=f.asset_name',
+        orderBy: ['asset_type' => 'DESC', 'f.id' => 'ASC']
+    ));
+
+    if ($has_favorites) $inline_keyboard[] = ($live_mssg) ?
+        [['text' => 'توقف نمایش زنده ⏸', 'callback_data' => json_encode(['set_live' => false])]] :
+        [['text' => 'نمایش زنده قیمت‌ها ▶', 'callback_data' => json_encode(['set_live' => true])]];
+
+    $inline_keyboard[] = [['text' => 'هشدار قیمت', 'callback_data' => json_encode(['price_alert' => null])]];
+    $inline_keyboard[] = [['text' => 'ویرایش لیست', 'callback_data' => json_encode(['edit_fav' => null])]];
+
+    return $inline_keyboard;
+}
+
+
 // ==========================================
 //          LEVEL 6: ARTIFICIAL INTELLIGENCE
 // ==========================================
 
 #[NoReturn]
-function level_6(User $user, DatabaseManager $db, ?array $message = null, ?array $callback_query = null): void
+function level_6(
+    User            $user,
+    DatabaseManager $db,
+    ?array          $message = null,
+    ?array          $callback_query = null): void
 {
     if ($callback_query) {
         sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
@@ -1517,52 +1567,6 @@ function deleteOldLiveMessage(User $user, int|string $message_id, DatabaseManage
 
     return boolval($live_mssg);
 }
-
-/**
- * Creates an array of array of inline buttons for favorites' message.
- *
- * @param int|string $user_id
- * @param int $message_id The ID of current message to be checked for live update
- * @param DatabaseManager $db
- * @param bool|null $has_favorites If `null`, The function automatically checks the database for any registered favorites
- * @return array[]
- */
-
-function createFavoritesInlineKeyboard(
-    int|string      $user_id,
-    int             $message_id,
-    DatabaseManager $db,
-    ?bool           $has_favorites = null): array
-{
-    $live_mssg = $db->read(
-        table: 'special_messages',
-        conditions: [
-            'user_id' => $user_id,
-            'type' => 'live_price',
-            'is_active' => true,
-            'message_id' => $message_id,
-        ],
-        single: true
-    );
-
-    $has_favorites = $has_favorites ?? boolval($db->read(
-        table: 'favorites f',
-        conditions: ['f.user_id' => $user_id],
-        selectColumns: 'a.*, f.id as fav_id',
-        join: 'JOIN assets a ON a.name=f.asset_name',
-        orderBy: ['asset_type' => 'DESC', 'f.id' => 'ASC']
-    ));
-
-    if ($has_favorites) $inline_keyboard[] = ($live_mssg) ?
-        [['text' => 'توقف نمایش زنده ⏸', 'callback_data' => json_encode(['set_live' => false])]] :
-        [['text' => 'نمایش زنده قیمت‌ها ▶', 'callback_data' => json_encode(['set_live' => true])]];
-
-    $inline_keyboard[] = [['text' => 'هشدار قیمت', 'callback_data' => json_encode(['price_alert' => null])]];
-    $inline_keyboard[] = [['text' => 'ویرایش لیست', 'callback_data' => json_encode(['edit_fav' => null])]];
-
-    return $inline_keyboard;
-}
-
 
 // ==========================================
 //          TEXT FORMATTING HELPERS
