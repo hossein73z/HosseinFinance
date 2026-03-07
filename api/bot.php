@@ -1599,9 +1599,13 @@ function createHoldingDetailText(
         $holding['asset_name'] = "[$asset_name](https://t.me/" . BOT_ID . "?start=viewHolding_holdingId{$holding['id']}" . ($mssg_id ? "_mssgId" . $mssg_id : '') . ")" . '‏';
     }
 
-    $price_def = $holding['current_price'] - $holding['avg_price'];
-    $profit_val = ($price_def * $holding['amount']) * floatval($holding['base_rate']);
-    $profit = ($price_def >= 0) ? "🟢 سود: " . beautifulNumber($profit_val) : "🔴 ضرر: " . beautifulNumber($profit_val);
+    $profit = calculateProLos($holding['current_price'], $holding['avg_price'], $holding['amount'], $holding['base_rate']);
+    if ($profit == 0)
+        $profit_string = "🟤 سود/زیان: ۰";
+    else
+        $profit_string = ($profit >= 0) ?
+            "🟢 سود: " . beautifulNumber($profit) :
+            "🔴 ضرر: " . beautifulNumber($profit);
 
     $tree = "\n   │ " . "‏";
     if (in_array('date', $attributes)) $tree .= "\n   ┤── تاریخ خرید: " . beautifulNumber("$date[2] $date[1] $date[0]", null);
@@ -1611,7 +1615,7 @@ function createHoldingDetailText(
     if (in_array('org_total_price', $attributes)) $tree .= "\n   ┤── قیمت خرید کل: " . beautifulNumber($holding['avg_price'] * $holding['amount']) . " " . $holding['base_currency'];
     if (in_array('new_total_price', $attributes)) $tree .= "\n   ┤── قیمت لحظه‌ای کل دارایی: " . beautifulNumber($holding['current_price'] * $holding['amount']) . " " . $holding['base_currency'];
     $tree .= "\n   │ " . "‏";
-    if (in_array('profit', $attributes)) $tree .= "\n   ┘── " . $profit . " ریال";
+    if (in_array('profit', $attributes)) $tree .= "\n   ┘── " . $profit_string . " ریال";
     $tree .= "\n";
 
     if ($markdown === 'MarkdownV2') $tree = markdownScape($tree);
@@ -1720,6 +1724,12 @@ function dateStringToArray(string $date, string $delimiter = '-'): array
     $date[1] = str_replace(['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'], $months, $date[1]);
 
     return $date;
+}
+
+function calculateProLos(float $p1, float $p2, float $amount = 1, float $conversion_rate = 1): float
+{
+    $total_price_def = $amount * ($p2 - $p1);
+    return $total_price_def * $conversion_rate;
 }
 
 /**
