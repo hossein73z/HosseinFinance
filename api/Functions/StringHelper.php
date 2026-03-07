@@ -144,7 +144,6 @@ function getJalaliDate(
 
 /**
  * Converts a Jalali date to Gregorian.
- * This is the mathematical inverse of your getJalaliDate function.
  */
 function jalaliToGregorian(int $j_y, int $j_m, int $j_d): string
 {

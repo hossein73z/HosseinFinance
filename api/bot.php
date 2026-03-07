@@ -1635,10 +1635,15 @@ function createLoansView(array $loans, ?string $mssg_id = null): string
         $daysRemaining = 0;
         $parts = explode('/', $next_payment);
         if (count($parts) == 3) {
-            $gregorianDueDate = new DateTime(jalaliToGregorian($parts[0], $parts[1], $parts[2]) . ' 00:00:00'); // TODO: Handle the exception
-            $today = new DateTime('now');
-            $today->setTime(0, 0);
-            $daysRemaining = (int)$today->diff($gregorianDueDate)->format('%r%a');
+            try {
+                $gregorianDueDate = new DateTime(jalaliToGregorian($parts[0], $parts[1], $parts[2]) . ' 00:00:00');
+                $today = new DateTime('now');
+                $today->setTime(0, 0);
+                $daysRemaining = (int)$today->diff($gregorianDueDate)->format('%r%a');
+            } catch (Exception $e) {
+                $daysRemaining = 'خطا در محاسبه!';
+                error_log('Error creating `DateTime` object from Jalali calendar: ' . $e->getMessage());
+            }
         }
 
         $link = "https://t.me/" . BOT_ID . "?start=showLoan_loanId{$loan['id']}" . ($mssg_id ? "_mssgId" . $mssg_id : '');
