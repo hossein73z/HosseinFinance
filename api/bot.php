@@ -24,7 +24,7 @@ define('BASE_URL', 'https://' . getenv('VERCEL_PROJECT_PRODUCTION_URL'));
 require_once 'Libraries/DatabaseManager.php';
 require_once 'Functions/ExternalEndpointsFunctions.php';
 require_once 'Functions/KeyboardFunctions.php';
-require_once 'Functions/StringHelper.php';
+require_once 'Functions/StringHelper.php'; // TODO: Create object for Jalali date
 require_once 'Models/Button.php';
 require_once 'Models/User.php';
 
@@ -1591,10 +1591,9 @@ function createHoldingDetailText(
     ],
     ?string $mssg_id = null): string
 {
-    $date = preg_split('/-/u', $holding['date']);
-    $months = ['فروردین', 'اردیبهشت', 'خرداد', 'تیر', 'مرداد', 'شهریور', 'مهر', 'آبان', 'آذر', 'دی', 'بهمن', 'اسفند'];
-    $date[1] = str_replace(['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'], $months, $date[1]);
+    $date = dateStringToArray($holding['date']);
 
+    // Add deeplink to asset name and scape characters for markdown
     if ($markdown === 'MarkdownV2') {
         $asset_name = beautifulNumber(markdownScape($holding['asset_name']), null);
         $holding['asset_name'] = "[$asset_name](https://t.me/" . BOT_ID . "?start=viewHolding_holdingId{$holding['id']}" . ($mssg_id ? "_mssgId" . $mssg_id : '') . ")" . '‏';
@@ -1710,6 +1709,17 @@ function createLoanDetailText(array $loan, string $mssg_id): string
         $text .= "\n‏    $num\) {$inst['is_paid']}  $date:  $amt    [تغییر وضعیت پرداخت]($link)";
     }
     return $text;
+}
+
+function dateStringToArray(string $date, string $delimiter = '-'): array
+{
+    // TODO: This function needs to be a method of Jalali object
+
+    $date = preg_split("/$delimiter/u", $date);
+    $months = ['فروردین', 'اردیبهشت', 'خرداد', 'تیر', 'مرداد', 'شهریور', 'مهر', 'آبان', 'آذر', 'دی', 'بهمن', 'اسفند'];
+    $date[1] = str_replace(['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'], $months, $date[1]);
+
+    return $date;
 }
 
 /**
