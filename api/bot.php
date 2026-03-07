@@ -1278,7 +1278,7 @@ function handlePricesCallback(User $user, array $callback_query, array $message,
 
         // Start showing live price updates on the current message
         case 'set_live':
-            deleteOldLiveMessage($user, $message['message_id'], $db);
+            deleteOldActiveLiveMessage($user, $message['message_id'], $db);
             setLiveMessage($user->getId(), $query_data['set_live'], $message['message_id'], $db);
             sendFavorites($user, $db, $message['message_id']);
             exit();
@@ -1551,7 +1551,11 @@ function sendLoadingMessage(string $chat_id, string $text): array|false
     ]);
 }
 
-function deleteOldLiveMessage(User $user, int|string $message_id, DatabaseManager $db): bool
+/**
+ * Finds user's **active** live message in the database with `$message_id`
+ * different from the one provided, and sends delete request to telegram.
+ **/
+function deleteOldActiveLiveMessage(User $user, int|string $message_id, DatabaseManager $db): bool
 {
     $live_mssg = $db->read(
         table: 'special_messages',
@@ -1563,9 +1567,10 @@ function deleteOldLiveMessage(User $user, int|string $message_id, DatabaseManage
         ],
         single: true
     );
-    if ($live_mssg) sendToTelegram('deleteMessage', ['chat_id' => $user->getChatId(), 'message_id' => $live_mssg['message_id']]);
-
-    return boolval($live_mssg);
+    if ($live_mssg)
+        return sendToTelegram('deleteMessage', ['chat_id' => $user->getChatId(), 'message_id' => $live_mssg['message_id']]);
+    else
+        return false;
 }
 
 // ==========================================
