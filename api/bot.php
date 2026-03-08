@@ -528,10 +528,11 @@ function handleHoldingsWebAppData(User $user, array $data, array $message, Datab
 #[NoReturn]
 function handleHoldingsTextMessage(User $user, array $data, array $message, DatabaseManager $db): void
 {
-    sendToTelegram('deleteMessage', ['chat_id' => $user->getChatId(), 'message_id' => $message['message_id']]);
 
+    // Check for supported deep-link(s)
     $matched = preg_match('/^\/start viewHolding_holdingId(\d+)(_mssgId(\d+))?$/m', $message['text'], $matches);
     if ($matched && !empty($matches[1])) {
+
         $holding_id = $matches[1];
 
         $holding = getHoldingsWithAssetDetails(['h.id' => $holding_id, 'h.user_id' => $user->getId()], $db, true);
@@ -554,21 +555,8 @@ function handleHoldingsTextMessage(User $user, array $data, array $message, Data
         } else $data['text'] = 'دارایی با این مشخصه یافت نشد!';
     } else $data['text'] = 'پیام نامفهوم است!';
 
-    // Add '✏ ویرایش' button to the keyboard if use is viewing a holding.
-    // This works with irreverent texts and deep-links with wrong holding id.
-    $progress = json_decode($user->getProgress(), true);
-    if ($progress && key($progress) === 'view_holding') {
-        $holding = getHoldingsWithAssetDetails(['h.id' => $progress['view_holding']['holding_id'], 'h.user_id' => $user->getId()], $db, true);
-        if ($holding) {
-            array_unshift($data['reply_markup']['keyboard'], [
-                createWebAppBtn(
-                    text: '✏ ویرایش ' . $holding['asset_name'],
-                    path: '/assets/add_holding.html',
-                    params: ['data' => base64_encode(json_encode($holding))])
-            ]);
-        }
-    }
-
+    // Only irreverent texts and deep-links with wrong holding id reach here.
+    $data = checkAndAddHoldingEditButton($data, $user, $db);
     sendToTelegram('sendMessage', $data);
     exit();
 }
@@ -608,9 +596,6 @@ function sendAllHoldings(User $user, DatabaseManager $db): void
     }
 }
 
-/**
- * Automatically adds edit button
- */
 function sendHoldingDetail(array $holding, array $data): void
 {
     $data['text'] = createHoldingDetailText($holding);
@@ -619,6 +604,24 @@ function sendHoldingDetail(array $holding, array $data): void
     ]);
 
     sendToTelegram('sendMessage', $data);
+}
+
+function checkAndAddHoldingEditButton(array $data, User $user, DatabaseManager $db): array
+{
+    $progress = json_decode($user->getProgress(), true);
+    if ($progress && key($progress) === 'view_holding') {
+        $holding = getHoldingsWithAssetDetails(['h.id' => $progress['view_holding']['holding_id'], 'h.user_id' => $user->getId()], $db, true);
+        if ($holding) {
+            array_unshift($data['reply_markup']['keyboard'], [
+                createWebAppBtn(
+                    text: '✏ ویرایش ' . $holding['asset_name'],
+                    path: '/assets/add_holding.html',
+                    params: ['data' => base64_encode(json_encode($holding))])
+            ]);
+        }
+    }
+
+    return $data;
 }
 
 
