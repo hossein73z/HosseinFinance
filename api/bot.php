@@ -385,13 +385,9 @@ function level_1(
         exit();
     }
 
-    if ($callback_query)
-        handleHoldingsCallback($user, $callback_query, $message);
-
-    if ($message && isset($message['web_app_data']))
-        handleHoldingsWebAppData($user, $data, $message, $db);
-    if ($message && !isset($message['web_app_data']))
-        handleHoldingsTextMessage($user, $data, $message, $db);
+    if ($callback_query) handleHoldingsCallback($user, $callback_query, $message);
+    if ($message && isset($message['web_app_data'])) handleHoldingsWebAppData($user, $data, $message, $db);
+    if ($message && !isset($message['web_app_data'])) handleHoldingsTextMessage($user, $data, $message, $db);
 }
 
 #[NoReturn]
@@ -588,7 +584,7 @@ function handleHoldingsTextMessage(User $user, array $data, array $message, Data
     } else $data['text'] = 'پیام نامفهوم است!';
 
     // Add '✏ ویرایش' button to the keyboard if use is viewing a holding.
-    // This works with irreverent texts and wrong holding id.
+    // This works with irreverent texts and deep-links with wrong holding id.
     $progress = json_decode($user->getProgress(), true);
     if ($progress && key($progress) === 'view_holding') {
         $holding = $db->read(
@@ -1661,7 +1657,7 @@ function createHoldingDetailText(
         }
     }
 
-    // Manage deeplink and markdown escaping
+    // Manage deep-link and markdown escaping
     if ($markdown === 'MarkdownV2') {
 
         $tree = markdownScape($tree);
