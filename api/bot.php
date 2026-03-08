@@ -638,7 +638,7 @@ function sendAllHoldings(User $user, DatabaseManager $db): void
 
             foreach ($holdings as $holding) {
                 $total_profit += $holding['amount'] * ($holding['current_price'] - $holding['avg_price']) * $holding['base_rate'];
-                $text .= "\n" . createHoldingDetailText($holding, 'MarkdownV2', ['org_amount', 'org_total_price', 'profit'], $temp_mssg['result']['message_id']);
+                $text .= "\n" . createHoldingDetailText($holding, 'MarkdownV2', ['space', 'org_amount', 'org_total_price', 'space', 'profit'], $temp_mssg['result']['message_id']);
             }
 
             $profit_text = ($total_profit >= 0) ? "🟢 کل سود: " . beautifulNumber($total_profit) . ' ریال' : "🔴 کل ضرر: " . beautifulNumber($total_profit) . ' ریال';
@@ -1581,44 +1581,87 @@ function createHoldingDetailText(
     array   $holding,
     ?string $markdown = null,
     array   $attributes = [
+        'space',
         'date',
         'org_amount',
         'org_price',
         'new_price',
         'org_total_price',
         'new_total_price',
+        'space',
         'profit'
     ],
     ?string $mssg_id = null): string
 {
-    $date = dateStringToArray($holding['date']);
+    // Create tree view for each presented attribute
+    $tree = '';
+    foreach ($attributes as $attribute) {
 
-    // Add deeplink to asset name and scape characters for markdown
+        if ($attribute == 'space') {
+            $tree .= "\n   │ " . "‏";
+        }
+
+        if ($attribute == 'date') {
+            $date = dateStringToArray($holding['date']);
+            $tree .=
+                "\n   ┤── تاریخ خرید: " .
+                beautifulNumber("$date[2] $date[1] $date[0]", null);
+        }
+
+        if ($attribute == 'org_amount') {
+            $tree .=
+                "\n   ┤── مقدار / تعداد: " .
+                beautifulNumber(floatval($holding['amount']));
+        }
+
+        if ($attribute == 'org_price') {
+            $tree .=
+                "\n   ┤── قیمت خرید هر واحد: " .
+                beautifulNumber(floatval($holding['avg_price'])) . " " . $holding['base_currency'];
+        }
+
+        if ($attribute == 'new_price') {
+            $tree .=
+                "\n   ┤── قیمت لحظه‌ای هر واحد: " .
+                beautifulNumber($holding['current_price']) . " " . $holding['base_currency'];
+        }
+
+        if ($attribute == 'org_total_price') {
+            $tree .=
+                "\n   ┤── قیمت خرید کل دارایی: " .
+                beautifulNumber($holding['avg_price'] * $holding['amount']) . " " . $holding['base_currency'];
+        }
+
+        if ($attribute == 'new_total_price') {
+            $tree .=
+                "\n   ┤── قیمت لحظه‌ای کل دارایی: " .
+                beautifulNumber($holding['current_price'] * $holding['amount']) . " " . $holding['base_currency'];
+        }
+
+        if ($attribute == 'profit') {
+
+            // Calculate and create profit string
+            $pro_los = calculateProLos($holding['avg_price'], $holding['current_price'], $holding['amount'], $holding['base_rate']);
+            $pro_los_string =
+                ($pro_los == 0) ?
+                    "🟤 سود/زیان: ۰ ریال" : (
+                ($pro_los > 0) ?
+                    "🟢 سود: " . beautifulNumber($pro_los) . " ریال" :
+                    "🔴 ضرر: " . beautifulNumber($pro_los) . " ریال"
+                );
+
+            $tree .= "\n   ┘── " . $pro_los_string;
+        }
+    }
+
+    // Manage deeplink and markdown escaping
     if ($markdown === 'MarkdownV2') {
+
+        $tree = markdownScape($tree);
+
         $asset_name = beautifulNumber(markdownScape($holding['asset_name']), null);
         $holding['asset_name'] = "[$asset_name](https://t.me/" . BOT_ID . "?start=viewHolding_holdingId{$holding['id']}" . ($mssg_id ? "_mssgId" . $mssg_id : '') . ")" . '‏';
     }
-
-    $profit = calculateProLos($holding['current_price'], $holding['avg_price'], $holding['amount'], $holding['base_rate']);
-    if ($profit == 0)
-        $profit_string = "🟤 سود/زیان: ۰";
-    else
-        $profit_string = ($profit >= 0) ?
-            "🟢 سود: " . beautifulNumber($profit) :
-            "🔴 ضرر: " . beautifulNumber($profit);
-
-    $tree = "\n   │ " . "‏";
-    if (in_array('date', $attributes)) $tree .= "\n   ┤── تاریخ خرید: " . beautifulNumber("$date[2] $date[1] $date[0]", null);
-    if (in_array('org_amount', $attributes)) $tree .= "\n   ┤── مقدار / تعداد: " . beautifulNumber(floatval($holding['amount']));
-    if (in_array('org_price', $attributes)) $tree .= "\n   ┤── قیمت خرید هر واحد: " . beautifulNumber(floatval($holding['avg_price'])) . " " . $holding['base_currency'];
-    if (in_array('new_price', $attributes)) $tree .= "\n   ┤── قیمت لحظه‌ای هر واحد: " . beautifulNumber($holding['current_price']) . " " . $holding['base_currency'];
-    if (in_array('org_total_price', $attributes)) $tree .= "\n   ┤── قیمت خرید کل: " . beautifulNumber($holding['avg_price'] * $holding['amount']) . " " . $holding['base_currency'];
-    if (in_array('new_total_price', $attributes)) $tree .= "\n   ┤── قیمت لحظه‌ای کل دارایی: " . beautifulNumber($holding['current_price'] * $holding['amount']) . " " . $holding['base_currency'];
-    $tree .= "\n   │ " . "‏";
-    if (in_array('profit', $attributes)) $tree .= "\n   ┘── " . $profit_string . " ریال";
-    $tree .= "\n";
-
-    if ($markdown === 'MarkdownV2') $tree = markdownScape($tree);
 
     return $holding['asset_name'] . $tree;
 }
