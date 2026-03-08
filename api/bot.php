@@ -483,18 +483,18 @@ function handleHoldingsWebAppData(User $user, array $data, array $message, Datab
 
             }
         }
+
+        $db->update('users', ['progress' => null], ['id' => $user->getId()]);
         sendAllHoldings($user, $db);
         exit();
     }
     if ($action === 'edit') {
         try {
-
             $db->update(
                 table: 'holdings',
                 data: $web_app_data['updates'],
                 conditions: ['id' => $web_app_data['id']]
             );
-
             $data['text'] = '✅ دارایی با موفقیت ویرایش ثبت شد.';
 
         } catch (PDOException $e) {
@@ -506,7 +506,8 @@ function handleHoldingsWebAppData(User $user, array $data, array $message, Datab
         }
 
         sendToTelegram('sendMessage', $data);
-        sendAllHoldings($user, $db);
+        $db->update('users', ['progress' => null], ['id' => $user->getId()]);
+        sendAllHoldings($user, $db); // TODO: Send just edited holding
         exit();
     }
     if ($action === 'delete') {
@@ -529,6 +530,7 @@ function handleHoldingsWebAppData(User $user, array $data, array $message, Datab
         }
 
         sendToTelegram('sendMessage', $data);
+        $db->update('users', ['progress' => null], ['id' => $user->getId()]);
         sendAllHoldings($user, $db);
         exit();
     }
@@ -536,6 +538,7 @@ function handleHoldingsWebAppData(User $user, array $data, array $message, Datab
     $data['text'] = 'داده‌های ارسالی قابل پردازش نیستند!';
     sendToTelegram('sendMessage', $data);
 
+    $db->update('users', ['progress' => null], ['id' => $user->getId()]);
     sendAllHoldings($user, $db);
     exit();
 }
@@ -660,8 +663,6 @@ function sendAllHoldings(User $user, DatabaseManager $db): void
     } else {
         sendToTelegram('sendMessage', ['chat_id' => $user->getChatId(), 'text' => 'شما هیچ دارایی‌ای ثبت نکرده‌اید.']);
     }
-
-    $db->update('users', ['progress' => null], ['id' => $user->getId()]);
 }
 
 /**
