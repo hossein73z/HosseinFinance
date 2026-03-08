@@ -437,21 +437,7 @@ function handleHoldingsWebAppData(User $user, array $data, array $message, Datab
                     'درصورت تمایل برای ثبت تغییرات، دارایی ثبت شده را ویرایش کنید.';
                 sendToTelegram('sendMessage', $data);
 
-                $holding = $db->read(
-                    table: 'holdings h',
-                    conditions: [
-                        'h.asset_id' => $new_holding["asset_id"],
-                        'h.user_id' => $user->getId()
-                    ],
-                    single: true,
-                    selectColumns: '
-                        h.*,
-                        a.name as asset_name,
-                        a.price as current_price,
-                        a.base_currency,
-                        a.exchange_rate as base_rate',
-                    join: 'INNER JOIN assets a ON h.asset_id = a.id'
-                );
+                $holding = getHoldingsWithAssetDetails(['h.asset_id' => $new_holding["asset_id"], 'h.user_id' => $user->getId()], $db, true);
 
                 if ($holding) {
 
@@ -548,22 +534,7 @@ function handleHoldingsTextMessage(User $user, array $data, array $message, Data
     if ($matched && !empty($matches[1])) {
         $holding_id = $matches[1];
 
-        $holding = $db->read(
-            table: 'holdings h',
-            conditions: [
-                'h.id' => $holding_id,
-                'h.user_id' => $user->getId()
-            ],
-            single: true,
-            selectColumns: '
-                h.*,
-                a.name as asset_name,
-                a.price as current_price,
-                a.base_currency,
-                a.exchange_rate as base_rate',
-            join: 'INNER JOIN assets a ON h.asset_id = a.id'
-        );
-
+        $holding = getHoldingsWithAssetDetails(['h.id' => $holding_id, 'h.user_id' => $user->getId()], $db, true);
         if ($holding) {
 
             // Delete holdings message
@@ -587,21 +558,7 @@ function handleHoldingsTextMessage(User $user, array $data, array $message, Data
     // This works with irreverent texts and deep-links with wrong holding id.
     $progress = json_decode($user->getProgress(), true);
     if ($progress && key($progress) === 'view_holding') {
-        $holding = $db->read(
-            table: 'holdings h',
-            conditions: [
-                'h.id' => $progress['view_holding']['holding_id'],
-                'h.user_id' => $user->getId()
-            ],
-            single: true,
-            selectColumns: '
-                h.*,
-                a.name as asset_name,
-                a.price as current_price,
-                a.base_currency,
-                a.exchange_rate as base_rate',
-            join: 'INNER JOIN assets a ON h.asset_id = a.id'
-        );
+        $holding = getHoldingsWithAssetDetails(['h.id' => $progress['view_holding']['holding_id'], 'h.user_id' => $user->getId()], $db, true);
         if ($holding) {
             array_unshift($data['reply_markup']['keyboard'], [
                 createWebAppBtn(
@@ -618,17 +575,7 @@ function handleHoldingsTextMessage(User $user, array $data, array $message, Data
 
 function sendAllHoldings(User $user, DatabaseManager $db): void
 {
-    $holdings = $db->read(
-        table: 'holdings h',
-        conditions: ['user_id' => $user->getId()],
-        selectColumns: '
-            h.*,
-            a.name as asset_name,
-            a.price as current_price,
-            a.base_currency,
-            a.exchange_rate as base_rate',
-        join: 'INNER JOIN assets a ON h.asset_id = a.id');
-
+    $holdings = getHoldingsWithAssetDetails(['user_id' => $user->getId()], $db);
     if ($holdings) {
         $temp_mssg = sendLoadingMessage($user->getChatId(), 'در حال دریافت اطلاعات دارایی‌ها ...');
         if ($temp_mssg) {
@@ -1501,6 +1448,22 @@ function level_6(
 // ==========================================
 //          DATA HANDLING & UI HELPERS
 // ==========================================
+
+function getHoldingsWithAssetDetails(array $conditions, DatabaseManager $db, $single = false): bool|array
+{
+    return $db->read(
+        table: 'holdings h',
+        conditions: $conditions,
+        single: $single,
+        selectColumns: '
+                h.*,
+                a.name as asset_name,
+                a.price as current_price,
+                a.base_currency,
+                a.exchange_rate as base_rate',
+        join: 'INNER JOIN assets a ON h.asset_id = a.id'
+    );
+}
 
 function getLoansWithInstallments(array $conditions, DatabaseManager $db): bool|array
 {
