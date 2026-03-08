@@ -555,7 +555,7 @@ function handleHoldingsTextMessage(User $user, array $data, array $message, Data
     } else $data['text'] = 'پیام نامفهوم است!';
 
     // Only irreverent texts and deep-links with wrong holding id reach here.
-    $data = checkAndAddHoldingEditButton($data, $user, $db);
+    $data = checkAndAddEditHoldingButton($data, $user, $db);
     sendToTelegram('sendMessage', $data);
     exit();
 }
@@ -605,7 +605,7 @@ function sendHoldingDetail(array $holding, array $data): void
     sendToTelegram('sendMessage', $data);
 }
 
-function checkAndAddHoldingEditButton(array $data, User $user, DatabaseManager $db): array
+function checkAndAddEditHoldingButton(array $data, User $user, DatabaseManager $db): array
 {
     $progress = json_decode($user->getProgress(), true);
     if ($progress && key($progress) === 'view_holding') {
