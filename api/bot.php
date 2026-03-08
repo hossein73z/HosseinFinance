@@ -633,16 +633,22 @@ function sendAllHoldings(User $user, DatabaseManager $db): void
     if ($holdings) {
         $temp_mssg = sendLoadingMessage($user->getChatId(), 'در حال دریافت اطلاعات دارایی‌ها ...');
         if ($temp_mssg) {
-            $text = "دارایی‌های ثبت شده‌ی شما:\n";
-            $total_profit = 0;
 
+            $text = "دارایی‌های ثبت شده‌ی شما:\n";
+            $total_pro_los = 0;
             foreach ($holdings as $holding) {
-                $total_profit += $holding['amount'] * ($holding['current_price'] - $holding['avg_price']) * $holding['base_rate'];
+                $total_pro_los += $holding['amount'] * ($holding['current_price'] - $holding['avg_price']) * $holding['base_rate'];
                 $text .= "\n" . createHoldingDetailText($holding, 'MarkdownV2', ['space', 'org_amount', 'org_total_price', 'space', 'profit'], $temp_mssg['result']['message_id']);
             }
 
-            $profit_text = ($total_profit >= 0) ? "🟢 کل سود: " . beautifulNumber($total_profit) . ' ریال' : "🔴 کل ضرر: " . beautifulNumber($total_profit) . ' ریال';
-            $text .= "\n" . markdownScape($profit_text);
+            $pro_los_string =
+                ($total_pro_los == 0) ?
+                    "🟤 جمع سود/زیان: ۰ ریال" : (
+                ($total_pro_los > 0) ?
+                    "🟢 جمع سود: " . beautifulNumber($total_pro_los) . " ریال" :
+                    "🔴 جمع ضرر: " . beautifulNumber($total_pro_los) . " ریال"
+                );
+            $text .= "\n" . markdownScape($pro_los_string);
 
             sendToTelegram('editMessageText', [
                 'chat_id' => $user->getChatId(),
