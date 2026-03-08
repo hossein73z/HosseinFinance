@@ -410,6 +410,8 @@ function handleHoldingsWebAppData(User $user, array $data, array $message, Datab
     $web_app_data = json_decode($message['web_app_data']['data'], true);
     $action = $web_app_data['action'] ?? null;
 
+    $correct_data = false;
+
     if ($action === 'add') {
 
         $new_holding = $web_app_data['holding'];
@@ -424,13 +426,19 @@ function handleHoldingsWebAppData(User $user, array $data, array $message, Datab
                     "date" => $new_holding["date"],
                     "time" => $new_holding["time"],
                     "note" => $new_holding["note"],
-                ]);
-
+                ]
+            );
             $data['text'] = '✅ دارایی جدید با موفقیت ثبت شد.';
-            sendToTelegram('sendMessage', $data);
 
         } catch (PDOException $e) {
+
             if ($e->errorInfo[1] == 1062) {
+                /*
+                 * Duplicate Entry.
+                 *
+                 * Sends the informative message, redirects user
+                 * to the existing holding and breaks the process.
+                 */
 
                 $data['text'] = ' ' .
                     'شما از قبل این دارایی را در سیستم ثبت کرده اید.' . "\n" .
@@ -438,39 +446,26 @@ function handleHoldingsWebAppData(User $user, array $data, array $message, Datab
                 sendToTelegram('sendMessage', $data);
 
                 $holding = getHoldingsWithAssetDetails(['h.asset_id' => $new_holding["asset_id"], 'h.user_id' => $user->getId()], $db, true);
-
                 if ($holding) {
-
-                    // Update user's progress to 'view_holding'
                     $db->update(
                         table: 'users',
                         data: ['progress' => json_encode(['view_holding' => ['holding_id' => $holding['id']]])],
                         conditions: ['id' => $user->getId()]
                     );
-
-                    // Send holding's detail to telegram
                     sendHoldingDetail($holding, $data);
                 }
-
                 exit();
-
-            } else {
-                sendToTelegram('sendMessage', [
-                    'text' => '❌ خطای پایگاه داده در ثبت دارایی جدید: ' . $e->errorInfo[2],
-                    'chat_id' => $user->getChatId()
-                ]);
-                error_log(
-                    'Holding: ' . json_encode($new_holding) . "\n" .
-                    'Error: ' . json_encode($e->errorInfo, JSON_PRETTY_PRINT));
-
             }
-        }
 
-        $db->update('users', ['progress' => null], ['id' => $user->getId()]);
-        sendAllHoldings($user, $db);
-        exit();
+            error_log('Holding: ' . json_encode($new_holding) . "\n" .
+                'Error: ' . json_encode($e->errorInfo, JSON_PRETTY_PRINT)
+            );
+            $data['text'] = '❌ خطای پایگاه داده در ثبت دارایی جدید: ' . $e->errorInfo[2];
+        }
+        $correct_data = true;
     }
     if ($action === 'edit') {
+
         try {
             $db->update(
                 table: 'holdings',
@@ -480,48 +475,44 @@ function handleHoldingsWebAppData(User $user, array $data, array $message, Datab
             $data['text'] = '✅ دارایی با موفقیت ویرایش ثبت شد.';
 
         } catch (PDOException $e) {
-            $data['text'] = '❌ خطای پایگاه داده در ویرایش دارایی: ' . $e->errorInfo[2];
-            error_log(
-                'Updates: ' . json_encode($web_app_data['updates']) . "\n" .
-                'Error: ' . json_encode($e->errorInfo, JSON_PRETTY_PRINT));
-
+            error_log('Updates: ' . json_encode($web_app_data['updates']) . "\n" .
+                'Error: ' . json_encode($e->errorInfo, JSON_PRETTY_PRINT)
+            );
+            $data['text'] = '❌ خطای پایگاه داده در ثبت دارایی جدید: ' . $e->errorInfo[2];
         }
-
-        sendToTelegram('sendMessage', $data);
-        $db->update('users', ['progress' => null], ['id' => $user->getId()]);
-        sendAllHoldings($user, $db); // TODO: Send just edited holding
-        exit();
+        $correct_data = true;
     }
     if ($action === 'delete') {
+
         try {
             $db->delete(
                 table: 'holdings',
                 conditions: ['id' => $web_app_data['id']],
                 resetAutoIncrement: true
             );
-
             $data['text'] = '✅ دارایی با موفقیت حذف شد.';
 
         } catch (PDOException $e) {
-            $data['text'] = '❌ خطای پایگاه داده درحذف دارایی: ' . $e->errorInfo[2];
-            error_log(
-                'Updates: ' . json_encode($web_app_data['updates']) . "\n" .
+            error_log('Updates: ' . json_encode($web_app_data['updates']) . "\n" .
                 'Error: ' . json_encode($e->errorInfo, JSON_PRETTY_PRINT)
             );
-
+            $data['text'] = '❌ خطای پایگاه داده درحذف دارایی: ' . $e->errorInfo[2];
         }
-
-        sendToTelegram('sendMessage', $data);
-        $db->update('users', ['progress' => null], ['id' => $user->getId()]);
-        sendAllHoldings($user, $db);
-        exit();
+        $correct_data = true;
     }
 
-    $data['text'] = 'داده‌های ارسالی قابل پردازش نیستند!';
-    sendToTelegram('sendMessage', $data);
+    if ($correct_data) {
+        // Send success/failure message
+        sendToTelegram('sendMessage', $data);
 
-    $db->update('users', ['progress' => null], ['id' => $user->getId()]);
-    sendAllHoldings($user, $db);
+        // Clear user progress and show all holdings
+        $db->update('users', ['progress' => null], ['id' => $user->getId()]);
+        sendAllHoldings($user, $db);
+    } else {
+        $data['text'] = 'داده‌های ارسالی قابل پردازش نیستند!';
+        $data = checkAndAddEditHoldingButton($data, $user, $db);
+        sendToTelegram('sendMessage', $data);
+    }
     exit();
 }
 
