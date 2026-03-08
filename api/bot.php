@@ -538,13 +538,12 @@ function handleHoldingsTextMessage(User $user, array $data, array $message, Data
         $holding = getHoldingsWithAssetDetails(['h.id' => $holding_id, 'h.user_id' => $user->getId()], $db, true);
         if ($holding) {
 
-            // Delete holdings message
+            // Delete received deep-link message
+            sendToTelegram('deleteMessage', ['chat_id' => $user->getChatId(), 'message_id' => $message['message_id']]);
+            // Delete holdings' message
             sendToTelegram('deleteMessage', ['chat_id' => $user->getChatId(), 'message_id' => $matches[3]]);
 
-            // Send holding's detail to telegram
             sendHoldingDetail($holding, $data);
-
-            // Update user's progress to 'view_holding'
             $db->update(
                 table: 'users',
                 data: ['progress' => json_encode(['view_holding' => ['holding_id' => $holding['id']]])],
