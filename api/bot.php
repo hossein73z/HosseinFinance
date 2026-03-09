@@ -402,6 +402,7 @@ function level_1(
     if ($callback_query) handleHoldingsCallback($user, $callback_query, $message);
     if ($message && isset($message['web_app_data'])) handleHoldingsWebAppData($user, $data, $message, $db);
     if ($message && !isset($message['web_app_data'])) handleHoldingsTextMessage($user, $data, $message, $db);
+    exit();
 }
 
 #[NoReturn]
@@ -688,6 +689,7 @@ function level_2(
         handleLoansWebAppData($user, $data, $message, $db);
     if ($message && !isset($message['web_app_data']))
         handleLoansTextMessage($user, $data, $message, $db);
+    exit();
 }
 
 #[NoReturn]
@@ -1068,6 +1070,7 @@ function level_5(
 
     if ($message) handlePricesTextMessage($data, $message, $asset_types, $db);
     if ($callback_query) handlePricesCallback($user, $callback_query, $message, $asset_types, $db);
+    exit();
 }
 
 #[NoReturn]
