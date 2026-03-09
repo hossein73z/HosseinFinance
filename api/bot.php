@@ -128,13 +128,13 @@ function handleIncomingMessage(array $message, DatabaseManager $db): void
     // Global Command Routing
     $text = $message['text'] ?? '';
     if ($text === '/holdings')
-        level_1($user, $db);
+        level_1(user: $user, db: $db, pressed_button: Button::fromDbRow($db->read('buttons', ['id' => 1], true)));
     if ($text === '/loans')
-        level_2($user, $db);
+        level_2(user: $user, db: $db, pressed_button: Button::fromDbRow($db->read('buttons', ['id' => 2], true)));
     if ($text === '/prices')
-        level_5($user, $db);
+        level_5(user: $user, db: $db, pressed_button: Button::fromDbRow($db->read('buttons', ['id' => 5], true)));
     if ($text === '/ai')
-        level_6($user, $db);
+        level_6(user: $user, db: $db);
 
     $pressed_button = getPressedButton(text: $text, parent_btn_id: $user->getLastBtn(), admin: $user->isAdmin(), db: $db);
 
