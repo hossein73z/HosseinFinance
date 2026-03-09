@@ -14,7 +14,8 @@ function sendToTelegram(string $method, array $data = [], string $token = ''): b
         $token = defined('MAIN_BOT_TOKEN') ? MAIN_BOT_TOKEN : getenv('MAIN_BOT_TOKEN');
     }
 
-    $url = "https://api.telegram.org/bot" . $token . "/$method";
+//    $url = "https://api.telegram.org/bot" . $token . "/$method";
+    $url = "https://tapi.bale.ai/bot" . $token . "/$method";
 
     // Handle Proxy Settings (Optional on Vercel as it is usually not blocked)
     $proxy = getenv('PROXY_SETTINGS');

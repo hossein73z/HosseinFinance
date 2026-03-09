@@ -1,4 +1,18 @@
 <?php
+
+// DON'T COMMIT!
+// Code for testing on KSWEB
+putenv('DB_HOST=localhost');
+putenv('DB_PORT=3306');
+putenv('DB_NAME=hossein_finance');
+putenv('DB_USER=hossein');
+putenv('DB_PASS=H457869z');
+
+putenv('SHARED_SECRET=0iNaaYhna2ilf0fY');
+putenv('BOT_ID=HosseinFinance_bot');
+putenv('MAIN_BOT_TOKEN=1797658259:sGXRQN3Hwkj79PCWjDnCFt9W072q-2OljYo');
+putenv('MAJID_API_TOKEN=1');
+
 // Load core configuration and constants.
 use JetBrains\PhpStorm\NoReturn;
 
@@ -356,7 +370,7 @@ function level_1(
     $keyboard = createKeyboardsArray(parent_btn_id: $current_button->getId(), admin: $user->isAdmin(), db: $db);
 
     // Add '➕ افزودن دارایی جدید' button to the keyboard
-    array_unshift($keyboard, [createWebAppBtn('➕ افزودن دارایی جدید', '/assets/add_holding.html')]);
+//    array_unshift($keyboard, [createWebAppBtn('➕ افزودن دارایی جدید', '/assets/add_holding.html')]);
 
     $data = [
         'chat_id' => $user->getChatId(),
@@ -589,9 +603,9 @@ function sendAllHoldings(User $user, DatabaseManager $db): void
 function sendHoldingDetail(array $holding, array $data): void
 {
     $data['text'] = createHoldingDetailText($holding);
-    array_unshift($data['reply_markup']['keyboard'], [
-        createWebAppBtn('✏ ویرایش ' . beautifulNumber($holding['asset_name'], null), '/assets/add_holding.html', ['data' => base64_encode(json_encode($holding))])
-    ]);
+//    array_unshift($data['reply_markup']['keyboard'], [
+//        createWebAppBtn('✏ ویرایش ' . beautifulNumber($holding['asset_name'], null), '/assets/add_holding.html', ['data' => base64_encode(json_encode($holding))])
+//    ]);
 
     sendToTelegram('sendMessage', $data);
 }
@@ -602,12 +616,12 @@ function checkAndAddEditHoldingButton(array $data, User $user, DatabaseManager $
     if ($progress && key($progress) === 'view_holding') {
         $holding = getHoldingsWithAssetDetails(['h.id' => $progress['view_holding']['holding_id'], 'h.user_id' => $user->getId()], $db, true);
         if ($holding) {
-            array_unshift($data['reply_markup']['keyboard'], [
-                createWebAppBtn(
-                    text: '✏ ویرایش ' . $holding['asset_name'],
-                    path: '/assets/add_holding.html',
-                    params: ['data' => base64_encode(json_encode($holding))])
-            ]);
+//            array_unshift($data['reply_markup']['keyboard'], [
+//                createWebAppBtn(
+//                    text: '✏ ویرایش ' . $holding['asset_name'],
+//                    path: '/assets/add_holding.html',
+//                    params: ['data' => base64_encode(json_encode($holding))])
+//            ]);
         }
     }
 
@@ -635,7 +649,7 @@ function level_2(
     $keyboard = createKeyboardsArray(parent_btn_id: $current_button->getId(), admin: $user->isAdmin(), db: $db);
 
     // Add '➕ افزودن وام جدید' button to the keyboard
-    array_unshift($keyboard, [createWebAppBtn('➕ افزودن وام جدید', '/assets/add_loan.html')]);
+//    array_unshift($keyboard, [createWebAppBtn('➕ افزودن وام جدید', '/assets/add_loan.html')]);
 
     $data = [
         'chat_id' => $user->getChatId(),
@@ -928,12 +942,12 @@ function handleLoansTextMessage(User $user, array $data, array $message, Databas
     if ($progress && key($progress) === 'view_loan') {
         $loan = getLoansWithInstallments(['l.id' => $progress['view_loan']['loan_id'], 'l.user_id' => $user->getId()], $db)[0];
         if ($loan) {
-            array_unshift($data['reply_markup']['keyboard'], [
-                createWebAppBtn(
-                    text: '✏ ویرایش وام «' . $loan['name'] . '»',
-                    path: '/assets/add_loan.html',
-                    params: ['data' => base64_encode(json_encode($loan))])
-            ]);
+//            array_unshift($data['reply_markup']['keyboard'], [
+//                createWebAppBtn(
+//                    text: '✏ ویرایش وام «' . $loan['name'] . '»',
+//                    path: '/assets/add_loan.html',
+//                    params: ['data' => base64_encode(json_encode($loan))])
+//            ]);
         }
     }
 
@@ -969,7 +983,7 @@ function sendLoanDetail(array $loan, array $data): void
 {
 
     $data['text'] = 'جزئیات وام «' . $loan['name'] . '»';
-    array_unshift($data['reply_markup']['keyboard'], [createWebAppBtn('✏ ویرایش وام «' . $loan['name'] . '»', '/assets/add_loan.html', ['data' => base64_encode(json_encode($loan))])]);
+//    array_unshift($data['reply_markup']['keyboard'], [createWebAppBtn('✏ ویرایش وام «' . $loan['name'] . '»', '/assets/add_loan.html', ['data' => base64_encode(json_encode($loan))])]);
 
     sendToTelegram('sendMessage', $data);
 
@@ -1271,7 +1285,7 @@ function handlePricesTextMessage(array $data, array $message, array $asset_types
  * Activate/Inactivate current message in the database as `live_price`.
  *
  * @param int|string $user_id
- * @param bool $activate On false only works on existing record with the same `$message_id`
+ * @param bool $activate If `false` **only** works on existing record with the same `$message_id`
  * @param int|string $message_id The ID of the message to set as live price message
  * @param DatabaseManager $db
  * @return bool|null Activation state on success or `null` on database error

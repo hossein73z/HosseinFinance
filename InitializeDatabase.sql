@@ -1,4 +1,4 @@
-USE test;
+USE hossein_finance;
 
 CREATE TABLE IF NOT EXISTS `users`
 (
