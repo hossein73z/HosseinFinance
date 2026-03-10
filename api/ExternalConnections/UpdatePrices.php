@@ -145,7 +145,10 @@ if (preg_match_all('/\|[  ].*? ((\d\d?) (.*?) (\d\d\d\d)) -[  ](\d\d:\d\d)/ums
             // Re-structure the $matches array to fit the `addPriceToDatabase` function's expected format.
 
             // Combine the two parts of the asset name (Flag icon and name).
-            foreach ($matches[1] as $i => $match) $matches[1][$i] = trim($matches[1][$i]) . " " . trim($matches[2][$i]);
+            foreach ($matches[1] as $i => $match) {
+                $matches[1][$i] = trim($matches[2][$i]);
+                $matches[3][$i] = trim($matches[1][$i]);
+            }
 
             // Sorting the indexes
             unset($matches[2]);
