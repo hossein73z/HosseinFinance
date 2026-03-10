@@ -125,10 +125,11 @@ function handleIncomingMessage(array $message, DatabaseManager $db): void
     $text = $message['text'] ?? '';
 
     // TODO: if ($text === '/start') /*****/ level_0(user: $user, db: $db);
-    if ($text === '/holdings') /**/ level_1(user: $user, db: $db);
-    if ($text === '/loans') /*****/ level_2(user: $user, db: $db);
-    if ($text === '/prices') /****/ level_5(user: $user, db: $db);
-    if ($text === '/ai') /********/ level_6(user: $user, db: $db);
+    if ($text === '/holdings') /*******/ level_1(user: $user, db: $db);
+    if ($text === '/loans') /**********/ level_2(user: $user, db: $db);
+    if ($text === '/prices') /*********/ level_5(user: $user, db: $db);
+    if ($text === '/ai') /*************/ level_6(user: $user, db: $db);
+    if ($text === '/base_currency') /**/ level_8(user: $user, db: $db);
 
     $pressed_button = getPressedButton(text: $text, parent_btn_id: $user->getLastBtn(), admin: $user->isAdmin(), db: $db);
 
@@ -178,7 +179,7 @@ function getOrCreateUser(array $chat, DatabaseManager $db): User
                 'first_name' => $chat['first_name'] ?? 'N/A',
                 'last_name' => $chat['last_name'] ?? null,
                 'username' => $chat['username'] ?? null,
-                'settings' => json_encode(['base_currency'=>'🇮🇷 ریال ایران']),
+                'settings' => json_encode(['base_currency' => '🇮🇷 ریال ایران']),
                 'progress' => null,
                 'is_admin' => ($admins) ? 0 : 1, // First user is admin
                 'last_btn' => 0
@@ -209,6 +210,7 @@ function callbackHandler(User $user, array $callback_query, DatabaseManager $db)
     if ($user->getLastBtn() == 2) level_2(user: $user, db: $db, message: $message, callback_query: $callback_query);
     if ($user->getLastBtn() == 5) level_5(user: $user, db: $db, message: $message, callback_query: $callback_query);
     if ($user->getLastBtn() == 6) level_6(user: $user, db: $db, message: $message, callback_query: $callback_query);
+    if ($user->getLastBtn() == 8) level_8(user: $user, db: $db, message: $message, callback_query: $callback_query);
 
     // Fallback if not handled
     sendToTelegram('editMessageText', [
@@ -238,6 +240,7 @@ function normalButtonHandler(User $user, Button $pressed_button, DatabaseManager
     if ($pressed_button->getId() == 2) level_2(user: $user, db: $db, level_button: $pressed_button);
     if ($pressed_button->getId() == 5) level_5(user: $user, db: $db, level_button: $pressed_button);
     if ($pressed_button->getId() == 6) level_6(user: $user, db: $db, level_button: $pressed_button);
+    if ($pressed_button->getId() == 8) level_8(user: $user, db: $db, level_button: $pressed_button);
 
     // Default Actions for normal button
     $response = sendToTelegram('sendMessage', [
@@ -269,6 +272,7 @@ function nonButtonHandler(User $user, array $message, DatabaseManager $db): void
     if ($user->getLastBtn() == 2) level_2(user: $user, db: $db, message: $message);
     if ($user->getLastBtn() == 5) level_5(user: $user, db: $db, message: $message);
     if ($user->getLastBtn() == 6) level_6(user: $user, db: $db, message: $message);
+    if ($user->getLastBtn() == 8) level_8(user: $user, db: $db, message: $message);
 
     // Fallback "Unrecognized" message
     sendToTelegram('sendMessage', [
@@ -1096,7 +1100,7 @@ function handlePricesCallback(User $user, array $callback_query, array $message,
                 foreach ($asset_types as $asset_type) {
                     array_unshift(
                         $data['reply_markup']['inline_keyboard'],
-                        [['text' => $asset_type, 'callback_data' => json_encode(['new_fav_type' => $asset_type])]]
+                        [['text' => beautifulNumber($asset_type, null), 'callback_data' => json_encode(['new_fav_type' => $asset_type])]]
                     );
                 }
             }
@@ -1121,7 +1125,7 @@ function handlePricesCallback(User $user, array $callback_query, array $message,
                     foreach ($favorites as $favorite) {
                         array_unshift(
                             $data['reply_markup']['inline_keyboard'],
-                            [['text' => $favorite['name'], 'callback_data' => json_encode(['del_fav' => $favorite['fav_id']])]]
+                            [['text' => beautifulNumber($favorite['name'], null), 'callback_data' => json_encode(['del_fav' => $favorite['fav_id']])]]
                         );
                     }
                 } else {
@@ -1153,7 +1157,7 @@ function handlePricesCallback(User $user, array $callback_query, array $message,
                 foreach ($assets as $asset)
                     array_unshift(
                         $data['reply_markup']['inline_keyboard'],
-                        [['text' => $asset['name'], 'callback_data' => json_encode(['new_fav_name' => $asset['name']])]]
+                        [['text' => beautifulNumber($asset['name'], null), 'callback_data' => json_encode(['new_fav_name' => $asset['name']])]]
                     );
 
             } else $data['text'] = 'دسته‌بندی مورد نظر خالی‌ست!';
@@ -1409,6 +1413,154 @@ function createFavoritesInlineKeyboard(
     return $inline_keyboard;
 }
 
+// ==========================================
+//          LEVEL 8: Base Currency
+// ==========================================
+
+#[NoReturn]
+function level_8(
+    User            $user,
+    DatabaseManager $db,
+    ?Button         $level_button = null,
+    ?array          $message = null,
+    ?array          $callback_query = null
+): void
+{
+    // Initialize button object if null is given
+    $level_button = $level_button ?? Button::fromDbRow($db->read('buttons', ['id' => 8], true));
+
+    // Create keyboards
+    $keyboard = createKeyboardsArray(parent_btn_id: $level_button->getId(), admin: $user->isAdmin(), db: $db);
+
+    $data = [
+        'chat_id' => $user->getChatId(),
+        'text' => $level_button->getText(),
+        'reply_markup' => [
+            'keyboard' => $keyboard,
+            'resize_keyboard' => true,
+            'is_persistent' => true,
+            'input_field_placeholder' => $level_button->getText()
+        ]
+    ];
+
+    if ($callback_query) handleBaseCurrencyCallback($user, $callback_query, $message, $db);
+    if ($message) handleBaseCurrencyTextMessage($data, $message, $db);
+
+    // Send initial message
+    $response = sendToTelegram('sendMessage', $data);
+
+    // Update user's level and progress
+    if ($response) {
+        $db->update(
+            table: 'users',
+            data: ['last_btn' => $level_button->getId(), 'progress' => null],
+            conditions: ['id' => $user->getId()]
+        );
+        // Send Informative message
+        sendSelectBaseCurrencyMessage($user, $db);
+    }
+
+    exit();
+}
+
+#[NoReturn]
+function handleBaseCurrencyCallback(User $user, array $callback_query, array $message, DatabaseManager $db): void
+{
+    $data = [
+        'chat_id' => $user->getChatId(),
+        'message_id' => $message['message_id'],
+    ];
+
+    $query_data = json_decode($callback_query['data'], true);
+    if (!$query_data)
+        sendToTelegram('deleteMessage', $data);
+
+    $data['text'] = '📢 خطای ناشناخته!';
+
+    $query_key = array_key_first($query_data);
+    switch ($query_key) {
+
+        // Change user's base currency setting
+        case 'set_base_currency':
+
+            $settings = json_decode($user->getSettings(), true);
+            $new_bc = $query_data['set_base_currency'];
+            $settings['base_currency'] = $new_bc;
+            try {
+                $db->update(
+                    table: 'users',
+                    data: ['settings' => json_encode($settings)],
+                    conditions: ['id' => $user->getId()],
+                );
+                $data['text'] = 'ارز پایه با موفقیت به «' . $new_bc . '» تغییر کرد';
+            } catch (Exception $e) {
+                error_log('Error changing base currency: ' . $e->getMessage());
+                $data['text'] = '❌ خطای پایگاه داده!';
+            }
+
+            sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
+            sendToTelegram('editMessageText', $data);
+            exit();
+
+        default:
+            sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
+            sendToTelegram('editMessageText', [
+                'chat_id' => $user->getChatId(),
+                'message_id' => $message['message_id'],
+                'text' => 'این پیام منقضی شده است.'
+            ]);
+            exit();
+    }
+}
+
+#[NoReturn]
+function handleBaseCurrencyTextMessage(array $data, array $message, DatabaseManager $db): void
+{
+    // Send default message of this level
+    $data['text'] = 'پیام نامفهوم است!';
+    sendToTelegram('sendMessage', $data);
+    exit();
+
+}
+
+function sendSelectBaseCurrencyMessage(User $user, DatabaseManager $db): void
+{
+    $user_base_currency = json_decode($user->getSettings(), true)['base_currency'];
+
+    $base_currencies = $db->read(
+        table: 'assets',
+        conditions: ['asset_type' => 'ارزهای آزاد'],
+        selectColumns: 'name',
+    );
+
+    if ($base_currencies) {
+
+        $base_currencies = array_column($base_currencies, 'name');
+
+        $keyboard = [];
+        $keyboard_row = [];
+        $keyboard_row_size = 2;
+        foreach ($base_currencies as $base_currency) {
+
+            if ($base_currency != $user_base_currency)
+                $keyboard_row[] = ['text' => $base_currency, 'callback_data' => json_encode(['set_base_currency' => $base_currency])];
+
+            if (sizeof($keyboard_row) >= $keyboard_row_size) {
+                $keyboard[] = $keyboard_row;
+                $keyboard_row = [];
+            }
+        }
+
+        $data = [
+            'reply_markup' => ['inline_keyboard' => $keyboard],
+            'text' => 'ارز پایه کنونی شما: ' . $user_base_currency . "\n" . 'شما می‌توانید از طریق دکمه‌های شیشه‌ای زیرو ارز پایه‌ی خود را تغییر دهید.',
+            'chat_id' => $user->getChatId()
+        ];
+
+        sendToTelegram('sendMessage', $data);
+    }
+
+}
 
 // ==========================================
 //          LEVEL 6: ARTIFICIAL INTELLIGENCE

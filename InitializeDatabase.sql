@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS `buttons`
     keyboards TEXT             DEFAULT NULL
 ) DEFAULT CHARSET = utf8mb4;
 INSERT INTO buttons (id, attrs, admin_key, messages, belong_to, keyboards)
-VALUES ('0', '{"text": "🏠 صفحه اصلی"}', 0, null, null, '[["1", "2"], ["3"], ["4"]]');
+VALUES ('0', '{"text": "🏠 صفحه اصلی"}', 0, null, null, '[["1", "2"], ["3"], ["4", "7"]]');
 INSERT INTO buttons (id, attrs, admin_key, messages, belong_to, keyboards)
 VALUES ('1', '{"text": "💼 دارایی‌ها"}', 0, null, '0', '[["s0"]]');
 INSERT INTO buttons (id, attrs, admin_key, messages, belong_to, keyboards)
@@ -36,6 +36,10 @@ INSERT INTO buttons (id, attrs, admin_key, messages, belong_to, keyboards)
 VALUES ('5', '{"text": "💰 قیمت‌ها"}', 0, null, '3', '[["s2"], ["s0"]]');
 INSERT INTO buttons (id, attrs, admin_key, messages, belong_to, keyboards)
 VALUES ('6', '{"text": "🤖 هوش مصنوعی"}', 0, null, '3', '[["s0"]]');
+INSERT INTO buttons (id, attrs, admin_key, messages, belong_to, keyboards)
+VALUES ('7', '{"text": "⚙ تنظیمات"}', 0, null, '0', '[["8"], ["s0"]]');
+INSERT INTO buttons (id, attrs, admin_key, messages, belong_to, keyboards)
+VALUES ('8', '{"text": "💲 ارز پایه"}', 0, null, '7', '[["s0"]]');
 INSERT INTO buttons (id, attrs, admin_key, messages, belong_to, keyboards)
 VALUES ('s0', '{"text": "🔙 برگشت 🔙"}', 0, null, null, null);
 INSERT INTO buttons (id, attrs, admin_key, messages, belong_to, keyboards)
@@ -54,6 +58,9 @@ CREATE TABLE IF NOT EXISTS `assets`
     date          VARCHAR(10)             DEFAULT NULL,
     time          VARCHAR(8)              DEFAULT NULL
 ) DEFAULT CHARSET = utf8mb4;
+
+INSERT INTO assets (name, asset_type, price, base_currency, exchange_rate, date, time)
+VALUES ('🇮🇷 ریال ایران', 'ارزهای آزاد', 1, 'ریال', 1, '1357-11-22', '00:00')
 
 CREATE TABLE IF NOT EXISTS `holdings`
 (
