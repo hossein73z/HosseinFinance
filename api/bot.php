@@ -86,13 +86,9 @@ try {
 
 // --- MAIN UPDATE ROUTER ---
 
-if (isset($update['message'])) {
-    handleIncomingMessage($update['message'], $db);
-} elseif (isset($update['callback_query'])) {
-    handleCallbackQuery($update['callback_query'], $db);
-} else {
-    error_log("[INFO] Unhandled update type received.");
-}
+if (isset($update['message'])) handleIncomingMessage($update['message'], $db);
+elseif (isset($update['callback_query'])) handleCallbackQuery($update['callback_query'], $db);
+else error_log("[INFO] Unhandled update type received.");
 
 DatabaseManager::closeConnection();
 exit();
@@ -127,14 +123,12 @@ function handleIncomingMessage(array $message, DatabaseManager $db): void
 
     // Global Command Routing
     $text = $message['text'] ?? '';
-    if ($text === '/holdings')
-        level_1(user: $user, db: $db, pressed_button: Button::fromDbRow($db->read('buttons', ['id' => 1], true)));
-    if ($text === '/loans')
-        level_2(user: $user, db: $db, pressed_button: Button::fromDbRow($db->read('buttons', ['id' => 2], true)));
-    if ($text === '/prices')
-        level_5(user: $user, db: $db, pressed_button: Button::fromDbRow($db->read('buttons', ['id' => 5], true)));
-    if ($text === '/ai')
-        level_6(user: $user, db: $db);
+    
+    // TODO: if ($text === '/start') /*****/ level_0(user: $user, db: $db);
+    if ($text === '/holdings') /**/ level_1(user: $user, db: $db);
+    if ($text === '/loans') /*****/ level_2(user: $user, db: $db);
+    if ($text === '/prices') /****/ level_5(user: $user, db: $db);
+    if ($text === '/ai') /********/ level_6(user: $user, db: $db);
 
     $pressed_button = getPressedButton(text: $text, parent_btn_id: $user->getLastBtn(), admin: $user->isAdmin(), db: $db);
 
@@ -231,6 +225,7 @@ function specialButtonHandler(User $user, Button $pressed_button, DatabaseManage
     if ($pressed_button->getId() === "s0") backButton($user, $db);
     if ($pressed_button->getId() === "s1") cancelButton($user, $db);
     if ($pressed_button->getId() === "s2") sendFavorites($user, $db);
+
     exit();
 }
 
@@ -238,10 +233,10 @@ function specialButtonHandler(User $user, Button $pressed_button, DatabaseManage
 function normalButtonHandler(User $user, Button $pressed_button, DatabaseManager $db): void
 {
     // Route the button to corresponding level
-    if ($pressed_button->getId() == 1) level_1(user: $user, db: $db, pressed_button: $pressed_button);
-    if ($pressed_button->getId() == 2) level_2(user: $user, db: $db, pressed_button: $pressed_button);
-    if ($pressed_button->getId() == 5) level_5(user: $user, db: $db, pressed_button: $pressed_button);
-    if ($pressed_button->getId() == 6) level_6(user: $user, db: $db);
+    if ($pressed_button->getId() == 1) level_1(user: $user, db: $db, level_button: $pressed_button);
+    if ($pressed_button->getId() == 2) level_2(user: $user, db: $db, level_button: $pressed_button);
+    if ($pressed_button->getId() == 5) level_5(user: $user, db: $db, level_button: $pressed_button);
+    if ($pressed_button->getId() == 6) level_6(user: $user, db: $db, level_button: $pressed_button);
 
     // Default Actions for normal button
     $response = sendToTelegram('sendMessage', [
@@ -358,50 +353,49 @@ function cancelButton(User $user, $db): void
 function level_1(
     User            $user,
     DatabaseManager $db,
-    ?Button         $pressed_button = null,
+    ?Button         $level_button = null,
     ?array          $message = null,
     ?array          $callback_query = null): void
 {
 
     // Initialize button object if null is given
-    $current_button = $pressed_button ?? Button::fromDbRow($db->read('buttons', ['id' => 1], true));
+    $level_button = $level_button ?? Button::fromDbRow($db->read('buttons', ['id' => 1], true));
 
     // Create keyboards
-    $keyboard = createKeyboardsArray(parent_btn_id: $current_button->getId(), admin: $user->isAdmin(), db: $db);
+    $keyboard = createKeyboardsArray(parent_btn_id: $level_button->getId(), admin: $user->isAdmin(), db: $db);
 
     // Add '➕ افزودن دارایی جدید' button to the keyboard
 //    array_unshift($keyboard, [createWebAppBtn('➕ افزودن دارایی جدید', '/assets/add_holding.html')]);
 
     $data = [
         'chat_id' => $user->getChatId(),
-        'text' => $current_button->getText(),
+        'text' => $level_button->getText(),
         'reply_markup' => [
             'keyboard' => $keyboard,
             'resize_keyboard' => true,
             'is_persistent' => true,
-            'input_field_placeholder' => $current_button->getText()
+            'input_field_placeholder' => $level_button->getText()
         ]
     ];
-
-    if ($pressed_button) {
-        $response = sendToTelegram('sendMessage', $data);
-        if ($response) {
-            $db->update(
-                table: 'users',
-                data: [
-                    'last_btn' => $pressed_button->getId(),
-                    'progress' => null,
-                ],
-                conditions: ['id' => $user->getId()]
-            );
-            sendAllHoldings($user, $db);
-        }
-        exit();
-    }
 
     if ($callback_query) handleHoldingsCallback($user, $callback_query, $message);
     if ($message && isset($message['web_app_data'])) handleHoldingsWebAppData($user, $data, $message, $db);
     if ($message && !isset($message['web_app_data'])) handleHoldingsTextMessage($user, $data, $message, $db);
+
+    // Send initial message
+    $response = sendToTelegram('sendMessage', $data);
+
+    // Update user's level and progress
+    if ($response) {
+        $db->update(
+            table: 'users',
+            data: ['last_btn' => $level_button->getId(), 'progress' => null],
+            conditions: ['id' => $user->getId()]
+        );
+        // Send Informative message
+        sendAllHoldings($user, $db);
+    }
+
     exit();
 }
 
@@ -638,57 +632,49 @@ function checkAndAddEditHoldingButton(array $data, User $user, DatabaseManager $
 function level_2(
     User            $user,
     DatabaseManager $db,
-    ?Button         $pressed_button = null,
+    ?Button         $level_button = null,
     ?array          $message = null,
     ?array          $callback_query = null
 ): void
 {
     // Initialize button object if null is given
-    $current_button = $pressed_button ?? Button::fromDbRow($db->read('buttons', ['id' => 2], true));
+    $level_button = $level_button ?? Button::fromDbRow($db->read('buttons', ['id' => 2], true));
 
     // Create keyboards
-    $keyboard = createKeyboardsArray(parent_btn_id: $current_button->getId(), admin: $user->isAdmin(), db: $db);
+    $keyboard = createKeyboardsArray(parent_btn_id: $level_button->getId(), admin: $user->isAdmin(), db: $db);
 
     // Add '➕ افزودن وام جدید' button to the keyboard
 //    array_unshift($keyboard, [createWebAppBtn('➕ افزودن وام جدید', '/assets/add_loan.html')]);
 
     $data = [
         'chat_id' => $user->getChatId(),
-        'text' => $current_button->getText(),
+        'text' => $level_button->getText(),
         'reply_markup' => [
             'keyboard' => $keyboard,
             'resize_keyboard' => true,
             'is_persistent' => true,
-            'input_field_placeholder' => $current_button->getText()
+            'input_field_placeholder' => $level_button->getText()
         ]
     ];
 
-    if ($pressed_button) {
-        // Send initial message
-        $response = sendToTelegram('sendMessage', $data);
-        if ($response) {
-            $db->update(
-                table: 'users',
-                data: [
-                    'last_btn' => $current_button->getId(),
-                    'progress' => null,
-                ],
-                conditions: ['id' => $user->getId()]
-            );
+    if ($callback_query) handleLoansCallback($user, $callback_query, $data, $message, $db);
+    if ($message && isset($message['web_app_data'])) handleLoansWebAppData($user, $data, $message, $db);
+    if ($message && !isset($message['web_app_data'])) handleLoansTextMessage($user, $data, $message, $db);
 
-            // Send informative message
-            sendAllLoans($user, $db);
-        }
-        exit();
+    // Send initial message
+    $response = sendToTelegram('sendMessage', $data);
+
+    // Update user's level and progress
+    if ($response) {
+        $db->update(
+            table: 'users',
+            data: ['last_btn' => $level_button->getId(), 'progress' => null],
+            conditions: ['id' => $user->getId()]
+        );
+        // Send Informative message
+        sendAllLoans($user, $db);
     }
 
-    if ($callback_query)
-        handleLoansCallback($user, $callback_query, $data, $message, $db);
-
-    if ($message && isset($message['web_app_data']))
-        handleLoansWebAppData($user, $data, $message, $db);
-    if ($message && !isset($message['web_app_data']))
-        handleLoansTextMessage($user, $data, $message, $db);
     exit();
 }
 
@@ -1009,25 +995,25 @@ function sendLoanDetail(array $loan, array $data): void
 function level_5(
     User            $user,
     DatabaseManager $db,
-    ?Button         $pressed_button = null,
+    ?Button         $level_button = null,
     ?array          $message = null,
     ?array          $callback_query = null
 ): void
 {
     // Initialize button object if null is given
-    $current_button = $pressed_button ?? Button::fromDbRow($db->read('buttons', ['id' => 5], true));
+    $level_button = $level_button ?? Button::fromDbRow($db->read('buttons', ['id' => 5], true));
 
     // Create keyboards
-    $keyboard = createKeyboardsArray(parent_btn_id: $current_button->getId(), admin: $user->isAdmin(), db: $db);
+    $keyboard = createKeyboardsArray(parent_btn_id: $level_button->getId(), admin: $user->isAdmin(), db: $db);
 
     $data = [
         'chat_id' => $user->getChatId(),
-        'text' => $current_button->getText(),
+        'text' => $level_button->getText(),
         'reply_markup' => [
             'keyboard' => $keyboard,
             'resize_keyboard' => true,
             'is_persistent' => true,
-            'input_field_placeholder' => $current_button->getText()
+            'input_field_placeholder' => $level_button->getText()
         ]
     ];
 
@@ -1037,39 +1023,30 @@ function level_5(
         distinct: true,
         orderBy: ['asset_type' => 'DESC']
     );
-    if (!$asset_types) {
 
-        $data['text'] = 'دسته‌بندی‌ای در سیستم یافت نشد!';
-        sendToTelegram('sendMessage', $data);
-        exit();
-
-    } else $asset_types = array_column($asset_types, 'asset_type');
+    $asset_types = array_column($asset_types, 'asset_type');
 
     // Add asset types to level 5 keyboard
     foreach ($asset_types as $asset_type) array_unshift($keyboard, [['text' => $asset_type]]);
     $data['reply_markup']['keyboard'] = $keyboard;
 
-    if ($pressed_button) {
+    if ($callback_query) handlePricesCallback($user, $callback_query, $message, $asset_types, $db);
+    if ($message) handlePricesTextMessage($data, $message, $asset_types, $db);
 
-        // Update user's level and progress
+    // Send initial message
+    $response = sendToTelegram('sendMessage', $data);
+
+    // Update user's level and progress
+    if ($response) {
         $db->update(
             table: 'users',
-            data: [
-                'last_btn' => $current_button->getId(),
-                'progress' => null,
-            ],
+            data: ['last_btn' => $level_button->getId(), 'progress' => null],
             conditions: ['id' => $user->getId()]
         );
-
-        // Send initial message
-        sendToTelegram('sendMessage', $data);
-
-        // Send favorites message
+        // Send Informative message
         sendFavorites($user, $db);
     }
 
-    if ($message) handlePricesTextMessage($data, $message, $asset_types, $db);
-    if ($callback_query) handlePricesCallback($user, $callback_query, $message, $asset_types, $db);
     exit();
 }
 
@@ -1425,6 +1402,7 @@ function createFavoritesInlineKeyboard(
 function level_6(
     User            $user,
     DatabaseManager $db,
+    ?Button         $level_button = null,
     ?array          $message = null,
     ?array          $callback_query = null): void
 {
