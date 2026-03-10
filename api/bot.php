@@ -178,6 +178,7 @@ function getOrCreateUser(array $chat, DatabaseManager $db): User
                 'first_name' => $chat['first_name'] ?? 'N/A',
                 'last_name' => $chat['last_name'] ?? null,
                 'username' => $chat['username'] ?? null,
+                'settings' => json_encode(['base_currency'=>'🇮🇷 ریال ایران']),
                 'progress' => null,
                 'is_admin' => ($admins) ? 0 : 1, // First user is admin
                 'last_btn' => 0

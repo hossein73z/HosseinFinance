@@ -8,6 +8,7 @@ class User implements JsonSerializable
         private string  $firstName,
         private ?string $lastName,
         private ?string $username,
+        private ?string $settings,
         private ?string $progress,
         private bool    $isAdmin = false,
         private string  $lastBtn = '0'
@@ -26,6 +27,7 @@ class User implements JsonSerializable
             $row['first_name'],
             $row['last_name'] ?? null,
             $row['username'] ?? null,
+            $row['settings'] ?? null,
             $row['progress'] ?? null,
             (bool)($row['is_admin'] ?? false),
             $row['last_btn'] ?? '0'
@@ -57,6 +59,11 @@ class User implements JsonSerializable
     public function getUsername(): ?string
     {
         return $this->username;
+    }
+
+    public function getSettings(): ?string
+    {
+        return $this->settings;
     }
 
     public function getProgress(): ?string
@@ -106,6 +113,12 @@ class User implements JsonSerializable
         return $this;
     }
 
+    public function setSettings(?string $settings): self
+    {
+        $this->$settings = $settings;
+        return $this;
+    }
+
     public function setProgress(?string $progress): self
     {
         $this->progress = $progress;
@@ -144,6 +157,7 @@ class User implements JsonSerializable
             'first_name' => $this->firstName,
             'last_name' => $this->lastName,
             'username' => $this->username,
+            'settings' => $this->settings,
             'progress' => $this->progress,
             'is_admin' => (int)$this->isAdmin,
             'last_btn' => $this->lastBtn,
@@ -152,7 +166,7 @@ class User implements JsonSerializable
 
     // --- JsonSerializable Implementation ---
 
-    public function jsonSerialize(): mixed
+    public function jsonSerialize(): array
     {
         return [
             'id' => $this->id,
@@ -161,6 +175,7 @@ class User implements JsonSerializable
             'last_name' => $this->lastName,
             'full_name' => $this->getFullName(),
             'username' => $this->username,
+            'settings' => $this->settings,
             'progress' => $this->progress,
             'is_admin' => $this->isAdmin,
             'last_btn' => $this->lastBtn,

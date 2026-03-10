@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS `users`
     first_name TEXT               NOT NULL,
     last_name  TEXT                        DEFAULT NULL,
     username   TEXT                        DEFAULT NULL,
+    settings   TEXT                        DEFAULT NULL,
     progress   TEXT                        DEFAULT NULL,
     is_admin   BOOLEAN            NOT NULL DEFAULT 0,
     last_btn   VARCHAR(10)        NOT NULL DEFAULT '0'
