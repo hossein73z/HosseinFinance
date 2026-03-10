@@ -179,7 +179,7 @@ function getOrCreateUser(array $chat, DatabaseManager $db): User
                 'first_name' => $chat['first_name'] ?? 'N/A',
                 'last_name' => $chat['last_name'] ?? null,
                 'username' => $chat['username'] ?? null,
-                'settings' => json_encode(['base_currency' => '🇮🇷 ریال ایران']),
+                'settings' => json_encode(['base_currency' => 'ریال ایران']),
                 'progress' => null,
                 'is_admin' => ($admins) ? 0 : 1, // First user is admin
                 'last_btn' => 0
@@ -996,6 +996,7 @@ function sendLoanDetail(array $loan, array $data): void
 //          LEVEL 5: PRICES
 // ==========================================
 
+// TODO: Save crypto prices ased on Rial instead of Tether
 #[NoReturn]
 function level_5(
     User            $user,
@@ -1036,7 +1037,10 @@ function level_5(
     $data['reply_markup']['keyboard'] = $keyboard;
 
     if ($callback_query) handlePricesCallback($user, $callback_query, $message, $asset_types, $db);
-    if ($message) handlePricesTextMessage($data, $message, $asset_types, $db);
+    if ($message) {
+        $user_base_currency = json_decode($user->getSettings(), true)['base_currency'];
+        handlePricesTextMessage($data, $message, $asset_types, $user_base_currency, $db);
+    }
 
     // Send initial message
     $response = sendToTelegram('sendMessage', $data);
@@ -1256,16 +1260,28 @@ function handlePricesCallback(User $user, array $callback_query, array $message,
 }
 
 #[NoReturn]
-function handlePricesTextMessage(array $data, array $message, array $asset_types, DatabaseManager $db): void
+function handlePricesTextMessage(array $data, array $message, array $asset_types, string $user_base_currency, DatabaseManager $db): void
 {
     if (in_array($message['text'], $asset_types)) {
 
-        $data['reply_to_message_id'] = $message['message_id'];
-
+        // Retrieve all related assets
         $assets = $db->read('assets', ['asset_type' => $message['text']]);
-        if ($assets) $data['text'] = createPricesTextForSingleAssetType($assets);
+
+        // Create array of the involved base currencies
+        $base_assets_names = array_unique(array_column($assets, 'base_currency'));
+        $asset_bases = array_merge($base_assets_names, [$user_base_currency]);
+
+        // Read prices for all base currencies
+        $base_prices = $db->read('assets', ['name' => $asset_bases]);
+        $base_prices = array_combine(
+            array_column($base_prices, 'name'),
+            array_map('floatval', array_column($base_prices, 'price'))
+        );
+
+        if ($assets) $data['text'] = createPricesTextForSingleAssetType($assets, $base_prices, $user_base_currency);
         else $data['text'] = 'این دسته بندی خالی‌ست!';
 
+        $data['reply_to_message_id'] = $message['message_id'];
         sendToTelegram('sendMessage', $data);
         exit();
     }
@@ -1950,9 +1966,11 @@ function createFavoritesText(?array $assets, int|string|null $user_id = null, ?D
 
 /**
  * @param array $assets Array of assets
+ * @param array $base_prices
+ * @param string $user_base_currency
  * @return string
  */
-function createPricesTextForSingleAssetType(array $assets): string
+function createPricesTextForSingleAssetType(array $assets, array $base_prices, string $user_base_currency): string
 {
     $date = preg_split('/-/u', $assets[0]['date']);
     $date[1] = str_replace(
@@ -1966,10 +1984,19 @@ function createPricesTextForSingleAssetType(array $assets): string
 
     // Create price texts and add them to the text
     foreach ($assets as $asset) {
-        $asset['price'] = beautifulNumber($asset['price']);
-        $asset['name'] = beautifulNumber($asset['name'], null);
-        $asset['base_currency'] = beautifulNumber($asset['base_currency'], null);
-        $text .= "\n$asset[name]: $asset[price] $asset[base_currency]";
+        $asset_price = beautifulNumber($asset['price']);
+        $asset_name = beautifulNumber($asset['name'], null);
+        $asset_base_currency = beautifulNumber($asset['base_currency'], null);
+        $text .= "\n$asset_name: $asset_price $asset_base_currency";
+
+        if (
+            $asset['base_currency'] != $user_base_currency &&
+            $base_prices[$user_base_currency]
+        ) {
+            $exchange_rate = $base_prices[$asset['base_currency']] / $base_prices[$user_base_currency];
+            $based_price = $asset['price'] * $exchange_rate;
+            $text .= ' --> ' . beautifulNumber($based_price) . ' ' . $user_base_currency;
+        }
     }
     return $text;
 }
