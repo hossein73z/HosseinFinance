@@ -1122,7 +1122,7 @@ function handlePricesCallback(User $user, array $callback_query, array $message,
                     foreach ($favorites as $favorite) {
                         array_unshift(
                             $data['reply_markup']['inline_keyboard'],
-                            [['text' => $favorite['asset_name'], 'callback_data' => json_encode(['del_fav' => $favorite['id']])]]
+                            [['text' => $favorite['name'], 'callback_data' => json_encode(['del_fav' => $favorite['fav_id']])]]
                         );
                     }
                 } else $data['text'] = 'لیست علاقه‌مندی‌های شما خالی‌ست!'; // TODO: Answer the callback with a message instead of changing text
@@ -1187,7 +1187,7 @@ function handlePricesCallback(User $user, array $callback_query, array $message,
 
             $data['text'] = 'آیا از حذف اطمینان دارید؟';
             $data['reply_markup']['inline_keyboard'] = [[
-                ['text' => 'لغو', 'callback_data' => json_encode(['edit_fav' => 'remove'])],
+                ['text' => 'لغو', 'callback_data' => json_encode(['show_favorites' => null])],
                 ['text' => 'تایید', 'callback_data' => json_encode(['conf_del_fav' => $favorite_id])],
             ]];
             sendToTelegram('editMessageText', $data);
