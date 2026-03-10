@@ -1053,8 +1053,6 @@ function level_5(
 #[NoReturn]
 function handlePricesCallback(User $user, array $callback_query, array $message, array $asset_types, DatabaseManager $db): void
 {
-    sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
-
     $data = [
         'chat_id' => $user->getChatId(),
         'message_id' => $message['message_id'],
@@ -1125,9 +1123,13 @@ function handlePricesCallback(User $user, array $callback_query, array $message,
                             [['text' => $favorite['name'], 'callback_data' => json_encode(['del_fav' => $favorite['fav_id']])]]
                         );
                     }
-                } else $data['text'] = 'لیست علاقه‌مندی‌های شما خالی‌ست!'; // TODO: Answer the callback with a message instead of changing text
+                } else {
+                    sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id'], 'text' => 'لیست علاقه‌مندی‌های شما خالی‌ست!']);
+                    exit();
+                }
             }
 
+            sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
             sendToTelegram('editMessageText', $data);
             exit();
 
@@ -1155,6 +1157,7 @@ function handlePricesCallback(User $user, array $callback_query, array $message,
 
             } else $data['text'] = 'دسته‌بندی مورد نظر خالی‌ست!';
 
+            sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
             sendToTelegram('editMessageText', $data);
             exit();
 
@@ -1176,6 +1179,7 @@ function handlePricesCallback(User $user, array $callback_query, array $message,
                 $data['text'] = '❌ خطای پایگاه داده!';
             }
 
+            sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
             sendToTelegram('editMessageText', $data);
             sendFavorites($user, $db);
             exit();
@@ -1190,6 +1194,8 @@ function handlePricesCallback(User $user, array $callback_query, array $message,
                 ['text' => 'لغو', 'callback_data' => json_encode(['show_favorites' => null])],
                 ['text' => 'تایید', 'callback_data' => json_encode(['conf_del_fav' => $favorite_id])],
             ]];
+
+            sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
             sendToTelegram('editMessageText', $data);
             exit();
 
@@ -1209,12 +1215,14 @@ function handlePricesCallback(User $user, array $callback_query, array $message,
                 $data['text'] = '❌ خطای پایگاه داده!';
             }
 
+            sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
             sendToTelegram('editMessageText', $data);
             sendFavorites($user, $db);
             exit();
 
         // Start showing live price updates on the current message
         case 'set_live':
+            sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
             deleteOldActiveLiveMessage($user, $message['message_id'], $db);
             setLiveMessage($user->getId(), $query_data['set_live'], $message['message_id'], $db);
             sendFavorites($user, $db, $message['message_id']);
@@ -1222,14 +1230,17 @@ function handlePricesCallback(User $user, array $callback_query, array $message,
 
         // Logic for price alerts can be added here
         case 'price_alert':
+            sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
             exit();
 
         // Acts as back button and shows the favorites message
         case 'show_favorites':
+            sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
             sendFavorites($user, $db, $message['message_id']);
             exit();
 
         default:
+            sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
             sendToTelegram('editMessageText', [
                 'chat_id' => $user->getChatId(),
                 'message_id' => $message['message_id'],
