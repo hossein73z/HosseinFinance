@@ -123,7 +123,7 @@ function handleIncomingMessage(array $message, DatabaseManager $db): void
 
     // Global Command Routing
     $text = $message['text'] ?? '';
-    
+
     // TODO: if ($text === '/start') /*****/ level_0(user: $user, db: $db);
     if ($text === '/holdings') /**/ level_1(user: $user, db: $db);
     if ($text === '/loans') /*****/ level_2(user: $user, db: $db);
@@ -1095,7 +1095,7 @@ function handlePricesCallback(User $user, array $callback_query, array $message,
                 ];
 
                 foreach ($asset_types as $asset_type) {
-                    $data['reply_markup']['inline_keyboard'] = array_unshift(
+                    array_unshift(
                         $data['reply_markup']['inline_keyboard'],
                         [['text' => $asset_type, 'callback_data' => json_encode(['new_fav_type' => $asset_type])]]
                     );
@@ -1120,7 +1120,7 @@ function handlePricesCallback(User $user, array $callback_query, array $message,
                     $data['text'] = 'کدام گزینه را می‌خواهید حذف کنید؟';
 
                     foreach ($favorites as $favorite) {
-                        $data['reply_markup']['inline_keyboard'] = array_unshift(
+                        array_unshift(
                             $data['reply_markup']['inline_keyboard'],
                             [['text' => $favorite['asset_name'], 'callback_data' => json_encode(['del_fav' => $favorite['id']])]]
                         );
@@ -1148,9 +1148,9 @@ function handlePricesCallback(User $user, array $callback_query, array $message,
                 $data['text'] = 'گزینه‌ی مد نظر خود را از لیست زیر انتخاب کنید:';
 
                 foreach ($assets as $asset)
-                    $data['reply_markup']['inline_keyboard'] = array_unshift(
+                    array_unshift(
                         $data['reply_markup']['inline_keyboard'],
-                        [['text' => $asset['name'], 'callback_data' => json_encode(['new_fav_id' => $asset['id']])]]
+                        [['text' => $asset['name'], 'callback_data' => json_encode(['new_fav_name' => $asset['name']])]]
                     );
 
             } else $data['text'] = 'دسته‌بندی مورد نظر خالی‌ست!';
@@ -1159,15 +1159,15 @@ function handlePricesCallback(User $user, array $callback_query, array $message,
             exit();
 
         // Add new favorite to the table and send the favorites message to the user
-        case 'new_fav_id':
+        case 'new_fav_name':
 
-            $asset_id = $query_data['new_fav_id'];
+            $asset_name = $query_data['new_fav_name'];
             try {
                 $db->create(
                     table: 'favorites',
                     data: [
                         'user_id' => $user->getId(),
-                        'asset_id' => $asset_id
+                        'asset_name' => $asset_name
                     ]
                 );
                 $data['text'] = '✅ علاقه‌مندی جدید افزوده شد!';
@@ -1205,7 +1205,7 @@ function handlePricesCallback(User $user, array $callback_query, array $message,
                 );
                 $data['text'] = '✅ حذف موفقیت آمیز بود!';
             } catch (Exception $e) {
-                error_log('Error adding new favorite: ' . $e->getMessage());
+                error_log('Error deleting a favorite: ' . $e->getMessage());
                 $data['text'] = '❌ خطای پایگاه داده!';
             }
 
@@ -1509,7 +1509,7 @@ function sendLoadingMessage(string $chat_id, string $text): array|false
  * Finds user's **active** live message in the database with `$message_id`
  * different from the one provided, and sends delete request to telegram.
  **/
-function deleteOldActiveLiveMessage(User $user, int|string $message_id, DatabaseManager $db): bool
+function deleteOldActiveLiveMessage(User $user, int|string $message_id, DatabaseManager $db): bool|array
 {
     $live_mssg = $db->read(
         table: 'special_messages',
