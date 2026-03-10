@@ -3,6 +3,18 @@ require_once __DIR__ . '/../Libraries/DatabaseManager.php';
 require_once __DIR__ . '/../Functions/ExternalEndpointsFunctions.php';
 require_once __DIR__ . '/../Functions/StringHelper.php';
 
+// DON'T COMMIT!
+// Code for testing on KSWEB
+putenv('SHARED_SECRET=0iNaaYhna2ilf0fY');
+
+putenv('MAIN_BOT_TOKEN=1797658259:sGXRQN3Hwkj79PCWjDnCFt9W072q-2OljYo');
+
+putenv('DB_HOST=localhost');
+putenv('DB_PORT=3306');
+putenv('DB_NAME=hossein_finance');
+putenv('DB_USER=hossein');
+putenv('DB_PASS=H457869z');
+
 // --- CONFIGURATION ---
 define('PRICE_BOT_TOKEN', getenv('PRICE_BOT_TOKEN'));
 define('SHARED_SECRET', getenv('SHARED_SECRET'));
@@ -226,7 +238,6 @@ if (preg_match_all('/\|[  ].*? ((\d\d?) (.*?) (\d\d\d\d)) -[  ](\d\d:\d\d)/ums
         } catch (Exception $e) {
             error_log($e->getMessage());
         }
-        error_log("Received message for (($asset_type))");
     }
     exit();
 }
@@ -317,32 +328,69 @@ function addPriceToDatabase(array $matches, string $asset_type, string $date, st
     // Update live messages
     $live_mssgs = $db->read(
         table: 'special_messages sm',
-        conditions: ['sm.type' => 'live_price'],
-        selectColumns: 'sm.*, p.chat_id',
-        join: 'JOIN users p ON p.id = sm.user_id'
+        conditions: ['sm.type' => 'live_price', 'is_active' => true,],
+        selectColumns: 'sm.*, u.chat_id',
+        join: 'JOIN users u ON u.id = sm.user_id'
     );
-
-    if ($live_mssgs) foreach ($live_mssgs as $live_mssg) {
-
-        if ($live_mssg['is_active']) {
-            $favorites = $db->read(
-                table: 'favorites f',
-                conditions: ['user_id' => $live_mssg['user_id']],
-                selectColumns: 'a.*',
-                join: 'JOIN assets a ON a.id=f.asset_id',
-                orderBy: ['asset_type' => 'DESC', 'id' => 'ASC']);
-
-            $data['chat_id'] = $live_mssg['chat_id'];
-            $data['message_id'] = $live_mssg['message_id'];
-            $data['text'] = createFavoritesText($favorites);
-            $data['reply_markup'] = ['inline_keyboard' => [
-                [['text' => 'توقف نمایش زنده ⏸', 'callback_data' => json_encode(['set_live' => false])]],
-                [['text' => 'هشدار قیمت', 'callback_data' => json_encode(['price_alert' => null])]],
-                [['text' => 'ویرایش لیست', 'callback_data' => json_encode(['edit_fav' => null])]],
-            ]];
-
-            sendToTelegram('editMessageText', $data);
+    function createFavoritesText(?array $assets, int|string|null $user_id = null, ?DatabaseManager $db = null): string|null
+    {
+        if ($assets === null) {
+            if ($db && $user_id) {
+                try {
+                    $assets = $db->read(
+                        table: 'favorites f',
+                        conditions: ['f.user_id' => $user_id],
+                        selectColumns: 'a.*, f.id as fav_id',
+                        join: 'JOIN assets a ON a.name=f.asset_name',
+                        orderBy: ['asset_type' => 'DESC', 'f.id' => 'ASC']
+                    );
+                } catch (Exception $e) {
+                    error_log('createFavoritesText: ' . $e->getMessage());
+                    exit();
+                }
+            } else {
+                error_log('createFavoritesText: Required inputs are wrong`');
+                exit();
+            }
         }
+
+        if ($assets) {
+            $text = '';
+            $asset_type = '';
+            foreach ($assets as $asset) {
+                if ($asset['asset_type'] != $asset_type) {
+                    $asset_type = $asset['asset_type'];
+                    $date = preg_split('/-/u', $asset['date']);
+                    $date[1] = str_replace(
+                        ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'],
+                        ['فروردین', 'اردیبهشت', 'خرداد', 'تیر', 'مرداد', 'شهریور', 'مهر', 'آبان', 'آذر', 'دی', 'بهمن', 'اسفند'],
+                        $date[1]);
+                    $text .= beautifulNumber("\nآخرین قیمت های «$asset[asset_type]» در " . "$date[2] $date[1] $date[0]" . " ساعت " . $asset['time'] . "\n", null);
+                }
+                $text .= "   -- " . beautifulNumber($asset['name'], null) . ': ' . beautifulNumber($asset['price']) . "\n";
+            }
+        } else $text = 'لیست علاقه‌مندی‌های شما خالیست!';
+
+        return $text;
     }
 
+    if ($live_mssgs) foreach ($live_mssgs as $live_mssg) {
+        $favorites = $db->read(
+            table: 'favorites f',
+            conditions: ['user_id' => $live_mssg['user_id']],
+            selectColumns: 'a.*',
+            join: 'JOIN assets a ON a.name=f.asset_name',
+            orderBy: ['asset_type' => 'DESC', 'id' => 'ASC']);
+
+        $data['chat_id'] = $live_mssg['chat_id'];
+        $data['message_id'] = $live_mssg['message_id'];
+        $data['text'] = createFavoritesText($favorites);
+        $data['reply_markup'] = ['inline_keyboard' => [
+            [['text' => 'توقف نمایش زنده ⏸', 'callback_data' => json_encode(['set_live' => false])]],
+            [['text' => 'هشدار قیمت', 'callback_data' => json_encode(['price_alert' => null])]],
+            [['text' => 'ویرایش لیست', 'callback_data' => json_encode(['edit_fav' => null])]],
+        ]];
+
+        sendToTelegram('editMessageText', $data);
+    }
 }
