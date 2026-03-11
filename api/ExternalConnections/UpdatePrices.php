@@ -47,52 +47,41 @@ if (json_last_error() !== JSON_ERROR_NONE) {
 http_response_code(200);
 
 // --- Message Data Extraction (Date and Time) ---
-/*
-* This regex attempts to find the standard date/time header pattern from a Telegram message.
-* Pattern: | (SPACE) ... (SPACE) (DAY) (MONTH_NAME) (YEAR) - (SPACE) (HH:MM)
-* Group 1: Full date part (e.g., 20 خرداد 1402)
-* Group 2: Day (d or dd)
-* Group 3: Month name (e.g., خرداد)
-* Group 4: Year (yyyy)
-* Group 5: Time (HH:MM)
-*/
-if (preg_match_all('/\|[  ].*? ((\d\d?) (.*?) (\d\d\d\d)) -[  ](\d\d:\d\d)/ums', $message['text'], $matches)) {
+if (preg_match_all('/\|[  ].*? ((\d\d?) (.*?) (\d\d\d\d)) -[  ](\d\d:\d\d)/ums', $message['text'], $date_time_matches)) {
 
-    $time = $matches[5][0];
-    // Reconstruct the date into 'YYYY-MM-DD' format.
-    $date =
-        $matches[4][0] . "-" . // Year
-        str_replace( // Month conversion from Persian month names to numerical months
+    $time = $date_time_matches[5][0];
+    // Year
+    $date = $date_time_matches[4][0] . "-";
+    // Month conversion from Persian month names to numerical months
+    $date .= str_replace(
             ['فروردین', 'اردیبهشت', 'خرداد', 'تیر', 'مرداد', 'شهریور', 'مهر', 'آبان', 'آذر', 'دی', 'بهمن', 'اسفند', ' '],
             ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12', '-'],
-            $matches[3][0]) . "-" .
-        $matches[2][0]; // Day
+            $date_time_matches[3][0]) . "-";
+    // Day
+    $date .= $date_time_matches[2][0];
 
     $asset_type = null;
     // --- Price Category 1: Precious Metals (فلزات گرانبها) ---
     if (preg_match('/^⭕️ قیمت فلزات گرانبها /mu', $message['text'])) {
 
-        $asset_type = 'فلزات گرانبها';
-
-        /*
-        * Find "Ounces" prices using a pattern to match the asset name, price, and currency.
-        * Pattern: قیمت (ASSET_NAME) ‏... \n قیمت لحظه ای : (PRICE) (CURRENCY)\n
-        * Group 1: Asset Name (e.g., اونس طلا)
-        * Group 2: Price value
-        * Group 3: Base Currency
-        */
         $pattern = "قیمت (.*?)‏.*?\nقیمت لحظه ای : (.*?) (.*?)\n";
         $matched = preg_match_all(pattern: "/$pattern/um", subject: $message['text'], matches: $matches);
         if ($matched) {
 
+            $asset_type = 'فلزات گرانبها';
+
+            $new_assets['names']/************/ = $matches[1];
+            $new_assets['prices']/***********/ = $matches[2];
+            $new_assets['base_currencies']/**/ = $matches[3];
+
             // Check if the expected number of items (4) was extracted.
-            if (sizeof($matches[2]) != 4) {
+            if (sizeof($new_assets['names']) != 4) {
                 // Log and send a warning to the chat if the count is unexpected.
-                error_log("MetaItems: " . json_encode($matches));
+                error_log("MetaItems: " . json_encode($new_assets));
                 sendToTelegram('sendMessage', [
                     'chat_id' => $message['chat']['id'],
                     'reply_to_message_id' => $message['message_id'],
-                    'text' => 'Warning: Expected 4 precious metal prices, got ' . sizeof($matches[2])
+                    'text' => 'Warning: Expected 4 precious metal prices, got ' . sizeof($new_assets[1])
                 ], PRICE_BOT_TOKEN);
             }
         }
@@ -100,27 +89,24 @@ if (preg_match_all('/\|[  ].*? ((\d\d?) (.*?) (\d\d\d\d)) -[  ](\d\d:\d\d)/ums
     // --- Price Category 2: Gold and Melted Gold (طلا و آبشده) ---
     if (preg_match('/^⭕️ قیمت طلا و آبشده /mu', $message['text'])) {
 
-        $asset_type = 'طلا و آبشده';
-
-        /*
-        * Find "Gold" prices.
-        * Pattern:  قیمت(ASSET_NAME) ? \s... \s+ قیمت لحظه ای : (PRICE) (CURRENCY)\s
-        * Group 1: Asset Name (e.g., طلای ۱۸ عیار)
-        * Group 2: Price value
-        * Group 3: Base Currency
-        */
         $pattern = " قیمت(.*?) ?\s\.*?\s+قیمت لحظه ای : (.*?) (.*?)\s";
         $matched = preg_match_all(pattern: "/$pattern/um", subject: $message['text'], matches: $matches);
         if ($matched) {
 
+            $asset_type = 'طلا و آبشده';
+
+            $new_assets['names']/************/ = $matches[1];
+            $new_assets['prices']/***********/ = $matches[2];
+            $new_assets['base_currencies']/**/ = $matches[3];
+
             // Check if the expected number of items (6) was extracted.
-            if (sizeof($matches[2]) != 6) {
+            if (sizeof($new_assets['names']) != 6) {
                 // Log and send a warning.
-                error_log("GoldItems:" . json_encode($matches));
+                error_log("GoldItems:" . json_encode($new_assets));
                 sendToTelegram('sendMessage', [
                     'chat_id' => $message['chat']['id'],
                     'reply_to_message_id' => $message['message_id'],
-                    'text' => 'Warning: Expected 6 gold prices, got ' . sizeof($matches[2])
+                    'text' => 'Warning: Expected 6 gold prices, got ' . sizeof($new_assets[1])
                 ], PRICE_BOT_TOKEN);
             }
         }
@@ -128,43 +114,25 @@ if (preg_match_all('/\|[  ].*? ((\d\d?) (.*?) (\d\d\d\d)) -[  ](\d\d:\d\d)/ums
     // --- Price Category 3: Free Currencies (ارزهای آزاد) ---
     if (preg_match('/^⭕️ قیمت ارزهای آزاد \|/mu', $message['text'])) {
 
-        $asset_type = 'ارزهای آزاد';
-
-        /*
-        * Find "Currency" prices. The pattern is complex due to various spaces/non-breaking spaces.
-        * Pattern: ^(ASSET_EMOJI)( | )(ASSET_NAME) :( | )(PRICE) (CURRENCY)$
-        * Group 1: Asset Emoji
-        * Group 3: Asset Name
-        * Group 5: Price value
-        * Group 6: Base Currency
-        */
         $pattern = "^(.*?)[  ](.*?) :[  ](.*?) (.*)$";
         $matched = preg_match_all(pattern: "/$pattern/um", subject: $message['text'], matches: $matches);
         if ($matched) {
 
-            // Re-structure the $matches array to fit the `addPriceToDatabase` function's expected format.
+            $asset_type = 'ارزهای آزاد';
 
-            foreach ($matches[1] as $i => $match) {
-                $matches[5][$i] = trim($matches[1][$i]);
-                $matches[1][$i] = trim($matches[2][$i]);
-                $matches[2][$i] = trim($matches[3][$i]);
-                $matches[3][$i] = trim($matches[4][$i]);
-                $matches[4][$i] = trim($matches[5][$i]);
-            }
+            $new_assets['emojis']/***********/ = $matches[1];
+            $new_assets['names']/************/ = $matches[2];
+            $new_assets['prices']/***********/ = $matches[3];
+            $new_assets['base_currencies']/**/ = $matches[4];
 
-            // Sorting the indexes
-//            unset($matches[2]);
-            $matches = array_values($matches);
-
-            echo json_encode($matches);
             // Check if the expected number of items (39) was extracted.
-            if (sizeof($matches[2]) != 39) {
+            if (sizeof($new_assets['names']) != 39) {
                 // Log and send a warning.
-                error_log("CurrencyItems: " . json_encode($matches));
+                error_log("CurrencyItems: " . json_encode($new_assets));
                 sendToTelegram('sendMessage', [
                     'chat_id' => $message['chat']['id'],
                     'reply_to_message_id' => $message['message_id'],
-                    'text' => 'Warning: Expected 39 currency prices, got ' . sizeof($matches[2])
+                    'text' => 'Warning: Expected 39 currency prices, got ' . sizeof($new_assets[2])
                 ], PRICE_BOT_TOKEN);
             }
         }
@@ -172,36 +140,30 @@ if (preg_match_all('/\|[  ].*? ((\d\d?) (.*?) (\d\d\d\d)) -[  ](\d\d:\d\d)/ums
     // --- Price Category 4: Coins (سکه) ---
     if (preg_match('/^⭕️ قیمت سکه \|/mu', $message['text'])) {
 
-        $asset_type = 'سکه';
-
-        /*
-        * First, find the block of "Coin" prices, which is delimited by the '⭕️ قیمت دیگر سکه ها' header and a trailing '#'.
-        * Pattern: ⭕️ قیمت دیگر سکه ها ... (PRICE_BLOCK)#
-        * Group 1: The entire block of specific coin prices.
-        */
+        // First match to find the correct block of "Coin" prices.
         $pattern = "⭕️ قیمت دیگر سکه ها \.*\s(.*?)#";
-        $matched = preg_match_all(pattern: "/$pattern/usm", subject: $message['text'], matches: $matches);
+        $matched = preg_match_all(pattern: "/$pattern/usm", subject: $message['text'], matches: $price_block_matches);
         if ($matched) {
 
-            /*
-            * Second, extract individual coin prices from the found block (Group 1 of the previous match).
-            * Pattern: (ASSET_NAME) : (PRICE) (CURRENCY)\s
-            * Group 1: Asset Name
-            * Group 2: Price value
-            * Group 3: Base Currency
-            */
+            // Extract Coin prices like other categories
             $pattern = "(.*?) : (.*?) (.*?)\s";
-            $matched = preg_match_all(pattern: "/$pattern/um", subject: $matches[1][0], matches: $matches);
+            $matched = preg_match_all(pattern: "/$pattern/um", subject: $price_block_matches[1][0], matches: $matches);
             if ($matched) {
 
+                $asset_type = 'سکه';
+
+                $new_assets['names']/************/ = $matches[1];
+                $new_assets['prices']/***********/ = $matches[2];
+                $new_assets['base_currencies']/**/ = $matches[3];
+
                 // Check if the expected number of items (13) was extracted.
-                if (sizeof($matches[2]) != 13) {
+                if (sizeof($new_assets['names']) != 13) {
                     // Log and send a warning.
-                    error_log("CoinItems: " . json_encode($matches));
+                    error_log("CoinItems: " . json_encode($new_assets));
                     sendToTelegram('sendMessage', [
                         'chat_id' => $message['chat']['id'],
                         'reply_to_message_id' => $message['message_id'],
-                        'text' => 'Warning: Expected 13 coin prices, got ' . sizeof($matches[2])
+                        'text' => 'Warning: Expected 13 coin prices, got ' . sizeof($new_assets[1])
                     ], PRICE_BOT_TOKEN);
                 }
             }
@@ -210,37 +172,34 @@ if (preg_match_all('/\|[  ].*? ((\d\d?) (.*?) (\d\d\d\d)) -[  ](\d\d:\d\d)/ums
     // --- Price Category 5: Cryptocurrencies (ارزهای دیجیتال) ---
     if (preg_match('/^⭕️ گزارش قیمت ارزهای دیجیتال/mu', $message['text'])) {
 
-        $asset_type = 'ارزهای دیجیتال';
-        /*
-        * Find "Cryptocurrencies" prices using a pattern to match the asset name, price, and currency.
-        * Pattern: ◽️ (ASSET_NAME) : (PRICE) (CURRENCY)\R\R
-        * Group 1: Asset Name (e.g., بیت کوین)
-        * Group 2: Price value
-        * Group 3: Base Currency
-        */
-        $pattern = "\R◽️ (.*?) : (.*?) (.*?)\R";
+        $pattern = "◽️ (.*?) : (.*?) (.*?)\R\R";
         $matched = preg_match_all(pattern: "/$pattern/um", subject: $message['text'], matches: $matches);
-
         if ($matched) {
 
+            $asset_type = 'ارزهای دیجیتال';
+
+            $new_assets['names']/************/ = $matches[1];
+            $new_assets['prices']/***********/ = $matches[2];
+            $new_assets['base_currencies']/**/ = $matches[3];
+
             // Check if the expected number of items (36) was extracted.
-            if (sizeof($matches[2]) != 36) {
+            if (sizeof($new_assets['names']) != 36) {
                 // Log and send a warning to the chat if the count is unexpected.
-                error_log("MetaItems: " . json_encode($matches));
+                error_log("MetaItems: " . json_encode($new_assets));
                 sendToTelegram('sendMessage', [
                     'chat_id' => $message['chat']['id'],
                     'reply_to_message_id' => $message['message_id'],
-                    'text' => 'Warning: Expected 36 cryptocurrencies prices, got ' . sizeof($matches[2])
+                    'text' => 'Warning: Expected 36 cryptocurrencies prices, got ' . sizeof($new_assets[1])
                 ], PRICE_BOT_TOKEN);
             }
 
         }
     }
 
-    if ($asset_type) {
+    if ($asset_type && isset($new_assets)) {
         // Successful extraction: Save to database and respond.
         try {
-            addPriceToDatabase($matches, $asset_type, $date, $time);
+            addPriceToDatabase($new_assets, $asset_type, $date, $time);
         } catch (Exception $e) {
             error_log($e->getMessage());
         }
@@ -252,15 +211,15 @@ if (preg_match_all('/\|[  ].*? ((\d\d?) (.*?) (\d\d\d\d)) -[  ](\d\d:\d\d)/ums
 /**
  * Processes the extracted price data and saves it to the 'assets' and 'prices' tables.
  *
- * @param array $matches The result of preg_match_all, expected to have keys 1 (asset name),
- * 2 (price value), and 3 (base currency).
+ * @param array $new_assets Object of arrays of new assets' information,
+ * expected to have `names`, `prices`, `base_currencies` and `emojis` (Optional) keys.
  * @param string $asset_type The category of the assets (e.g., 'فلزات گرانبها').
  * @param string $date The extracted date in 'YYYY-MM-DD' format.
  * @param string $time The extracted time in 'HH:MM' format.
  * @return void
  * @throws Exception
  */
-function addPriceToDatabase(array $matches, string $asset_type, string $date, string $time): void
+function addPriceToDatabase(array $new_assets, string $asset_type, string $date, string $time): void
 {
     $db = DatabaseManager::getInstance(
         host: getenv('DB_HOST'),
@@ -269,33 +228,24 @@ function addPriceToDatabase(array $matches, string $asset_type, string $date, st
         pass: getenv('DB_PASS'),
         port: getenv('DB_PORT') ?: '3306',
     );
+
     $assets = [];
-    // Format extracted data into a structured array for batch processing.
-    foreach ($matches[1] as $index => $match) {
-        $asset_price = str_replace(",", "", $matches[2][$index]);
+    foreach ($new_assets['names'] as $index => $name) {
+        $asset_price = str_replace(",", "", $new_assets['prices'][$index]);
         $assets[] = [
-            'name' => trim($match),
-            'emoji' => trim($matches[4][$index]),
+            'name' => trim($name),
+            'emoji' => $new_assets['emojis'] ? trim($new_assets['emojis'][$index]) : null,
             'asset_type' => $asset_type,
             'price' => floatval($asset_price),
-            'base_currency' => trim($matches[3][$index]),
+            'base_currency' => trim($new_assets['base_currencies'][$index]),
             'date' => preg_match("/^\d\d\d\d-\d\d-\d$/m", $date) ? substr_replace($date, "0", 8, 0) : $date,
             'time' => $time,
         ];
 
-        // Update all the related exchange rates.
-        if (trim($match) == '🇺🇸 دلار') {
-            $dollars = $db->read('assets', ['base_currency' => ['دلار', 'تتر']]);
-            if ($dollars) {
-                foreach ($dollars as $i => $dollar) $dollars[$i]['exchange_rate'] = floatval($asset_price);
-                $db->upsertBatch('assets', $dollars);
-            }
-        }
-
         //Check for and send alerts
         $alerts = $db->read(
             table: 'alerts',
-            conditions: ['asset_name' => trim($match), 'is_active' => true],
+            conditions: ['asset_name' => trim($name), 'is_active' => true],
             selectColumns: 'alerts.*, assets.price',
             join: 'JOIN assets ON assets.name = alerts.asset_name'
         );
@@ -319,7 +269,7 @@ function addPriceToDatabase(array $matches, string $asset_type, string $date, st
             $response = sendToTelegram('sendMessage', [
                 'chat_id' => $user['chat_id'],
                 'text' =>
-                    "هشدار قیمت برای " . "«" . beautifulNumber(trim($match), null) . "»" . " فعال شد." . "\n" .
+                    "هشدار قیمت برای " . "«" . beautifulNumber(trim($name), null) . "»" . " فعال شد." . "\n" .
                     "قیمت هشدار: " . $alert_icon . beautifulNumber($alert['target_price']) . "\n" .
                     "قیمت کنونی: " . beautifulNumber(floatval($asset_price))
             ]);
