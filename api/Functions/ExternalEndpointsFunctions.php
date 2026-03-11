@@ -5,19 +5,21 @@
  * @param string $method The Telegram API method (e.g., 'sendMessage').
  * @param array $data The method parameters.
  * @param string $token The bot token to use.
+ * @param string $bot_endpoint
  * @return bool|array The Telegram API response on success, or false on failure.
  */
-function sendToTelegram(string $method, array $data = [], string $token = ''): bool|array
+function sendToTelegram(string $method, array $data = [], string $token = '', string $bot_endpoint = ''): bool|array
 {
     // Allow token to be passed, or fallback to constant/env
-    if (empty($token)) {
+    if (empty($token))
         $token = defined('MAIN_BOT_TOKEN') ? MAIN_BOT_TOKEN : getenv('MAIN_BOT_TOKEN');
-    }
+    if (empty($bot_endpoint))
+        $bot_endpoint = defined('BOT_ENDPOINT') ? BOT_ENDPOINT : getenv('BOT_ENDPOINT');
 
-    $url = "https://api.telegram.org/bot" . $token . "/$method";
+    $url = "https://$bot_endpoint/bot$token/$method";
 
     // Handle Proxy Settings (Optional on Vercel as it is usually not blocked)
-    $proxy = getenv('PROXY_SETTINGS');
+    // $proxy = getenv('PROXY_SETTINGS');
 
     //$response = stream_request($url, "POST", $data, proxy: $proxy);
     $response = stream_request(url: $url, method: "POST", data: $data);
