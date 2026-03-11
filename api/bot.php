@@ -274,7 +274,7 @@ function normalButtonHandler(User $user, Button $pressed_button, DatabaseManager
     if ($pressed_button->getId() == 1) level_1(user: $user, db: $db, level_button: $pressed_button);
     if ($pressed_button->getId() == 2) level_2(user: $user, db: $db, level_button: $pressed_button);
     if ($pressed_button->getId() == 5) level_5(user: $user, db: $db, level_button: $pressed_button);
-    if ($pressed_button->getId() == 6) level_6(user: $user, db: $db, level_button: $pressed_button);
+    if ($pressed_button->getId() == 6) level_6(user: $user, db: $db);
     if ($pressed_button->getId() == 8) level_8(user: $user, db: $db, level_button: $pressed_button);
 
     // Default Actions for normal button
@@ -1466,7 +1466,6 @@ function createFavoritesInlineKeyboard(
 function level_6(
     User            $user,
     DatabaseManager $db,
-    ?Button         $level_button = null,
     ?array          $message = null,
     ?array          $callback_query = null): void
 {
@@ -1527,7 +1526,7 @@ function level_8(
     ];
 
     if ($callback_query) handleBaseCurrencyCallback($user, $callback_query, $message);
-    if ($message) handleBaseCurrencyTextMessage($data, $message, $db);
+    if ($message) handleBaseCurrencyTextMessage($data);
 
     // Send initial message
     $response = sendToTelegram('sendMessage', $data);
@@ -1559,7 +1558,7 @@ function handleBaseCurrencyCallback(User $user, array $callback_query, array $me
 }
 
 #[NoReturn]
-function handleBaseCurrencyTextMessage(array $data, array $message, DatabaseManager $db): void
+function handleBaseCurrencyTextMessage(array $data): void
 {
     // Send default message of this level
     $data['text'] = 'پیام نامفهوم است!';
@@ -1934,7 +1933,7 @@ function CreateNamePricePairs(array $asset_names, DatabaseManager $db): array
 function createFavoritesText(?array $assets, string $base_currency, DatabaseManager $db, int|string|null $user_id = null): string|null
 {
     if ($assets === null) {
-        if ($db && $user_id) {
+        if ($user_id) {
             try {
                 $assets = $db->read(
                     table: 'favorites f',
