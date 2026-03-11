@@ -132,9 +132,9 @@ if (preg_match_all('/\|[  ].*? ((\d\d?) (.*?) (\d\d\d\d)) -[  ](\d\d:\d\d)/ums
 
         /*
         * Find "Currency" prices. The pattern is complex due to various spaces/non-breaking spaces.
-        * Pattern: ^(ASSET_PART_1)( | )(ASSET_PART_2) :( | )(PRICE) (CURRENCY)$
-        * Group 1: Part 1 of Asset Name
-        * Group 3: Part 2 of Asset Name
+        * Pattern: ^(ASSET_EMOJI)( | )(ASSET_NAME) :( | )(PRICE) (CURRENCY)$
+        * Group 1: Asset Emoji
+        * Group 3: Asset Name
         * Group 5: Price value
         * Group 6: Base Currency
         */
@@ -144,16 +144,19 @@ if (preg_match_all('/\|[  ].*? ((\d\d?) (.*?) (\d\d\d\d)) -[  ](\d\d:\d\d)/ums
 
             // Re-structure the $matches array to fit the `addPriceToDatabase` function's expected format.
 
-            // Combine the two parts of the asset name (Flag icon and name).
             foreach ($matches[1] as $i => $match) {
+                $matches[5][$i] = trim($matches[1][$i]);
                 $matches[1][$i] = trim($matches[2][$i]);
-                $matches[3][$i] = trim($matches[1][$i]);
+                $matches[2][$i] = trim($matches[3][$i]);
+                $matches[3][$i] = trim($matches[4][$i]);
+                $matches[4][$i] = trim($matches[5][$i]);
             }
 
             // Sorting the indexes
-            unset($matches[2]);
+//            unset($matches[2]);
             $matches = array_values($matches);
 
+            echo json_encode($matches);
             // Check if the expected number of items (39) was extracted.
             if (sizeof($matches[2]) != 39) {
                 // Log and send a warning.
@@ -269,13 +272,13 @@ function addPriceToDatabase(array $matches, string $asset_type, string $date, st
     $assets = [];
     // Format extracted data into a structured array for batch processing.
     foreach ($matches[1] as $index => $match) {
-        $asset_price = str_replace(",", "", $matches[2][$index]); // Remove thousands separators
+        $asset_price = str_replace(",", "", $matches[2][$index]);
         $assets[] = [
             'name' => trim($match),
+            'emoji' => trim($matches[4][$index]),
             'asset_type' => $asset_type,
             'price' => floatval($asset_price),
             'base_currency' => trim($matches[3][$index]),
-            // Fix a potential single-digit day issue in the reconstructed date string.
             'date' => preg_match("/^\d\d\d\d-\d\d-\d$/m", $date) ? substr_replace($date, "0", 8, 0) : $date,
             'time' => $time,
         ];
