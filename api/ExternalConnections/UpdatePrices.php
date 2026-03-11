@@ -215,7 +215,7 @@ if (preg_match_all('/\|[  ].*? ((\d\d?) (.*?) (\d\d\d\d)) -[  ](\d\d:\d\d)/ums
         * Group 2: Price value
         * Group 3: Base Currency
         */
-        $pattern = "◽️ (.*?) : (.*?) (.*?)\R\R";
+        $pattern = "\R◽️ (.*?) : (.*?) (.*?)\R";
         $matched = preg_match_all(pattern: "/$pattern/um", subject: $message['text'], matches: $matches);
 
         if ($matched) {

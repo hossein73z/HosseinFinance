@@ -52,7 +52,7 @@ CREATE TABLE IF NOT EXISTS `assets`
     id            INT AUTO_INCREMENT PRIMARY KEY,
     name          VARCHAR(191)   NOT NULL UNIQUE,
     asset_type    VARCHAR(20)    NOT NULL,
-    price         NUMERIC(18, 8) NOT NULL DEFAULT 0.0,
+    price         NUMERIC(20, 8) NOT NULL DEFAULT 0.0,
     base_currency VARCHAR(10)             DEFAULT 'ریال',
     exchange_rate int                     default 1 not null,
     date          VARCHAR(10)             DEFAULT NULL,
