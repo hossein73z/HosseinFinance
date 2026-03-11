@@ -1260,25 +1260,19 @@ function handlePricesCallback(User $user, array $callback_query, array $message,
 }
 
 #[NoReturn]
-function handlePricesTextMessage(array $data, array $message, array $asset_types, string $user_base_currency, DatabaseManager $db): void
+function handlePricesTextMessage(array $data, array $message, array $asset_types, string $base_currency, DatabaseManager $db): void
 {
     if (in_array($message['text'], $asset_types)) {
 
         // Retrieve all related assets
         $assets = $db->read('assets', ['asset_type' => $message['text']]);
 
-        // Create array of the involved base currencies
-        $base_assets_names = array_unique(array_column($assets, 'base_currency'));
-        $asset_bases = array_merge($base_assets_names, [$user_base_currency]);
-
-        // Read prices for all base currencies
-        $base_prices = $db->read('assets', ['name' => $asset_bases]);
-        $base_prices = array_combine(
-            array_column($base_prices, 'name'),
-            array_map('floatval', array_column($base_prices, 'price'))
+        $base_prices = CreateNamePricePairs(
+            array_merge(array_unique(array_column($assets, 'base_currency')), [$base_currency]),
+            $db
         );
 
-        if ($assets) $data['text'] = createPricesTextForSingleAssetType($assets, $base_prices, $user_base_currency);
+        if ($assets) $data['text'] = createPricesTextForSingleAssetType($assets, $base_prices, $base_currency);
         else $data['text'] = 'این دسته بندی خالی‌ست!';
 
         $data['reply_to_message_id'] = $message['message_id'];
@@ -1430,6 +1424,44 @@ function createFavoritesInlineKeyboard(
 }
 
 // ==========================================
+//          LEVEL 6: ARTIFICIAL INTELLIGENCE
+// ==========================================
+
+#[NoReturn]
+function level_6(
+    User            $user,
+    DatabaseManager $db,
+    ?Button         $level_button = null,
+    ?array          $message = null,
+    ?array          $callback_query = null): void
+{
+    if ($callback_query) {
+        sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
+        sendToTelegram('editMessageText', [
+            'chat_id' => $user->getChatId(),
+            'message_id' => $message['message_id'],
+            'text' => 'این پیام منقضی شده است.'
+        ]);
+    } else {
+        sendToTelegram('sendMessage', [
+            'chat_id' => $user->getChatId(),
+            'text' => 'در حال توسعه...',
+            'reply_markup' => [
+                'keyboard' => createKeyboardsArray(6, $user->isAdmin(), $db),
+                'resize_keyboard' => true,
+                'input_field_placeholder' => 'هوش مصنوعی',
+            ]
+        ]);
+        $db->update(
+            table: 'users',
+            data: ['last_btn' => 6, 'progress' => null],
+            conditions: ['id' => $user->getId()]
+        );
+    }
+    exit();
+}
+
+// ==========================================
 //          LEVEL 8: Base Currency
 // ==========================================
 
@@ -1578,44 +1610,6 @@ function sendSelectBaseCurrencyMessage(User $user, DatabaseManager $db): void
 
 }
 
-// ==========================================
-//          LEVEL 6: ARTIFICIAL INTELLIGENCE
-// ==========================================
-
-#[NoReturn]
-function level_6(
-    User            $user,
-    DatabaseManager $db,
-    ?Button         $level_button = null,
-    ?array          $message = null,
-    ?array          $callback_query = null): void
-{
-    if ($callback_query) {
-        sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
-        sendToTelegram('editMessageText', [
-            'chat_id' => $user->getChatId(),
-            'message_id' => $message['message_id'],
-            'text' => 'این پیام منقضی شده است.'
-        ]);
-    } else {
-        sendToTelegram('sendMessage', [
-            'chat_id' => $user->getChatId(),
-            'text' => 'در حال توسعه...',
-            'reply_markup' => [
-                'keyboard' => createKeyboardsArray(6, $user->isAdmin(), $db),
-                'resize_keyboard' => true,
-                'input_field_placeholder' => 'هوش مصنوعی',
-            ]
-        ]);
-        $db->update(
-            table: 'users',
-            data: ['last_btn' => 6, 'progress' => null],
-            conditions: ['id' => $user->getId()]
-        );
-    }
-    exit();
-}
-
 
 // ==========================================
 //          DATA HANDLING & UI HELPERS
@@ -1712,7 +1706,7 @@ function deleteOldActiveLiveMessage(User $user, int|string $message_id, Database
 }
 
 // ==========================================
-//          TEXT FORMATTING HELPERS
+//  TEXT FORMATTING AND MATHEMATICAL HELPERS
 // ==========================================
 
 function createHoldingDetailText(
@@ -1911,6 +1905,22 @@ function calculateProLos(float $p1, float $p2, float $amount = 1, float $convers
 {
     $total_price_def = $amount * ($p2 - $p1);
     return $total_price_def * $conversion_rate;
+}
+
+/**
+ * @param array $asset_names
+ * @param DatabaseManager $db
+ * @return array
+ */
+function CreateNamePricePairs(array $asset_names, DatabaseManager $db): array
+{
+    // Read prices for all base currencies
+    $base_prices = $db->read('assets', ['name' => $asset_names]);
+    // Create an array of [$name => $price] pairs
+    return array_combine(
+        array_column($base_prices, 'name'),
+        array_map('floatval', array_column($base_prices, 'price'))
+    );
 }
 
 /**
