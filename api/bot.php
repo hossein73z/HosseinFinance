@@ -1367,7 +1367,7 @@ function sendFavorites(User $user, DatabaseManager $db, int|string|null $message
     sendToTelegram('editMessageText', [
         'chat_id' => $user->getChatId(),
         'message_id' => $message_id,
-        'text' => createFavoritesText($favorites),
+        'text' => createFavoritesText($favorites, json_decode($user->getSettings(), true)['base_currency'], $db),
         'reply_markup' => [
             'inline_keyboard' => createFavoritesInlineKeyboard($user->getId(), $message_id, $db, boolval($favorites))
         ]
@@ -1928,11 +1928,12 @@ function CreateNamePricePairs(array $asset_names, DatabaseManager $db): array
  * If `$assets` is `null`, both `$user_id` and `$db` are required.
  *
  * @param array|null $assets Array of assets, must be ordered by `asset_type`
+ * @param string $base_currency
+ * @param DatabaseManager $db
  * @param int|string|null $user_id Used to fetch favorites **only** if `$assets` is `null`
- * @param DatabaseManager|null $db Used to fetch favorites **only** if `$assets` is `null`
  * @return string|null `null` on wrong inputs
  */
-function createFavoritesText(?array $assets, int|string|null $user_id = null, ?DatabaseManager $db = null): string|null
+function createFavoritesText(?array $assets, string $base_currency, DatabaseManager $db, int|string|null $user_id = null): string|null
 {
     if ($assets === null) {
         if ($db && $user_id) {
@@ -1958,6 +1959,8 @@ function createFavoritesText(?array $assets, int|string|null $user_id = null, ?D
         $text = '';
         $asset_type = '';
         foreach ($assets as $asset) {
+
+            // Create and add asset type header text
             if ($asset['asset_type'] != $asset_type) {
                 $asset_type = $asset['asset_type'];
                 $date = preg_split('/-/u', $asset['date']);
@@ -1965,13 +1968,29 @@ function createFavoritesText(?array $assets, int|string|null $user_id = null, ?D
                     ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'],
                     ['فروردین', 'اردیبهشت', 'خرداد', 'تیر', 'مرداد', 'شهریور', 'مهر', 'آبان', 'آذر', 'دی', 'بهمن', 'اسفند'],
                     $date[1]);
-                $text .= beautifulNumber("\nآخرین قیمت های «$asset[asset_type]» در " . "$date[2] $date[1] $date[0]" . " ساعت " . $asset['time'] . "\n", null);
+                $text .= "\n" . beautifulNumber("\nآخرین قیمت های «$asset[asset_type]» در " . "$date[2] $date[1] $date[0]" . " ساعت " . $asset['time'], null);
             }
-            $text .= "   -- " . beautifulNumber($asset['name'], null) . ': ' . beautifulNumber($asset['price']) . "\n";
+
+            $asset_name = beautifulNumber($asset['name'], null);
+            $asset_price = beautifulNumber($asset['price']);
+            $asset_base = beautifulNumber($asset['base_currency'], null);
+            $text .= "\n   -- " . $asset_name . ': ' . $asset_price . ' ' . $asset_base;
+
+            $base_prices = CreateNamePricePairs(
+                array_merge(array_unique(array_column($assets, 'base_currency')), [$base_currency]), $db);
+            if (
+                $asset['base_currency'] != $base_currency &&
+                $base_prices[$base_currency]
+            ) {
+                $exchange_rate = $base_prices[$asset['base_currency']] / $base_prices[$base_currency];
+                $based_price = beautifulNumber($asset['price'] * $exchange_rate);
+                $text .= ' --> ' . $based_price . ' ' . $base_currency;
+            }
+
         }
     } else $text = 'لیست علاقه‌مندی‌های شما خالیست!';
 
-    return $text;
+    return trim($text);
 }
 
 /**
