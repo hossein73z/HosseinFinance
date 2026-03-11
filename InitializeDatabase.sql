@@ -51,6 +51,7 @@ CREATE TABLE IF NOT EXISTS `assets`
 (
     id            INT AUTO_INCREMENT PRIMARY KEY,
     name          VARCHAR(191)   NOT NULL UNIQUE,
+    emoji         VARCHAR(2)              DEFAULT NULL,
     asset_type    VARCHAR(20)    NOT NULL,
     price         NUMERIC(20, 8) NOT NULL DEFAULT 0.0,
     base_currency VARCHAR(10)             DEFAULT 'ریال',
@@ -60,7 +61,7 @@ CREATE TABLE IF NOT EXISTS `assets`
 ) DEFAULT CHARSET = utf8mb4;
 
 INSERT INTO assets (name, asset_type, price, base_currency, exchange_rate, date, time)
-VALUES ('🇮🇷 ریال ایران', 'ارزهای آزاد', 1, 'ریال', 1, '1357-11-22', '00:00')
+VALUES ('🇮🇷 ریال ایران', 'ارزهای آزاد', 1, 'ریال', 1, '1357-11-22', '00:00');
 
 CREATE TABLE IF NOT EXISTS `holdings`
 (
