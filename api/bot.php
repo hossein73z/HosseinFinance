@@ -129,7 +129,7 @@ function handleIncomingMessage(array $message, DatabaseManager $db): void
     if ($text === '/loans') /**********/ level_2(user: $user, db: $db);
     if ($text === '/prices') /*********/ level_5(user: $user, db: $db);
     if ($text === '/ai') /*************/ level_6(user: $user, db: $db);
-    if ($text === '/base_currency') /**/ level_8(user: $user, db: $db);
+    if ($text === '/base_currency') /**/ sendSelectBaseCurrencyMessage($user, $db);
 
     $pressed_button = getPressedButton(text: $text, parent_btn_id: $user->getLastBtn(), admin: $user->isAdmin(), db: $db);
 
@@ -148,7 +148,42 @@ function handleCallbackQuery(array $callback_query, DatabaseManager $db): void
         single: true);
 
     if ($user !== false) {
-        choosePath(message: $message, user: User::fromDbRow($user), callback_query: $callback_query, db: $db);
+        $user = User::fromDbRow($user);
+
+        $data = ['chat_id' => $user->getChatId(), 'message_id' => $message['message_id']];
+
+        $query_data = json_decode($callback_query['data'], true);
+        if (!$query_data) sendToTelegram('deleteMessage', $data);
+
+        $data['text'] = '📢 خطای ناشناخته!';
+        $query_key = array_key_first($query_data);
+
+        // Handling non-level-based callback queries
+        if ($query_key == 'set_base_currency') {
+
+            // Change user's base currency setting
+            $settings = json_decode($user->getSettings(), true);
+            $new_bc = $query_data['set_base_currency'];
+            $settings['base_currency'] = $new_bc;
+            try {
+                $db->update(
+                    table: 'users',
+                    data: ['settings' => json_encode($settings)],
+                    conditions: ['id' => $user->getId()],
+                );
+                $data['text'] = '✅ ارز پایه با موفقیت به «' . $new_bc . '» تغییر کرد';
+            } catch (Exception $e) {
+                error_log('Error changing base currency: ' . $e->getMessage());
+                $data['text'] = '❌ خطای پایگاه داده!';
+            }
+
+            sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
+            sendToTelegram('editMessageText', $data);
+            exit();
+        }
+
+        // Handling level-based callback queries
+        choosePath(message: $message, user: $user, callback_query: $callback_query, db: $db);
     } else {
         sendToTelegram('editMessageText', [
             'text' => 'برای استفاده از این رباط ابتدا دستور /start را ارسال کنید.',
@@ -1491,7 +1526,7 @@ function level_8(
         ]
     ];
 
-    if ($callback_query) handleBaseCurrencyCallback($user, $callback_query, $message, $db);
+    if ($callback_query) handleBaseCurrencyCallback($user, $callback_query, $message);
     if ($message) handleBaseCurrencyTextMessage($data, $message, $db);
 
     // Send initial message
@@ -1512,53 +1547,15 @@ function level_8(
 }
 
 #[NoReturn]
-function handleBaseCurrencyCallback(User $user, array $callback_query, array $message, DatabaseManager $db): void
+function handleBaseCurrencyCallback(User $user, array $callback_query, array $message): void
 {
-    $data = [
+    sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
+    sendToTelegram('editMessageText', [
         'chat_id' => $user->getChatId(),
         'message_id' => $message['message_id'],
-    ];
-
-    $query_data = json_decode($callback_query['data'], true);
-    if (!$query_data)
-        sendToTelegram('deleteMessage', $data);
-
-    $data['text'] = '📢 خطای ناشناخته!';
-
-    $query_key = array_key_first($query_data);
-    switch ($query_key) {
-
-        // Change user's base currency setting
-        case 'set_base_currency':
-
-            $settings = json_decode($user->getSettings(), true);
-            $new_bc = $query_data['set_base_currency'];
-            $settings['base_currency'] = $new_bc;
-            try {
-                $db->update(
-                    table: 'users',
-                    data: ['settings' => json_encode($settings)],
-                    conditions: ['id' => $user->getId()],
-                );
-                $data['text'] = 'ارز پایه با موفقیت به «' . $new_bc . '» تغییر کرد';
-            } catch (Exception $e) {
-                error_log('Error changing base currency: ' . $e->getMessage());
-                $data['text'] = '❌ خطای پایگاه داده!';
-            }
-
-            sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
-            sendToTelegram('editMessageText', $data);
-            exit();
-
-        default:
-            sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
-            sendToTelegram('editMessageText', [
-                'chat_id' => $user->getChatId(),
-                'message_id' => $message['message_id'],
-                'text' => 'این پیام منقضی شده است.'
-            ]);
-            exit();
-    }
+        'text' => 'این پیام منقضی شده است.'
+    ]);
+    exit();
 }
 
 #[NoReturn]
@@ -1571,6 +1568,7 @@ function handleBaseCurrencyTextMessage(array $data, array $message, DatabaseMana
 
 }
 
+#[NoReturn]
 function sendSelectBaseCurrencyMessage(User $user, DatabaseManager $db): void
 {
     $user_base_currency = json_decode($user->getSettings(), true)['base_currency'];
@@ -1587,7 +1585,7 @@ function sendSelectBaseCurrencyMessage(User $user, DatabaseManager $db): void
 
         $keyboard = [];
         $keyboard_row = [];
-        $keyboard_row_size = 2;
+        $keyboard_row_size = 3;
         foreach ($base_currencies as $base_currency) {
 
             if ($base_currency != $user_base_currency)
@@ -1607,7 +1605,7 @@ function sendSelectBaseCurrencyMessage(User $user, DatabaseManager $db): void
 
         sendToTelegram('sendMessage', $data);
     }
-
+    exit();
 }
 
 
