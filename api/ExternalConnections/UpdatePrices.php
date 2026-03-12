@@ -233,7 +233,7 @@ function addPriceToDatabase(array $new_assets, string $asset_type, string $date,
 
         // Change Tether information to match dollar
         if ($name == 'تتر') {
-            $dollar = $db->read('assets', ['name'=>'دلار'],true);
+            $dollar = $db->read('assets', ['name' => 'دلار'], true);
             $assets[$index]['price'] = $dollar['price'];
             $assets[$index]['base_currency'] = $dollar['base_currency'];
             $assets[$index]['date'] = $dollar['date'];

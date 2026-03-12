@@ -8,7 +8,12 @@
  * @param string $bot_endpoint
  * @return bool|array The Telegram API response on success, or false on failure.
  */
-function sendToTelegram(string $method, array $data = [], string $token = '', string $bot_endpoint = ''): bool|array
+function sendToTelegram(
+    string $method,
+    array  $data = [],
+    string $token = '',
+    string $bot_endpoint = ''
+): bool|array
 {
     // Allow token to be passed, or fallback to constant/env
     if (empty($token))
@@ -58,12 +63,14 @@ function sendToTelegram(string $method, array $data = [], string $token = '', st
  * @param int $timeout Request timeout in seconds.
  * @return string|false The response body content or an error string/false on failure.
  */
-function stream_request(string       $url,
-                        string       $method = 'GET',
-                        array|string $data = null,
-                        ?string      $proxy = null,
-                        array        $headers = [],
-                        int          $timeout = 10): string|false
+function stream_request(
+    string       $url,
+    string       $method = 'GET',
+    array|string $data = null,
+    ?string      $proxy = null,
+    array        $headers = [],
+    int          $timeout = 10
+): string|false
 {
     $method = strtoupper($method);
     $content = '';

@@ -59,8 +59,8 @@ CREATE TABLE IF NOT EXISTS `assets`
     time          VARCHAR(8)              DEFAULT NULL
 ) DEFAULT CHARSET = utf8mb4;
 
-INSERT INTO assets (name, asset_type, price, base_currency, date, time)
-VALUES ('🇮🇷 ریال ایران', 'ارزهای آزاد', 1, 'ریال', '1357-11-22', '00:00');
+INSERT INTO assets (name, emoji, asset_type, price, base_currency, date, time)
+VALUES ('ریال', '🇮🇷', 'ارزهای آزاد', 1, 'ریال', '1357-11-22', '00:00');
 
 CREATE TABLE IF NOT EXISTS `holdings`
 (

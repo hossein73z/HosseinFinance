@@ -200,7 +200,7 @@ function getOrCreateUser(array $chat, DatabaseManager $db): User
                 'first_name' => $chat['first_name'] ?? 'N/A',
                 'last_name' => $chat['last_name'] ?? null,
                 'username' => $chat['username'] ?? null,
-                'settings' => json_encode(['base_currency' => 'ریال ایران']),
+                'settings' => json_encode(['base_currency' => 'ریال']),
                 'progress' => null,
                 'is_admin' => ($admins) ? 0 : 1, // First user is admin
                 'last_btn' => 0
@@ -1081,7 +1081,13 @@ function level_5(
 }
 
 #[NoReturn]
-function handlePricesCallback(User $user, array $callback_query, array $message, array $asset_types, DatabaseManager $db): void
+function handlePricesCallback(
+    User            $user,
+    array           $callback_query,
+    array           $message,
+    array           $asset_types,
+    DatabaseManager $db
+): void
 {
     $data = [
         'chat_id' => $user->getChatId(),
@@ -1652,7 +1658,7 @@ function createWebAppBtn(string $text, string $path, array $params = []): array
     $params['api_key'] = DB_API_SECRET;
 
     return [
-        'text' => 'WebApp: '.$text,
+        'text' => 'WebApp: ' . $text,
 //        'web_app' => ['url' => $url . '?' . http_build_query($params)]
     ];
 }
@@ -1769,7 +1775,7 @@ function createHoldingDetailText(
         }
     }
 
-    // Manage deep-link and markdown escaping
+    // Manage deep-link and Markdown escaping
     if ($markdown === 'MarkdownV2') {
 
         $tree = markdownScape($tree);
@@ -1916,7 +1922,12 @@ function CreateNamePricePairs(array $asset_names, DatabaseManager $db): array
  * @param int|string|null $user_id Used to fetch favorites **only** if `$assets` is `null`
  * @return string|null `null` on wrong inputs
  */
-function createFavoritesText(?array $assets, string $base_currency, DatabaseManager $db, int|string|null $user_id = null): string|null
+function createFavoritesText(
+    ?array          $assets,
+    string          $base_currency,
+    DatabaseManager $db,
+    int|string|null $user_id = null
+): string|null
 {
     if ($assets === null) {
         if ($user_id) {
