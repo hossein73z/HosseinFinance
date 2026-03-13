@@ -223,7 +223,7 @@ function addPriceToDatabase(array $new_assets, string $asset_type, string $date,
         $asset_price = str_replace(",", "", $new_assets['prices'][$index]);
         $assets[] = [
             'name' => trim($name),
-            'emoji' => $new_assets['emojis'] ? trim($new_assets['emojis'][$index]) : null,
+            'emoji' => (isset($new_assets['emojis']) && $new_assets['emojis']) ? trim($new_assets['emojis'][$index]) : null,
             'asset_type' => $asset_type,
             'price' => floatval($asset_price),
             'base_currency' => trim($new_assets['base_currencies'][$index]),
