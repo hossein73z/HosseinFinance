@@ -1575,17 +1575,9 @@ function sendSelectBaseCurrencyMessage(User $user, DatabaseManager $db): void
         $base_currencies = array_column($base_currencies, 'name');
 
         $keyboard = [];
-        $keyboard_row = [];
-        $keyboard_row_size = 3;
         foreach ($base_currencies as $base_currency) {
-
             if ($base_currency != $user_base_currency)
-                $keyboard_row[] = ['text' => $base_currency, 'callback_data' => json_encode(['set_base_currency' => $base_currency])];
-
-            if (sizeof($keyboard_row) >= $keyboard_row_size) {
-                $keyboard[] = $keyboard_row;
-                $keyboard_row = [];
-            }
+                $keyboard[] = [['text' => $base_currency, 'callback_data' => json_encode(['set_base_currency' => $base_currency])]];
         }
 
         $data = [
