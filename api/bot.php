@@ -1209,7 +1209,7 @@ function handlePricesCallback(
                         'asset_name' => $asset_name
                     ]
                 );
-                $data['text'] = '✅ علاقه‌مندی جدید افزوده شد!';
+                $data['text'] = '✅ «' . beautifulNumber($asset_name, null) . '» به لیست علاقه‌مندی‌های شما افزوده شد!';
             } catch (Exception $e) {
                 error_log('Error adding new favorite: ' . $e->getMessage());
                 $data['text'] = '❌ خطای پایگاه داده!';
@@ -1651,7 +1651,7 @@ function createWebAppBtn(string $text, string $path, array $params = []): array
 
     return [
         'text' => 'WebApp: ' . $text,
-//        'web_app' => ['url' => $url . '?' . http_build_query($params)]
+        'web_app' => ['url' => $url . '?' . http_build_query($params)]
     ];
 }
 
