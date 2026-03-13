@@ -294,19 +294,21 @@ function addPriceToDatabase(array $new_assets, string $asset_type, string $date,
                 table: 'favorites f',
                 conditions: ['user_id' => $live_mssg['user_id']],
                 selectColumns: 'a.*',
-                join: 'JOIN assets a ON a.id=f.asset_id',
+                join: 'JOIN assets a ON a.name=f.asset_name',
                 orderBy: ['asset_type' => 'DESC', 'id' => 'ASC']);
 
-            $data['chat_id'] = $live_mssg['chat_id'];
-            $data['message_id'] = $live_mssg['message_id'];
-            $data['text'] = createFavoritesText($favorites);
-            $data['reply_markup'] = ['inline_keyboard' => [
-                [['text' => 'توقف نمایش زنده ⏸', 'callback_data' => json_encode(['set_live' => false])]],
-                [['text' => 'هشدار قیمت', 'callback_data' => json_encode(['price_alert' => null])]],
-                [['text' => 'ویرایش لیست', 'callback_data' => json_encode(['edit_fav' => null])]],
-            ]];
+            if ($favorites) {
+                $data['chat_id'] = $live_mssg['chat_id'];
+                $data['message_id'] = $live_mssg['message_id'];
+                $data['text'] = 'createFavoritesText($favorites)'; // TODO: Fix
+                $data['reply_markup'] = ['inline_keyboard' => [
+                    [['text' => 'توقف نمایش زنده ⏸', 'callback_data' => json_encode(['set_live' => false])]],
+                    [['text' => 'هشدار قیمت', 'callback_data' => json_encode(['price_alert' => null])]],
+                    [['text' => 'ویرایش لیست', 'callback_data' => json_encode(['edit_fav' => null])]],
+                ]];
 
-            sendToTelegram('editMessageText', $data);
+                sendToTelegram('editMessageText', $data);
+            }
         }
     }
 
