@@ -1650,7 +1650,7 @@ function createWebAppBtn(string $text, string $path, array $params = []): array
     $params['api_key'] = DB_API_SECRET;
 
     return [
-        'text' => 'WebApp: ' . $text,
+        'text' => $text,
         'web_app' => ['url' => $url . '?' . http_build_query($params)]
     ];
 }
