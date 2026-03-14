@@ -1642,8 +1642,11 @@ function getLoansWithInstallments(array $conditions, DatabaseManager $db): bool|
         groupBy: 'l.id'
     );
     if ($loans)
-        foreach ($loans as &$loan)
+        foreach ($loans as $i => $loan) {
             $loan['installments'] = json_decode($loan['installments'], true);
+            if ($loan['installments'][0]['id'] == null) $loans[$i]['installments'] = null;
+            else $loans[$i]['installments'] = $loan['installments'];
+        }
     return $loans;
 }
 
@@ -1789,8 +1792,9 @@ function createLoansView(array $loans, ?string $mssg_id = null): string
     foreach ($loans as $loan) {
         $installments_per_year = [];
         $next_payment = getJalaliDate();
+        $installments = $loan['installments'];
 
-        foreach ($loan['installments'] as $inst) {
+        foreach ($installments as $inst) {
             $year = explode('/', $inst['due_date'])[0];
             if ($inst['is_paid'] == 1) {
                 $installments_per_year[$year][] = "🟢";
@@ -1821,12 +1825,13 @@ function createLoansView(array $loans, ?string $mssg_id = null): string
             "\n‏      ┤─ تاریخ دریافت\: " . markdownScape(beautifulNumber($loan['received_date'], null));
         if ($daysRemaining) $detail .= "\n‏      ┤─ قسط بعدی\: " . beautifulNumber($daysRemaining) . ' روز دیگر';
 
-        $detail .= "\n‏      ┘─ وضعیت اقساط\: ";
-        foreach ($installments_per_year as $year => $insts) {
-            $prefix = (array_key_last($installments_per_year) != $year) ? "\n‏          ┤─ " : "\n‏          ┘─ ";
-            $detail .= $prefix . beautifulNumber($year, null) . '\: ' . implode('', $insts);
+        if ($installments) {
+            $detail .= "\n‏      ┘─ وضعیت اقساط\: ";
+            foreach ($installments_per_year as $year => $insts) {
+                $prefix = (array_key_last($installments_per_year) != $year) ? "\n‏          ┤─ " : "\n‏          ┘─ ";
+                $detail .= $prefix . beautifulNumber($year, null) . '\: ' . implode('', $insts);
+            }
         }
-
         $text .= $loan_name . $detail . "\n";
     }
     return $text;
@@ -1838,22 +1843,24 @@ function createLoanDetailText(array $loan, string $mssg_id): string
     $paid_count = $overdue_count = $remaining_count = 0;
     $paid_sum = $overdue_sum = $remaining_sum = 0;
 
-    foreach ($installments as &$inst) {
-        if ($inst['is_paid'] == 1) {
-            $inst['is_paid'] = "🟢";
-            $paid_count++;
-            $paid_sum += $inst['amount'];
-        } elseif ($inst['due_date'] < getJalaliDate()) {
-            $inst['is_paid'] = "🔴";
-            $overdue_count++;
-            $overdue_sum += $inst['amount'];
-        } else {
-            $inst['is_paid'] = "⚪";
-            $remaining_count++;
-            $remaining_sum += $inst['amount'];
+    if ($installments) {
+        foreach ($installments as &$inst) {
+            if ($inst['is_paid'] == 1) {
+                $inst['is_paid'] = "🟢";
+                $paid_count++;
+                $paid_sum += $inst['amount'];
+            } elseif ($inst['due_date'] < getJalaliDate()) {
+                $inst['is_paid'] = "🔴";
+                $overdue_count++;
+                $overdue_sum += $inst['amount'];
+            } else {
+                $inst['is_paid'] = "⚪";
+                $remaining_count++;
+                $remaining_sum += $inst['amount'];
+            }
         }
+        unset($inst);
     }
-    unset($inst);
 
     $text = "‏*" . markdownScape($loan['name']) . "*:\n" .
         "\n مبلغ وام\: " . markdownScape(beautifulNumber($loan['total_amount'])) .
@@ -1908,6 +1915,7 @@ function CreateNamePricePairs(array $asset_names, DatabaseManager $db): array
     );
 }
 
+
 /**
  * Creates a well-structured text for favorites' message.
  * If `$assets` is `null`, both `$user_id` and `$db` are required.
@@ -1916,6 +1924,7 @@ function CreateNamePricePairs(array $asset_names, DatabaseManager $db): array
  * @param string $base_currency
  * @param DatabaseManager $db
  * @param int|string|null $user_id Used to fetch favorites **only** if `$assets` is `null`
+ * @param string|null $markdown Can be 'MarkdownV2'
  * @return string|null `null` on wrong inputs
  */
 function createFavoritesText(
@@ -1923,7 +1932,7 @@ function createFavoritesText(
     string          $base_currency,
     DatabaseManager $db,
     int|string|null $user_id = null,
-    string          $markdown = null
+    ?string         $markdown = null
 ): string|null
 {
     if ($assets === null) {
