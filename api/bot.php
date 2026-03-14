@@ -1624,22 +1624,21 @@ function getLoansWithInstallments(array $conditions, DatabaseManager $db): bool|
         conditions: $conditions,
         selectColumns: '
             l.*,
-            CAST(
-                CONCAT(
-                    "[", IFNULL(
-                        GROUP_CONCAT(
-                            JSON_OBJECT(
-                                "id", i.id, 
-                                "loan_id", i.loan_id, 
-                                "amount", i.amount, 
-                                "due_date", i.due_date, 
-                                "is_paid", i.is_paid
-                            ) ORDER BY i.due_date ASC
-                        ), ""
-                    ), "]"
-                ) AS JSON
-            ) as installments',
-        join: 'JOIN installments i on i.loan_id = l.id',
+            CONCAT("[",
+                IFNULL(
+                    GROUP_CONCAT(
+                        JSON_OBJECT(
+                            "id", i.id,
+                            "loan_id", i.loan_id,
+                            "amount", i.amount,
+                            "due_date", i.due_date,
+                            "is_paid", i.is_paid
+                        ) ORDER BY due_date ASC
+                    ),
+                    ""),
+                "]") AS installments
+            ',
+        join: 'LEFT JOIN installments i on i.loan_id = l.id',
         groupBy: 'l.id'
     );
     if ($loans)
