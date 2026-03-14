@@ -1394,7 +1394,12 @@ function sendFavorites(User $user, DatabaseManager $db, int|string|null $message
     sendToTelegram('editMessageText', [
         'chat_id' => $user->getChatId(),
         'message_id' => $message_id,
-        'text' => createFavoritesText($favorites, json_decode($user->getSettings(), true)['base_currency'], $db),
+        'text' => createFavoritesText(
+            assets: $favorites,
+            base_currency: json_decode($user->getSettings(), true)['base_currency'],
+            db: $db,
+            markdown: 'MarkdownV2'), // TODO: Should be tested with telegram
+        'parse_mode' => 'MarkdownV2',
         'reply_markup' => [
             'inline_keyboard' => createFavoritesInlineKeyboard($user->getId(), $message_id, $db, boolval($favorites))
         ]
@@ -1918,7 +1923,8 @@ function createFavoritesText(
     ?array          $assets,
     string          $base_currency,
     DatabaseManager $db,
-    int|string|null $user_id = null
+    int|string|null $user_id = null,
+    string          $markdown = null
 ): string|null
 {
     if ($assets === null) {
@@ -1944,7 +1950,16 @@ function createFavoritesText(
     if ($assets) {
         $text = '';
         $asset_type = '';
+        $latest_updated_type = ['name' => null, 'date' => '', 'time' => ''];
         foreach ($assets as $asset) {
+
+            // Check and store latest price update
+            if ($markdown) {
+                if ($asset['date'] > $latest_updated_type['date'] || !$latest_updated_type['date'])
+                    $latest_updated_type = ['name' => $asset['asset_type'], 'date' => $asset['date'], 'time' => $asset['time'],];
+                elseif ($asset['date'] == $latest_updated_type['date'] && $asset['time'] > $latest_updated_type['time'])
+                    $latest_updated_type = ['name' => $asset['asset_type'], 'date' => $asset['date'], 'time' => $asset['time'],];
+            }
 
             // Create and add asset type header text
             if ($asset['asset_type'] != $asset_type) {
@@ -1954,13 +1969,15 @@ function createFavoritesText(
                     ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'],
                     ['فروردین', 'اردیبهشت', 'خرداد', 'تیر', 'مرداد', 'شهریور', 'مهر', 'آبان', 'آذر', 'دی', 'بهمن', 'اسفند'],
                     $date[1]);
-                $text .= "\n" . beautifulNumber("\nآخرین قیمت های «$asset[asset_type]» در " . "$date[2] $date[1] $date[0]" . " ساعت " . $asset['time'], null);
+                $type_header_line = beautifulNumber("\nآخرین قیمت‌های «$asset[asset_type]» در " . "$date[2] $date[1] $date[0]" . " ساعت " . $asset['time'], null);
+                $text .= $markdown ? "\n" . markdownScape($type_header_line) : "\n" . $type_header_line;
             }
 
             $asset_name = beautifulNumber($asset['name'], null);
             $asset_price = beautifulNumber($asset['price']);
             $asset_base = beautifulNumber($asset['base_currency'], null);
-            $text .= "\n   -- " . $asset_name . ': ' . $asset_price . ' ' . $asset_base;
+            $asset_line = "\n   -- " . $asset_name . ': ' . $asset_price . ' ' . $asset_base;
+            $text .= $markdown ? markdownScape($asset_line) : $asset_line;
 
             $base_prices = CreateNamePricePairs(
                 array_merge(array_unique(array_column($assets, 'base_currency')), [$base_currency]), $db);
@@ -1970,10 +1987,22 @@ function createFavoritesText(
             ) {
                 $exchange_rate = $base_prices[$asset['base_currency']] / $base_prices[$base_currency];
                 $based_price = beautifulNumber($asset['price'] * $exchange_rate);
-                $text .= ' --> ' . $based_price . ' ' . $base_currency;
+                $converted_price_text = ' --> ' . $based_price . ' ' . $base_currency;
+                $text .= $markdown ? markdownScape($converted_price_text) : $converted_price_text;
             }
 
         }
+        if ($markdown == 'MarkdownV2') {
+            $pattern = "آخرین قیمت‌های «" . markdownScape($latest_updated_type['name']) . "» در .. .+? .... ساعت ..:.." . "\n";
+            $pattern .= "( {3}\\\-\\\- .+?: .+?\n?)+?((\n\n)|$)";
+            $text = preg_replace("/$pattern/u", ' *\\0* ', $text);
+        }
+        /**
+         * Patterns to extract text from markdown message:
+         *  Asset line (Specific asset): `"/^\*? {3}\\\-\\\- ".markdownScape($asset_name).": .+?\*?$/um"`
+         *  Asset line (not-Specific asset): `"( {3}\\\-\\\- .+?: .+?\n?)+?((\n\n)|$)"`
+         *  Type line: `"آخرین قیمت‌های «" . markdownScape($latest_updated_type['name']) . "» در .. .+? .... ساعت ..:.." . "\n"`
+         */
     } else $text = 'لیست علاقه‌مندی‌های شما خالیست!';
 
     return trim($text);
