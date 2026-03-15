@@ -61,9 +61,21 @@ class User implements JsonSerializable
         return $this->username;
     }
 
-    public function getSettings(): ?string
+    /**
+     * Get settings as an associative array (decoded from JSON)
+     */
+    public function getSettings(): ?array
     {
-        return $this->settings;
+        return $this->settings ? json_decode($this->settings, true) : null;
+    }
+
+    /**
+     * Replace the full settings array (stored as JSON internally)
+     */
+    public function setSettings(?array $settings): self
+    {
+        $this->settings = $settings ? json_encode($settings, JSON_UNESCAPED_UNICODE) : null;
+        return $this;
     }
 
     public function getProgress(): ?string
@@ -113,12 +125,6 @@ class User implements JsonSerializable
         return $this;
     }
 
-    public function setSettings(?string $settings): self
-    {
-        $this->$settings = $settings;
-        return $this;
-    }
-
     public function setProgress(?string $progress): self
     {
         $this->progress = $progress;
@@ -134,6 +140,20 @@ class User implements JsonSerializable
     public function setLastBtn(string $lastBtn): self
     {
         $this->lastBtn = $lastBtn;
+        return $this;
+    }
+
+    public function getBaseCurrency(): ?string
+    {
+        $settings = $this->getSettings();
+        return $settings['base_currency'] ?? 'ریال';
+    }
+
+    public function setBaseCurrency(string $currency): self
+    {
+        $settings = $this->getSettings() ?? [];
+        $settings['base_currency'] = $currency;
+        $this->setSettings($settings);
         return $this;
     }
 
@@ -175,10 +195,11 @@ class User implements JsonSerializable
             'last_name' => $this->lastName,
             'full_name' => $this->getFullName(),
             'username' => $this->username,
-            'settings' => $this->settings,
+            'settings' => $this->getSettings(),
             'progress' => $this->progress,
             'is_admin' => $this->isAdmin,
             'last_btn' => $this->lastBtn,
+            'base_currency' => $this->getBaseCurrency(),
         ];
     }
 }

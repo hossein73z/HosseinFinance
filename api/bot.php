@@ -133,7 +133,7 @@ function handleCallbackQuery(array $callback_query, DatabaseManager $db): void
         conditions: ['chat_id' => $message['chat']['id']],
         single: true);
 
-    if ($user !== false) {
+    if ($user) {
         $user = User::fromDbRow($user);
 
         $data = ['chat_id' => $user->getChatId(), 'message_id' => $message['message_id']];
@@ -148,16 +148,14 @@ function handleCallbackQuery(array $callback_query, DatabaseManager $db): void
         if ($query_key == 'set_base_currency') {
 
             // Change user's base currency setting
-            $settings = json_decode($user->getSettings(), true);
-            $new_bc = $query_data['set_base_currency'];
-            $settings['base_currency'] = $new_bc;
+            $user->setBaseCurrency($query_data['set_base_currency']);
             try {
                 $db->update(
                     table: 'users',
-                    data: ['settings' => json_encode($settings)],
+                    data: ['settings' => json_encode($user->getSettings())],
                     conditions: ['id' => $user->getId()],
                 );
-                $data['text'] = '✅ ارز پایه با موفقیت به «' . $new_bc . '» تغییر کرد';
+                $data['text'] = '✅ ارز پایه با موفقیت به «' . $query_data['set_base_currency'] . '» تغییر کرد';
             } catch (Exception $e) {
                 error_log('Error changing base currency: ' . $e->getMessage());
                 $data['text'] = '❌ خطای پایگاه داده!';
@@ -487,7 +485,7 @@ function handleHoldingsWebAppData(User $user, array $data, array $message, Datab
                         data: ['progress' => json_encode(['view_holding' => ['holding_id' => $holding['id']]])],
                         conditions: ['id' => $user->getId()]
                     );
-                    sendHoldingDetail($holding, $data);
+                    sendHoldingDetail($holding, $data, $user->getBaseCurrency());
                 }
                 exit();
             }
@@ -569,7 +567,7 @@ function handleHoldingsTextMessage(User $user, array $data, array $message, Data
             // Delete holdings' message
             sendToTelegram('deleteMessage', ['chat_id' => $user->getChatId(), 'message_id' => $matches[3]]);
 
-            sendHoldingDetail($holding, $data);
+            sendHoldingDetail($holding, $data, $user->getBaseCurrency());
             $db->update(
                 table: 'users',
                 data: ['progress' => json_encode(['view_holding' => ['holding_id' => $holding['id']]])],
@@ -597,15 +595,22 @@ function sendAllHoldings(User $user, DatabaseManager $db): void
             $total_pro_los = 0;
             foreach ($holdings as $holding) {
                 $total_pro_los += $holding['amount'] * ($holding['current_price'] - $holding['avg_price']) * $holding['exchange_rate'];
-                $text .= "\n" . createHoldingDetailText($holding, 'MarkdownV2', ['space', 'org_amount', 'org_total_price', 'space', 'profit'], $temp_mssg['result']['message_id']);
+                $text .= "\n";
+                $text .= createHoldingDetailText(
+                    holding: $holding,
+                    markdown: 'MarkdownV2',
+                    user_base_currency: $user->getBaseCurrency(),
+                    attributes: ['space', 'org_amount', 'org_total_price', 'space', 'profit'],
+                    mssg_id: $temp_mssg['result']['message_id']
+                );
             }
 
             $pro_los_string =
                 ($total_pro_los == 0) ?
-                    "🟤 جمع سود/زیان: ۰ ریال" : (
+                    "🟤 جمع سود/زیان: ۰ " . $user->getBaseCurrency() : (
                 ($total_pro_los > 0) ?
-                    "🟢 جمع سود: " . beautifulNumber($total_pro_los) . " ریال" :
-                    "🔴 جمع ضرر: " . beautifulNumber($total_pro_los) . " ریال"
+                    "🟢 جمع سود: " . beautifulNumber($total_pro_los) . ' ' . $user->getBaseCurrency() :
+                    "🔴 جمع ضرر: " . beautifulNumber($total_pro_los) . ' ' . $user->getBaseCurrency()
                 );
             $text .= "\n" . markdownScape($pro_los_string);
 
@@ -626,11 +631,12 @@ function sendAllHoldings(User $user, DatabaseManager $db): void
  *
  * @param array $holding
  * @param array $data
+ * @param string $user_base_currency
  * @return void
  */
-function sendHoldingDetail(array $holding, array $data): void
+function sendHoldingDetail(array $holding, array $data, string $user_base_currency = 'ریال'): void
 {
-    $data['text'] = createHoldingDetailText($holding);
+    $data['text'] = createHoldingDetailText($holding, user_base_currency: $user_base_currency);
     array_unshift($data['reply_markup']['keyboard'], [
         createWebAppBtn('✏ ویرایش ' . beautifulNumber($holding['asset_name'], null), '/assets/add_holding.html', ['data' => base64_encode(json_encode($holding))])
     ]);
@@ -1065,10 +1071,7 @@ function level_5(
     $data['reply_markup']['keyboard'] = $keyboard;
 
     if ($callback_query) handlePricesCallback($user, $callback_query, $message, $asset_types, $db);
-    if ($message) {
-        $user_base_currency = json_decode($user->getSettings(), true)['base_currency'];
-        handlePricesTextMessage($data, $message, $asset_types, $user_base_currency, $db);
-    }
+    if ($message) handlePricesTextMessage($data, $message, $asset_types, $user->getBaseCurrency(), $db);
 
     // Send initial message
     $response = sendToTelegram('sendMessage', $data);
@@ -1401,7 +1404,7 @@ function sendFavorites(User $user, DatabaseManager $db, int|string|null $message
         'message_id' => $message_id,
         'text' => createFavoritesText(
             assets: $favorites,
-            base_currency: json_decode($user->getSettings(), true)['base_currency'],
+            base_currency: $user->getBaseCurrency(),
             db: $db,
             markdown: 'MarkdownV2'), // TODO: Should be tested with telegram
         'parse_mode' => 'MarkdownV2',
@@ -1572,8 +1575,6 @@ function handleBaseCurrencyTextMessage(array $data): void
 #[NoReturn]
 function sendSelectBaseCurrencyMessage(User $user, DatabaseManager $db): void
 {
-    $user_base_currency = json_decode($user->getSettings(), true)['base_currency'];
-
     $base_currencies = $db->read(
         table: 'assets',
         conditions: ['asset_type' => 'ارزهای آزاد'],
@@ -1585,14 +1586,13 @@ function sendSelectBaseCurrencyMessage(User $user, DatabaseManager $db): void
         $base_currencies = array_column($base_currencies, 'name');
 
         $keyboard = [];
-        foreach ($base_currencies as $base_currency) {
-            if ($base_currency != $user_base_currency)
+        foreach ($base_currencies as $base_currency)
+            if ($base_currency != $user->getBaseCurrency())
                 $keyboard[] = [['text' => $base_currency, 'callback_data' => json_encode(['set_base_currency' => $base_currency])]];
-        }
 
         $data = [
             'reply_markup' => ['inline_keyboard' => $keyboard],
-            'text' => 'ارز پایه کنونی شما: ' . $user_base_currency . "\n" . 'شما می‌توانید از طریق دکمه‌های شیشه‌ای زیرو ارز پایه‌ی خود را تغییر دهید.',
+            'text' => 'ارز پایه کنونی شما: ' . $user->getBaseCurrency() . "\n" . 'شما می‌توانید از طریق دکمه‌های شیشه‌ای زیرو ارز پایه‌ی خود را تغییر دهید.',
             'chat_id' => $user->getChatId()
         ];
 
@@ -1724,6 +1724,7 @@ function deleteOldActiveLiveMessage(User $user, int|string $message_id, Database
 function createHoldingDetailText(
     array   $holding,
     ?string $markdown = null,
+    string  $user_base_currency = 'ریال',
     array   $attributes = [
         'space',
         'date',
@@ -1788,10 +1789,10 @@ function createHoldingDetailText(
             $pro_los = calculateProLos($holding['avg_price'], $holding['current_price'], $holding['amount'], $holding['exchange_rate']);
             $pro_los_string =
                 ($pro_los == 0) ?
-                    "🟤 سود/زیان: ۰ ریال" : (
+                    "🟤 سود/زیان: ۰ " . $user_base_currency : (
                 ($pro_los > 0) ?
-                    "🟢 سود: " . beautifulNumber($pro_los) . " ریال" :
-                    "🔴 ضرر: " . beautifulNumber($pro_los) . " ریال"
+                    "🟢 سود: " . beautifulNumber($pro_los) . ' ' . $user_base_currency :
+                    "🔴 ضرر: " . beautifulNumber($pro_los) . ' ' . $user_base_currency
                 );
 
             $tree .= "\n   ┘── " . $pro_los_string;
@@ -1807,7 +1808,7 @@ function createHoldingDetailText(
         $holding['asset_name'] = "[$asset_name](https://t.me/" . BOT_ID . "?start=viewHolding_holdingId{$holding['id']}" . ($mssg_id ? "_mssgId" . $mssg_id : '') . ")" . '‏';
     }
 
-    return $holding['asset_name'] . $tree;
+    return $holding['asset_name'] . $tree . "\n";
 }
 
 function createLoansView(array $loans, ?string $mssg_id = null): string
