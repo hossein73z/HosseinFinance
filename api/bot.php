@@ -596,7 +596,7 @@ function sendAllHoldings(User $user, DatabaseManager $db): void
             $text = "دارایی‌های ثبت شده‌ی شما:\n";
             $total_pro_los = 0;
             foreach ($holdings as $holding) {
-                $total_pro_los += $holding['amount'] * ($holding['current_price'] - $holding['avg_price']) * $holding['base_rate'];
+                $total_pro_los += $holding['amount'] * ($holding['current_price'] - $holding['avg_price']) * $holding['exchange_rate'];
                 $text .= "\n" . createHoldingDetailText($holding, 'MarkdownV2', ['space', 'org_amount', 'org_total_price', 'space', 'profit'], $temp_mssg['result']['message_id']);
             }
 
@@ -621,6 +621,13 @@ function sendAllHoldings(User $user, DatabaseManager $db): void
     }
 }
 
+/**
+ * Automatically adds edit button to the message.
+ *
+ * @param array $holding
+ * @param array $data
+ * @return void
+ */
 function sendHoldingDetail(array $holding, array $data): void
 {
     $data['text'] = createHoldingDetailText($holding);
@@ -1369,8 +1376,6 @@ function setLiveMessage(int|string $user_id, bool $activate, int|string $message
  * @param DatabaseManager $db
  * @param int|string|null $message_id ID of the message to be edited. If `null`, a new message is sent and immediately edited
  * @return void
- *
- * TODO: Add markdown
  */
 function sendFavorites(User $user, DatabaseManager $db, int|string|null $message_id = null): void
 {
@@ -1601,19 +1606,38 @@ function sendSelectBaseCurrencyMessage(User $user, DatabaseManager $db): void
 //          DATA HANDLING & UI HELPERS
 // ==========================================
 
-function getHoldingsWithAssetDetails(array $conditions, DatabaseManager $db, $single = false): bool|array
+/**
+ * Return a list of holdings (Or just one, if `Single -- true`) containing `asset_name`,
+ * `current_price`, `base_currency` and `exchange_rate` (Based on user's base currency).
+ *
+ * @param array $conditions
+ * @param DatabaseManager $db
+ * @param bool $single
+ * @return bool|array
+ */
+function getHoldingsWithAssetDetails(array $conditions, DatabaseManager $db, bool $single = false): bool|array
 {
+    $select_price = "select price from assets where assets.name";
+
+    $asset_base = "a.base_currency";
+    $asset_base_price = "$select_price = $asset_base";
+
+    $user_base = "ifnull(json_unquote(json_extract(u.settings, '$.base_currency')), 'ریال')";
+    $user_base_price = "$select_price = $user_base";
+
     return $db->read(
         table: 'holdings h',
         conditions: $conditions,
         single: $single,
-        selectColumns: '
-                h.*,
-                a.name as asset_name,
-                a.price as current_price,
-                a.base_currency,
-                a.exchange_rate as base_rate',
-        join: 'INNER JOIN assets a ON h.asset_id = a.id'
+        selectColumns: "
+            h.*,
+            a.name                                   as asset_name,
+            a.price                                  as current_price,
+            a.base_currency                          as base_currency,
+            ($asset_base_price) / ($user_base_price) as exchange_rate",
+        join: '
+            INNER JOIN assets a ON h.asset_id = a.id
+            left join users u on h.user_id = u.id'
     );
 }
 
@@ -1721,7 +1745,7 @@ function createHoldingDetailText(
             $tree .= "\n   │ " . "‏";
         }
 
-        if ($attribute == 'date') {
+        if ($attribute == 'date' && isset($holding['date'])) {
             $date = dateStringToArray($holding['date']);
             $tree .=
                 "\n   ┤── تاریخ خرید: " .
@@ -1761,7 +1785,7 @@ function createHoldingDetailText(
         if ($attribute == 'profit') {
 
             // Calculate and create profit string
-            $pro_los = calculateProLos($holding['avg_price'], $holding['current_price'], $holding['amount'], $holding['base_rate']);
+            $pro_los = calculateProLos($holding['avg_price'], $holding['current_price'], $holding['amount'], $holding['exchange_rate']);
             $pro_los_string =
                 ($pro_los == 0) ?
                     "🟤 سود/زیان: ۰ ریال" : (
