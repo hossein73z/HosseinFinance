@@ -111,11 +111,11 @@ function handleIncomingMessage(array $message, DatabaseManager $db): void
     $text = $message['text'] ?? '';
 
     // TODO: if ($text === '/start') /*****/ level_0(user: $user, db: $db);
-    if ($text === '/holdings') /*******/ level_1(user: $user, db: $db);
-    if ($text === '/loans') /**********/ level_2(user: $user, db: $db);
-    if ($text === '/prices') /*********/ level_5(user: $user, db: $db);
-    if ($text === '/ai') /*************/ level_6(user: $user, db: $db);
-    if ($text === '/base_currency') /**/ sendSelectBaseCurrencyMessage($user, $db);
+    if ($text === '/holdings') /***********/ level_1(user: $user, db: $db);
+    if ($text === '/loans') /**************/ level_2(user: $user, db: $db);
+    if ($text === '/prices') /*************/ level_5(user: $user, db: $db);
+    if ($text === '/ai') /*****************/ level_6(user: $user, db: $db);
+    if ($text === '/base_currency') /******/ sendSelectBaseCurrencyMessage($user, $db);
 
     $pressed_button = getPressedButton(text: $text, parent_btn_id: $user->getLastBtn(), admin: $user->isAdmin(), db: $db);
 
@@ -221,8 +221,6 @@ function getOrCreateUser(array $chat, DatabaseManager $db): User
 #[NoReturn]
 function callbackHandler(User $user, array $callback_query, DatabaseManager $db): void
 {
-    // TODO: Callback queries move user to corresponding level instead of removing the message
-
     $message = $callback_query['message'];
 
     if ($user->getLastBtn() == 1) level_1(user: $user, db: $db, message: $message, callback_query: $callback_query);
@@ -285,8 +283,6 @@ function normalButtonHandler(User $user, Button $pressed_button, DatabaseManager
 #[NoReturn]
 function nonButtonHandler(User $user, array $message, DatabaseManager $db): void
 {
-    // TODO: Misplaced deep links move user to the corresponding level instead of showing error
-
     if ($user->getLastBtn() == 1) level_1(user: $user, db: $db, message: $message);
     if ($user->getLastBtn() == 2) level_2(user: $user, db: $db, message: $message);
     if ($user->getLastBtn() == 5) level_5(user: $user, db: $db, message: $message);
@@ -1030,7 +1026,6 @@ function sendLoanDetail(array $loan, array $data): void
 //          LEVEL 5: PRICES
 // ==========================================
 
-// TODO: Save crypto prices ased on Rial instead of Tether
 #[NoReturn]
 function level_5(
     User            $user,
@@ -1406,7 +1401,7 @@ function sendFavorites(User $user, DatabaseManager $db, int|string|null $message
             assets: $favorites,
             base_currency: $user->getBaseCurrency(),
             db: $db,
-            markdown: 'MarkdownV2'), // TODO: Should be tested with telegram
+            markdown: 'MarkdownV2'),
         'parse_mode' => 'MarkdownV2',
         'reply_markup' => [
             'inline_keyboard' => createFavoritesInlineKeyboard($user->getId(), $message_id, $db, boolval($favorites))
