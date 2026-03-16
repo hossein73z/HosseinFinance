@@ -1085,6 +1085,7 @@ function level_5(
     exit();
 }
 
+// TODO: make the messages fill the space horizontally
 #[NoReturn]
 function handlePricesCallback(
     User            $user,
