@@ -1382,11 +1382,24 @@ function sendFavorites(User $user, DatabaseManager $db, int|string|null $message
         sendLoadingMessage($user->getChatId(), 'در حال دریافت اطلاعات لیست علاقه‌مندی‌ها ...')['result']['message_id'];
 
     try {
+        $select_price = "select price from assets where assets.name";
+
+        $asset_base = "a.base_currency";
+        $asset_base_price = "$select_price = $asset_base";
+
+        $user_base = "ifnull(json_unquote(json_extract(u.settings, '$.base_currency')), 'ریال')";
+        $user_base_price = "$select_price = $user_base";
+
         $favorites = $db->read(
             table: 'favorites f',
             conditions: ['f.user_id' => $user->getId()],
-            selectColumns: 'a.*, f.id as fav_id',
-            join: 'JOIN assets a ON a.name=f.asset_name',
+            selectColumns: "
+                a.*,
+                f.id                                     as fav_id,
+                ($asset_base_price) / ($user_base_price) as exchange_rate",
+            join: '
+                LEFT JOIN assets a ON f.asset_name = a.name
+                LEFT join users u ON f.user_id = u.id',
             orderBy: ['asset_type' => 'DESC', 'f.id' => 'ASC']
         );
     } catch (Exception $e) {
@@ -2007,16 +2020,10 @@ function createFavoritesText(
             $asset_line = "\n   -- " . $asset_name . ': ' . $asset_price . ' ' . $asset_base;
             $text .= $markdown ? markdownScape($asset_line) : $asset_line;
 
-            $base_prices = CreateNamePricePairs(
-                array_merge(array_unique(array_column($assets, 'base_currency')), [$base_currency]), $db);
-            if (
-                $asset['base_currency'] != $base_currency &&
-                $base_prices[$base_currency]
-            ) {
-                $exchange_rate = $base_prices[$asset['base_currency']] / $base_prices[$base_currency];
-                $based_price = beautifulNumber($asset['price'] * $exchange_rate);
-                $converted_price_text = ' --> ' . $based_price . ' ' . $base_currency;
-                $text .= $markdown ? markdownScape($converted_price_text) : $converted_price_text;
+            if ($asset['base_currency'] != $base_currency) {
+                $based_price = beautifulNumber($asset['price'] * $asset['exchange_rate']);
+                $based_price_text = ' --> ' . $based_price . ' ' . $base_currency;
+                $text .= $markdown ? markdownScape($based_price_text) : $based_price_text;
             }
 
         }
