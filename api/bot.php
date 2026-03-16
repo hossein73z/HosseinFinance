@@ -1181,11 +1181,11 @@ function handlePricesCallback(
                 [['text' => '🔙 برگشت 🔙', 'callback_data' => json_encode(['edit_fav' => 'add'])]]
             ];
 
-            $assets = $db->read(
-                table: 'assets',
-                conditions: ['asset_type' => $query_data['new_fav_type']],
-                orderBy: ['asset_type' => 'DESC']
-            );
+            $assets = $db->query(
+                "select a.* from assets a
+                     left join favorites f on f.asset_name = a.name
+                     where a.asset_type = '$query_data[new_fav_type]' and (f.user_id is null or f.user_id!=" . $user->getId() . ")"
+            )->fetchAll();
 
             if ($assets) {
                 $data['text'] = 'گزینه‌ی مد نظر خود را از لیست زیر انتخاب کنید:';
