@@ -24,9 +24,10 @@ define('BASE_URL', 'https://' . getenv('VERCEL_PROJECT_PRODUCTION_URL'));
 require_once 'Libraries/DatabaseManager.php';
 require_once 'Functions/ExternalEndpointsFunctions.php';
 require_once 'Functions/KeyboardFunctions.php';
-require_once 'Functions/StringHelper.php'; // TODO: Create object for Jalali date
+require_once 'Functions/StringHelper.php';
 require_once 'Models/Button.php';
 require_once 'Models/User.php';
+require_once 'Models/JalaliDate.php';
 
 // --- INITIALIZATION & SHUTDOWN ---
 
@@ -1827,36 +1828,32 @@ function createLoansView(array $loans, ?string $mssg_id = null): string
 {
     $text = 'وام‌های ثبت شده‌ی شما: ' . "\n";
     foreach ($loans as $loan) {
+
+        $todayJ = JalaliDate::fromGregorian();
+        $next_payment = null;
+
         $installments_per_year = [];
-        $next_payment = getJalaliDate();
-        $installments = $loan['installments'];
+        $installments = &$loan['installments'];
+        foreach ($installments as &$installment) {
 
-        foreach ($installments as $inst) {
-            $year = explode('/', $inst['due_date'])[0];
-            if ($inst['is_paid'] == 1) {
-                $installments_per_year[$year][] = "🟢";
-            } else {
-                if ($next_payment <= getJalaliDate()) $next_payment = $inst['due_date'];
-                $installments_per_year[$year][] = ($inst['due_date'] < getJalaliDate()) ? "🔴" : "⚪";
+            $due_date = JalaliDate::fromString($installment['due_date']);
+            $installment['due_date'] = $due_date;
+
+            if ($installment['is_paid'] == 1) $installments_per_year[$due_date->jy][] = "🟢";
+            else {
+
+                if ($due_date->diffInDays($todayJ) >= 0 &&
+                    ($next_payment === null || $due_date->diffInDays($next_payment) <= 0)
+                ) $next_payment = $due_date;
+
+                $installments_per_year[$due_date->jy][] = ($due_date->diffInDays($todayJ) < 0) ? "🔴" : "⚪";
             }
         }
 
-        $daysRemaining = 0;
-        $parts = explode('/', $next_payment);
-        if (count($parts) == 3) {
-            try {
-                $gregorianDueDate = new DateTime(jalaliToGregorian($parts[0], $parts[1], $parts[2]) . ' 00:00:00');
-                $today = new DateTime('now');
-                $today->setTime(0, 0);
-                $daysRemaining = (int)$today->diff($gregorianDueDate)->format('%r%a');
-            } catch (Exception $e) {
-                $daysRemaining = 'خطا در محاسبه!';
-                error_log('Error creating `DateTime` object from Jalali calendar: ' . $e->getMessage());
-            }
-        }
+        $daysRemaining = $next_payment?->diffInDays($todayJ);
 
-        $link = "https://t.me/" . BOT_ID . "?start=showLoan_loanId{$loan['id']}" . ($mssg_id ? "_mssgId" . $mssg_id : '');
-        $loan_name = "\n‏\-* [" . markdownScape(beautifulNumber($loan['name'], null)) . "]($link)*";
+        $deep_link = "https://t.me/" . BOT_ID . "?start=showLoan_loanId{$loan['id']}" . ($mssg_id ? "_mssgId" . $mssg_id : '');
+        $loan_name = "\n‏\-* [" . markdownScape(beautifulNumber($loan['name'], null)) . "]($deep_link)*";
 
         $detail = "\n‏      │  \n‏      ┤─ مبلغ وام\: " . markdownScape(beautifulNumber($loan['total_amount'])) .
             "\n‏      ┤─ تاریخ دریافت\: " . markdownScape(beautifulNumber($loan['received_date'], null));
@@ -1864,9 +1861,9 @@ function createLoansView(array $loans, ?string $mssg_id = null): string
 
         if ($installments) {
             $detail .= "\n‏      ┘─ وضعیت اقساط\: ";
-            foreach ($installments_per_year as $year => $insts) {
+            foreach ($installments_per_year as $year => $year_installments) {
                 $prefix = (array_key_last($installments_per_year) != $year) ? "\n‏          ┤─ " : "\n‏          ┘─ ";
-                $detail .= $prefix . beautifulNumber($year, null) . '\: ' . implode('', $insts);
+                $detail .= $prefix . beautifulNumber($year, null) . '\: ' . implode('', $year_installments);
             }
         }
         $text .= $loan_name . $detail . "\n";
