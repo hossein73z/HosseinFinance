@@ -1381,31 +1381,7 @@ function sendFavorites(User $user, DatabaseManager $db, int|string|null $message
         $message_id :
         sendLoadingMessage($user->getChatId(), 'در حال دریافت اطلاعات لیست علاقه‌مندی‌ها ...')['result']['message_id'];
 
-    try {
-        $select_price = "select price from assets where assets.name";
-
-        $asset_base = "a.base_currency";
-        $asset_base_price = "$select_price = $asset_base";
-
-        $user_base = "ifnull(json_unquote(json_extract(u.settings, '$.base_currency')), 'ریال')";
-        $user_base_price = "$select_price = $user_base";
-
-        $favorites = $db->read(
-            table: 'favorites f',
-            conditions: ['f.user_id' => $user->getId()],
-            selectColumns: "
-                a.*,
-                f.id                                     as fav_id,
-                ($asset_base_price) / ($user_base_price) as exchange_rate",
-            join: '
-                LEFT JOIN assets a ON f.asset_name = a.name
-                LEFT join users u ON f.user_id = u.id',
-            orderBy: ['asset_type' => 'DESC', 'f.id' => 'ASC']
-        );
-    } catch (Exception $e) {
-        error_log('createFavoritesText: ' . $e->getMessage());
-        $favorites = null;
-    }
+    $favorites = getFavoriteWithExchangeRate($user->getId(), $db);
 
     sendToTelegram('editMessageText', [
         'chat_id' => $user->getChatId(),
@@ -1680,6 +1656,37 @@ function getLoansWithInstallments(array $conditions, DatabaseManager $db): bool|
             else $loans[$i]['installments'] = $loan['installments'];
         }
     return $loans;
+}
+
+function getFavoriteWithExchangeRate(string|int $user_id, DatabaseManager $db): bool|array
+{
+    try {
+        $select_price = "select price from assets where assets.name";
+
+        $asset_base = "a.base_currency";
+        $asset_base_price = "$select_price = $asset_base";
+
+        $user_base = "ifnull(json_unquote(json_extract(u.settings, '$.base_currency')), 'ریال')";
+        $user_base_price = "$select_price = $user_base";
+
+        $favorites = $db->read(
+            table: 'favorites f',
+            conditions: ['f.user_id' => $user_id],
+            selectColumns: "
+                a.*,
+                f.id                                     as fav_id,
+                ($asset_base_price) / ($user_base_price) as exchange_rate",
+            join: '
+                LEFT JOIN assets a ON f.asset_name = a.name
+                LEFT join users u ON f.user_id = u.id',
+            orderBy: ['asset_type' => 'DESC', 'f.id' => 'ASC']
+        );
+
+    } catch (Exception $e) {
+        error_log('createFavoritesText: ' . $e->getMessage());
+        $favorites = null;
+    }
+    return $favorites;
 }
 
 function createWebAppBtn(string $text, string $path, array $params = []): array
