@@ -3,7 +3,6 @@ USE test;
 CREATE TABLE IF NOT EXISTS `users`
 (
     id         INT AUTO_INCREMENT NOT NULL PRIMARY KEY,
-    chat_id    BIGINT             NOT NULL UNIQUE,
     first_name TEXT               NOT NULL,
     last_name  TEXT                        DEFAULT NULL,
     username   TEXT                        DEFAULT NULL,
@@ -74,7 +73,7 @@ CREATE TABLE IF NOT EXISTS `holdings`
     time      TEXT                    DEFAULT NULL,
 
     UNIQUE KEY idx_unique_holding (user_id, asset_id),
-    FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE ON UPDATE CASCADE,
     FOREIGN KEY (asset_id) REFERENCES assets (id) ON DELETE RESTRICT
 ) DEFAULT CHARSET = utf8mb4;
 
@@ -85,7 +84,7 @@ CREATE TABLE IF NOT EXISTS favorites
     asset_name VARCHAR(191) NOT NULL,
 
     UNIQUE KEY idx_unique_favorite (user_id, asset_name),
-    FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE ON UPDATE CASCADE,
     FOREIGN KEY (asset_name) REFERENCES assets (name) ON DELETE RESTRICT
 ) DEFAULT CHARSET = utf8mb4;
 
@@ -104,7 +103,7 @@ CREATE TABLE IF NOT EXISTS `alerts`
     note           TEXT,
 
     UNIQUE INDEX idx_unique_alert (asset_name, user_id, target_price),
-    FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE ON UPDATE CASCADE,
     FOREIGN KEY (asset_name) REFERENCES assets (name) ON DELETE RESTRICT
 ) DEFAULT CHARSET = utf8mb4;
 
@@ -122,7 +121,7 @@ CREATE TABLE IF NOT EXISTS `transactions`
     note     TEXT,
 
     FOREIGN KEY (asset_id) REFERENCES assets (id) ON DELETE RESTRICT,
-    FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+    FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE ON UPDATE CASCADE
 ) DEFAULT CHARSET = utf8mb4;
 
 CREATE TABLE IF NOT EXISTS `loans`
@@ -135,7 +134,7 @@ CREATE TABLE IF NOT EXISTS `loans`
     alert_offset  INT         DEFAULT 0 NOT NULL,
     created_at    TIMESTAMP   DEFAULT CURRENT_TIMESTAMP,
 
-    FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+    FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE ON UPDATE CASCADE
 ) DEFAULT CHARSET = utf8mb4;
 
 CREATE TABLE IF NOT EXISTS `installments`
@@ -160,7 +159,7 @@ CREATE TABLE IF NOT EXISTS `special_messages`
     data       text,
 
     UNIQUE INDEX idx_unique_installment (user_id, type),
-    FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+    FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE ON UPDATE CASCADE
 ) DEFAULT CHARSET = utf8mb4;
 
 alter table users

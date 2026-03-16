@@ -4,7 +4,6 @@ class User implements JsonSerializable
 {
     public function __construct(
         private ?int    $id,
-        private int     $chatId,
         private string  $firstName,
         private ?string $lastName,
         private ?string $username,
@@ -23,7 +22,6 @@ class User implements JsonSerializable
     {
         return new self(
             isset($row['id']) ? (int)$row['id'] : null,
-            (int)$row['chat_id'],
             $row['first_name'],
             $row['last_name'] ?? null,
             $row['username'] ?? null,
@@ -39,11 +37,6 @@ class User implements JsonSerializable
     public function getId(): ?int
     {
         return $this->id;
-    }
-
-    public function getChatId(): int
-    {
-        return $this->chatId;
     }
 
     public function getFirstName(): string
@@ -98,12 +91,6 @@ class User implements JsonSerializable
     public function setId(?int $id): self
     {
         $this->id = $id;
-        return $this;
-    }
-
-    public function setChatId(int $chatId): self
-    {
-        $this->chatId = $chatId;
         return $this;
     }
 
@@ -173,7 +160,6 @@ class User implements JsonSerializable
     {
         return [
             'id' => $this->id,
-            'chat_id' => $this->chatId,
             'first_name' => $this->firstName,
             'last_name' => $this->lastName,
             'username' => $this->username,
@@ -184,13 +170,10 @@ class User implements JsonSerializable
         ];
     }
 
-    // --- JsonSerializable Implementation ---
-
     public function jsonSerialize(): array
     {
         return [
             'id' => $this->id,
-            'chat_id' => $this->chatId,
             'first_name' => $this->firstName,
             'last_name' => $this->lastName,
             'full_name' => $this->getFullName(),

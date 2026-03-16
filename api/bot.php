@@ -130,13 +130,13 @@ function handleCallbackQuery(array $callback_query, DatabaseManager $db): void
     $message = $callback_query['message'];
     $user = $db->read(
         table: 'users',
-        conditions: ['chat_id' => $message['chat']['id']],
+        conditions: ['id' => $message['chat']['id']],
         single: true);
 
     if ($user) {
         $user = User::fromDbRow($user);
 
-        $data = ['chat_id' => $user->getChatId(), 'message_id' => $message['message_id']];
+        $data = ['chat_id' => $user->getid(), 'message_id' => $message['message_id']];
 
         $query_data = json_decode($callback_query['data'], true);
         if (!$query_data) sendToTelegram('deleteMessage', $data);
@@ -184,7 +184,7 @@ function getOrCreateUser(array $chat, DatabaseManager $db): User
 {
     $user = $db->read(
         table: 'users',
-        conditions: ['chat_id' => $chat['id']],
+        conditions: ['id' => $chat['id']],
         single: true);
 
     if (!$user) {
@@ -194,7 +194,7 @@ function getOrCreateUser(array $chat, DatabaseManager $db): User
         $new_user_id = $db->create(
             table: 'users',
             data: [
-                'chat_id' => $chat['id'],
+                'id' => $chat['id'],
                 'first_name' => $chat['first_name'] ?? 'N/A',
                 'last_name' => $chat['last_name'] ?? null,
                 'username' => $chat['username'] ?? null,
@@ -207,7 +207,7 @@ function getOrCreateUser(array $chat, DatabaseManager $db): User
         if ($new_user_id) {
             $user = $db->read(
                 table: 'users',
-                conditions: ['chat_id' => $chat['id']],
+                conditions: ['id' => $chat['id']],
                 single: true
             );
         } else {
@@ -233,7 +233,7 @@ function callbackHandler(User $user, array $callback_query, DatabaseManager $db)
     sendToTelegram('editMessageText', [
         'text' => 'درخواست نامفهوم بود!',
         'message_id' => $message['message_id'],
-        'chat_id' => $user->getChatId(),
+        'chat_id' => $user->getid(),
     ]);
 
     exit();
@@ -262,7 +262,7 @@ function normalButtonHandler(User $user, Button $pressed_button, DatabaseManager
     // Default Actions for normal button
     $response = sendToTelegram('sendMessage', [
         'text' => $pressed_button->getText(),
-        'chat_id' => $user->getChatId(),
+        'chat_id' => $user->getid(),
         'reply_markup' => [
             'keyboard' => createKeyboardsArray($pressed_button->getId(), $user->isAdmin(), $db),
             'resize_keyboard' => true,
@@ -292,7 +292,7 @@ function nonButtonHandler(User $user, array $message, DatabaseManager $db): void
     // Fallback "Unrecognized" message
     sendToTelegram('sendMessage', [
         'text' => 'پیام نامفهوم است!',
-        'chat_id' => $user->getChatId(),
+        'chat_id' => $user->getid(),
         'reply_markup' => [
             'keyboard' => createKeyboardsArray($user->getLastBtn(), $user->isAdmin(), $db),
             'resize_keyboard' => true,
@@ -388,7 +388,7 @@ function level_1(
     array_unshift($keyboard, [createWebAppBtn('➕ افزودن دارایی جدید', '/assets/add_holding.html')]);
 
     $data = [
-        'chat_id' => $user->getChatId(),
+        'chat_id' => $user->getid(),
         'text' => $level_button->getText(),
         'reply_markup' => [
             'keyboard' => $keyboard,
@@ -426,7 +426,7 @@ function handleHoldingsCallback(User $user, array $callback_query, array $messag
     // $query_data = json_decode($callback_query['data'], true);
 
     sendToTelegram('editMessageText', [
-        'chat_id' => $user->getChatId(),
+        'chat_id' => $user->getid(),
         'message_id' => $message['message_id'],
         'text' => 'این پیام منقضی شده است.'
     ]);
@@ -559,9 +559,9 @@ function handleHoldingsTextMessage(User $user, array $data, array $message, Data
         if ($holding) {
 
             // Delete received deep-link message
-            sendToTelegram('deleteMessage', ['chat_id' => $user->getChatId(), 'message_id' => $message['message_id']]);
+            sendToTelegram('deleteMessage', ['chat_id' => $user->getid(), 'message_id' => $message['message_id']]);
             // Delete holdings' message
-            sendToTelegram('deleteMessage', ['chat_id' => $user->getChatId(), 'message_id' => $matches[3]]);
+            sendToTelegram('deleteMessage', ['chat_id' => $user->getid(), 'message_id' => $matches[3]]);
 
             sendHoldingDetail($holding, $data, $user->getBaseCurrency());
             $db->update(
@@ -584,7 +584,7 @@ function sendAllHoldings(User $user, DatabaseManager $db): void
 {
     $holdings = getHoldingsWithAssetDetails(['user_id' => $user->getId()], $db);
     if ($holdings) {
-        $temp_mssg = sendLoadingMessage($user->getChatId(), 'در حال دریافت اطلاعات دارایی‌ها ...');
+        $temp_mssg = sendLoadingMessage($user->getid(), 'در حال دریافت اطلاعات دارایی‌ها ...');
         if ($temp_mssg) {
 
             $text = "دارایی‌های ثبت شده‌ی شما:\n";
@@ -611,14 +611,14 @@ function sendAllHoldings(User $user, DatabaseManager $db): void
             $text .= "\n" . markdownScape($pro_los_string);
 
             sendToTelegram('editMessageText', [
-                'chat_id' => $user->getChatId(),
+                'chat_id' => $user->getid(),
                 'message_id' => $temp_mssg['result']['message_id'],
                 'text' => $text,
                 'parse_mode' => 'MarkdownV2'
             ]);
         }
     } else {
-        sendToTelegram('sendMessage', ['chat_id' => $user->getChatId(), 'text' => 'شما هیچ دارایی‌ای ثبت نکرده‌اید.']);
+        sendToTelegram('sendMessage', ['chat_id' => $user->getid(), 'text' => 'شما هیچ دارایی‌ای ثبت نکرده‌اید.']);
     }
 }
 
@@ -682,7 +682,7 @@ function level_2(
     array_unshift($keyboard, [createWebAppBtn('➕ افزودن وام جدید', '/assets/add_loan.html')]);
 
     $data = [
-        'chat_id' => $user->getChatId(),
+        'chat_id' => $user->getid(),
         'text' => $level_button->getText(),
         'reply_markup' => [
             'keyboard' => $keyboard,
@@ -726,7 +726,7 @@ function handleLoansCallback(User $user, array $callback_query, array $data, arr
 
     switch ($query_key) {
         case 'loan_list':
-            sendToTelegram('deleteMessage', ['chat_id' => $user->getChatId(), 'message_id' => $message['message_id']]);
+            sendToTelegram('deleteMessage', ['chat_id' => $user->getid(), 'message_id' => $message['message_id']]);
 
             sendToTelegram('sendMessage', $data);
             sendAllLoans($user, $db);
@@ -734,7 +734,7 @@ function handleLoansCallback(User $user, array $callback_query, array $data, arr
         default:
 
             sendToTelegram('editMessageText', [
-                'chat_id' => $user->getChatId(),
+                'chat_id' => $user->getid(),
                 'message_id' => $message['message_id'],
                 'text' => 'این پیام منقضی شده است.'
             ]);
@@ -788,7 +788,7 @@ function handleLoansWebAppData(User $user, array $data, array $message, Database
         } catch (Exception $e) {
             sendToTelegram('sendMessage', [
                 'text' => '❌ خطای پایگاه داده در ثبت دارایی جدید: ' . $e->getMessage(),
-                'chat_id' => $user->getChatId()
+                'chat_id' => $user->getid()
             ]);
             error_log(
                 'Loan: ' . json_encode($new_loan) . "\n" .
@@ -899,7 +899,7 @@ function handleLoansWebAppData(User $user, array $data, array $message, Database
 #[NoReturn]
 function handleLoansTextMessage(User $user, array $data, array $message, DatabaseManager $db): void
 {
-    sendToTelegram('deleteMessage', ['chat_id' => $user->getChatId(), 'message_id' => $message['message_id']]);
+    sendToTelegram('deleteMessage', ['chat_id' => $user->getid(), 'message_id' => $message['message_id']]);
 
     // Show loan detail
     $matched = preg_match("/^\/start showLoan_loanId(\d+?)_mssgId(\d+?)$/m", $message['text'], $matches);
@@ -910,7 +910,7 @@ function handleLoansTextMessage(User $user, array $data, array $message, Databas
         if ($loan) {
 
             // Delete loans message
-            sendToTelegram('deleteMessage', ['chat_id' => $user->getChatId(), 'message_id' => $matches[2]]);
+            sendToTelegram('deleteMessage', ['chat_id' => $user->getid(), 'message_id' => $matches[2]]);
 
             sendLoanDetail($loan, $data);
 
@@ -946,7 +946,7 @@ function handleLoansTextMessage(User $user, array $data, array $message, Databas
 
             if ($loan) {
                 sendToTelegram('editMessageText', [
-                    'chat_id' => $user->getChatId(),
+                    'chat_id' => $user->getid(),
                     'message_id' => $matches[2],
                     'text' => createLoanDetailText($loan, $matches[2]),
                     'parse_mode' => 'MarkdownV2',
@@ -986,17 +986,17 @@ function sendAllLoans(User $user, DatabaseManager $db): void
 
     if ($loans) {
 
-        $temp_mssg = sendLoadingMessage($user->getChatId(), 'در حال دریافت اطلاعات وام‌ها ...');
+        $temp_mssg = sendLoadingMessage($user->getid(), 'در حال دریافت اطلاعات وام‌ها ...');
         if ($temp_mssg) {
             sendToTelegram('editMessageText', [
-                'chat_id' => $user->getChatId(),
+                'chat_id' => $user->getid(),
                 'message_id' => $temp_mssg['result']['message_id'],
                 'text' => createLoansView($loans, $temp_mssg['result']['message_id']),
                 'parse_mode' => 'MarkdownV2'
             ]);
         }
     } else {
-        sendToTelegram('sendMessage', ['chat_id' => $user->getChatId(), 'text' => 'هیچ وام یا قسطی برای شما ثبت نشده است!']);
+        sendToTelegram('sendMessage', ['chat_id' => $user->getid(), 'text' => 'هیچ وام یا قسطی برای شما ثبت نشده است!']);
     }
 
     $db->update('users', ['progress' => null], ['id' => $user->getId()]);
@@ -1042,7 +1042,7 @@ function level_5(
     $keyboard = createKeyboardsArray(parent_btn_id: $level_button->getId(), admin: $user->isAdmin(), db: $db);
 
     $data = [
-        'chat_id' => $user->getChatId(),
+        'chat_id' => $user->getid(),
         'text' => $level_button->getText(),
         'reply_markup' => [
             'keyboard' => $keyboard,
@@ -1095,7 +1095,7 @@ function handlePricesCallback(
 ): void
 {
     $data = [
-        'chat_id' => $user->getChatId(),
+        'chat_id' => $user->getid(),
         'message_id' => $message['message_id'],
     ];
 
@@ -1283,7 +1283,7 @@ function handlePricesCallback(
         default:
             sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
             sendToTelegram('editMessageText', [
-                'chat_id' => $user->getChatId(),
+                'chat_id' => $user->getid(),
                 'message_id' => $message['message_id'],
                 'text' => 'این پیام منقضی شده است.'
             ]);
@@ -1379,12 +1379,12 @@ function sendFavorites(User $user, DatabaseManager $db, int|string|null $message
 {
     $message_id = ($message_id !== null) ?
         $message_id :
-        sendLoadingMessage($user->getChatId(), 'در حال دریافت اطلاعات لیست علاقه‌مندی‌ها ...')['result']['message_id'];
+        sendLoadingMessage($user->getid(), 'در حال دریافت اطلاعات لیست علاقه‌مندی‌ها ...')['result']['message_id'];
 
     $favorites = getFavoriteWithExchangeRate($user->getId(), $db);
 
     sendToTelegram('editMessageText', [
-        'chat_id' => $user->getChatId(),
+        'chat_id' => $user->getid(),
         'message_id' => $message_id,
         'text' => createFavoritesText(
             assets: $favorites,
@@ -1454,13 +1454,13 @@ function level_6(
     if ($callback_query) {
         sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
         sendToTelegram('editMessageText', [
-            'chat_id' => $user->getChatId(),
+            'chat_id' => $user->getid(),
             'message_id' => $message['message_id'],
             'text' => 'این پیام منقضی شده است.'
         ]);
     } else {
         sendToTelegram('sendMessage', [
-            'chat_id' => $user->getChatId(),
+            'chat_id' => $user->getid(),
             'text' => 'در حال توسعه...',
             'reply_markup' => [
                 'keyboard' => createKeyboardsArray(6, $user->isAdmin(), $db),
@@ -1497,7 +1497,7 @@ function level_8(
     $keyboard = createKeyboardsArray(parent_btn_id: $level_button->getId(), admin: $user->isAdmin(), db: $db);
 
     $data = [
-        'chat_id' => $user->getChatId(),
+        'chat_id' => $user->getid(),
         'text' => $level_button->getText(),
         'reply_markup' => [
             'keyboard' => $keyboard,
@@ -1532,7 +1532,7 @@ function handleBaseCurrencyCallback(User $user, array $callback_query, array $me
 {
     sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
     sendToTelegram('editMessageText', [
-        'chat_id' => $user->getChatId(),
+        'chat_id' => $user->getid(),
         'message_id' => $message['message_id'],
         'text' => 'این پیام منقضی شده است.'
     ]);
@@ -1570,7 +1570,7 @@ function sendSelectBaseCurrencyMessage(User $user, DatabaseManager $db): void
         $data = [
             'reply_markup' => ['inline_keyboard' => $keyboard],
             'text' => 'ارز پایه کنونی شما: ' . $user->getBaseCurrency() . "\n" . 'شما می‌توانید از طریق دکمه‌های شیشه‌ای زیرو ارز پایه‌ی خود را تغییر دهید.',
-            'chat_id' => $user->getChatId()
+            'chat_id' => $user->getid()
         ];
 
         sendToTelegram('sendMessage', $data);
@@ -1720,7 +1720,7 @@ function deleteOldActiveLiveMessage(User $user, int|string $message_id, Database
         single: true
     );
     if ($live_mssg)
-        return sendToTelegram('deleteMessage', ['chat_id' => $user->getChatId(), 'message_id' => $live_mssg['message_id']]);
+        return sendToTelegram('deleteMessage', ['chat_id' => $user->getid(), 'message_id' => $live_mssg['message_id']]);
     else
         return false;
 }
