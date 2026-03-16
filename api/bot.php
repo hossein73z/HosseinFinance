@@ -110,12 +110,12 @@ function handleIncomingMessage(array $message, DatabaseManager $db): void
     // Global Command Routing
     $text = $message['text'] ?? '';
 
-    // TODO: if ($text === '/start') /*****/ level_0(user: $user, db: $db);
-    if ($text === '/holdings') /***********/ level_1(user: $user, db: $db);
-    if ($text === '/loans') /**************/ level_2(user: $user, db: $db);
-    if ($text === '/prices') /*************/ level_5(user: $user, db: $db);
-    if ($text === '/ai') /*****************/ level_6(user: $user, db: $db);
-    if ($text === '/base_currency') /******/ sendSelectBaseCurrencyMessage($user, $db);
+    // TODO: if ($text === '/start') /**/ level_0(user: $user, db: $db);
+    if ($text === '/holdings') /********/ level_1(user: $user, db: $db);
+    if ($text === '/loans') /***********/ level_2(user: $user, db: $db);
+    if ($text === '/prices') /**********/ level_5(user: $user, db: $db);
+    if ($text === '/ai') /**************/ level_6(user: $user, db: $db);
+    if ($text === '/base_currency') /***/ sendSelectBaseCurrencyMessage($user, $db);
 
     $pressed_button = getPressedButton(text: $text, parent_btn_id: $user->getLastBtn(), admin: $user->isAdmin(), db: $db);
 
@@ -1129,9 +1129,10 @@ function handlePricesCallback(
             if ($action === 'add') {
 
                 $data['text'] = 'یکی از دسته‌بندی‌های زیر را انتخاب کنید:';
-                $data['reply_markup']['inline_keyboard'] = [
-                    [['text' => '🔙 برگشت 🔙', 'callback_data' => json_encode(['edit_fav' => null])]]
-                ];
+                $data['reply_markup']['inline_keyboard'] = [[
+                    ['text' => '🔙 برگشت 🔙', 'callback_data' => json_encode(['edit_fav' => null])],
+                    ['text' => '❌ لغو ❌', 'callback_data' => json_encode(['show_favorites' => null])]
+                ]];
 
                 foreach ($asset_types as $asset_type) {
                     array_unshift(
@@ -1151,9 +1152,10 @@ function handlePricesCallback(
                     join: 'JOIN assets a ON a.name=f.asset_name', // Join is required for sorting the based on asset type
                     orderBy: ['asset_type' => 'ASC']
                 );
-                $data['reply_markup']['inline_keyboard'] = [
-                    [['text' => '🔙 برگشت 🔙', 'callback_data' => json_encode(['edit_fav' => null])]]
-                ];
+                $data['reply_markup']['inline_keyboard'] = [[
+                    ['text' => '🔙 برگشت 🔙', 'callback_data' => json_encode(['edit_fav' => null])],
+                    ['text' => '❌ لغو ❌', 'callback_data' => json_encode(['show_favorites' => null])]
+                ]];
                 if ($favorites) {
 
                     $data['text'] = 'کدام گزینه را می‌خواهید حذف کنید؟';
@@ -1177,9 +1179,10 @@ function handlePricesCallback(
         // Show list of assets in a specific type for user to add to their favorites
         case 'new_fav_type':
 
-            $data['reply_markup']['inline_keyboard'] = [
-                [['text' => '🔙 برگشت 🔙', 'callback_data' => json_encode(['edit_fav' => 'add'])]]
-            ];
+            $data['reply_markup']['inline_keyboard'] = [[
+                ['text' => '🔙 برگشت 🔙', 'callback_data' => json_encode(['edit_fav' => 'add'])],
+                ['text' => '❌ لغو ❌', 'callback_data' => json_encode(['show_favorites' => null])]
+            ]];
 
             $assets = $db->query(
                 "select a.* from assets a
@@ -1274,7 +1277,7 @@ function handlePricesCallback(
             sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
             exit();
 
-        // Acts as back button and shows the favorites message
+        // Show the main favorites' message
         case 'show_favorites':
             sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
             sendFavorites($user, $db, $message['message_id']);
