@@ -1148,8 +1148,8 @@ function handlePricesCallback(
                     table: 'favorites f',
                     conditions: ['f.user_id' => $user->getId()],
                     selectColumns: 'a.*, f.id as fav_id',
-                    join: 'JOIN assets a ON a.name=f.asset_name',
-                    orderBy: ['asset_type' => 'DESC', 'f.id' => 'ASC']
+                    join: 'JOIN assets a ON a.name=f.asset_name', // Join is required for sorting the based on asset type
+                    orderBy: ['asset_type' => 'ASC']
                 );
                 $data['reply_markup']['inline_keyboard'] = [
                     [['text' => '🔙 برگشت 🔙', 'callback_data' => json_encode(['edit_fav' => null])]]
@@ -1389,7 +1389,6 @@ function sendFavorites(User $user, DatabaseManager $db, int|string|null $message
         'text' => createFavoritesText(
             assets: $favorites,
             base_currency: $user->getBaseCurrency(),
-            db: $db,
             markdown: 'MarkdownV2'),
         'parse_mode' => 'MarkdownV2',
         'reply_markup' => [
@@ -1425,13 +1424,7 @@ function createFavoritesInlineKeyboard(
         single: true
     );
 
-    $has_favorites = $has_favorites ?? boolval($db->read(
-        table: 'favorites f',
-        conditions: ['f.user_id' => $user_id],
-        selectColumns: 'a.*, f.id as fav_id',
-        join: 'JOIN assets a ON a.name=f.asset_name',
-        orderBy: ['asset_type' => 'DESC', 'f.id' => 'ASC']
-    ));
+    $has_favorites = $has_favorites ?? boolval($db->read('favorites', ['favorites.user_id' => $user_id]));
 
     if ($has_favorites) $inline_keyboard = [
         ($live_mssg) ?
@@ -1620,8 +1613,8 @@ function getHoldingsWithAssetDetails(array $conditions, DatabaseManager $db, boo
             a.base_currency                          as base_currency,
             ($asset_base_price) / ($user_base_price) as exchange_rate",
         join: '
-            INNER JOIN assets a ON h.asset_id = a.id
-            left join users u on h.user_id = u.id'
+            LEFT JOIN assets a ON h.asset_id = a.id
+            LEFT JOIN users u ON h.user_id = u.id'
     );
 }
 
@@ -1958,50 +1951,25 @@ function CreateNamePricePairs(array $asset_names, DatabaseManager $db): array
 
 /**
  * Creates a well-structured text for favorites' message.
- * If `$assets` is `null`, both `$user_id` and `$db` are required.
  *
- * @param array|null $assets Array of assets, must be ordered by `asset_type`
- * @param string $base_currency
- * @param DatabaseManager $db
- * @param int|string|null $user_id Used to fetch favorites **only** if `$assets` is `null`
- * @param string|null $markdown Can be 'MarkdownV2'
- * @return string|null `null` on wrong inputs
+ * @param array $assets Array of assets, must be ordered by `asset_type`
+ * @param string $base_currency Users' base currency
+ * @param string|null $markdown Supports 'MarkdownV2'
+ * @return string
  */
 function createFavoritesText(
-    ?array          $assets,
-    string          $base_currency,
-    DatabaseManager $db,
-    int|string|null $user_id = null,
-    ?string         $markdown = null
-): string|null
+    array   $assets,
+    string  $base_currency,
+    ?string $markdown = null
+): string
 {
-    if ($assets === null) {
-        if ($user_id) {
-            try {
-                $assets = $db->read(
-                    table: 'favorites f',
-                    conditions: ['f.user_id' => $user_id],
-                    selectColumns: 'a.*, f.id as fav_id',
-                    join: 'JOIN assets a ON a.name=f.asset_name',
-                    orderBy: ['asset_type' => 'DESC', 'f.id' => 'ASC']
-                );
-            } catch (Exception $e) {
-                error_log('createFavoritesText: ' . $e->getMessage());
-                exit();
-            }
-        } else {
-            error_log('createFavoritesText: Required inputs are wrong`');
-            exit();
-        }
-    }
-
     if ($assets) {
         $text = '';
         $asset_type = '';
         $latest_updated_type = ['name' => null, 'date' => '', 'time' => ''];
         foreach ($assets as $asset) {
 
-            // Check and store latest price update
+            // Find and store latest price update
             if ($markdown) {
                 if ($asset['date'] > $latest_updated_type['date'] || !$latest_updated_type['date'])
                     $latest_updated_type = ['name' => $asset['asset_type'], 'date' => $asset['date'], 'time' => $asset['time'],];
@@ -2009,7 +1977,7 @@ function createFavoritesText(
                     $latest_updated_type = ['name' => $asset['asset_type'], 'date' => $asset['date'], 'time' => $asset['time'],];
             }
 
-            // Create and add asset type header text
+            // Create and add asset type header text to `$text`
             if ($asset['asset_type'] != $asset_type) {
                 $asset_type = $asset['asset_type'];
                 $date = preg_split('/-/u', $asset['date']);
@@ -2021,9 +1989,12 @@ function createFavoritesText(
                 $text .= $markdown ? "\n" . markdownScape($type_header_line) : "\n" . $type_header_line;
             }
 
+            // Create asset detail line
             $asset_name = beautifulNumber($asset['name'], null);
             $asset_price = beautifulNumber($asset['price']);
             $asset_base = beautifulNumber($asset['base_currency'], null);
+
+            // Add asset detail line to `$text`
             $asset_line = "\n   -- " . $asset_name . ': ' . $asset_price . ' ' . $asset_base;
             $text .= $markdown ? markdownScape($asset_line) : $asset_line;
 
