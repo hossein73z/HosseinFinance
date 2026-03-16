@@ -29,12 +29,21 @@ class JalaliDate
      * Static constructor from string.
      * Supported format: year/month/day
      */
-    public static function fromString(string $date, string $delimiter = '/'): self
+    public static function fromString(string $date_string, ?string $delimiter = null): self
     {
-        $date = explode("$delimiter", $date);
-        $months = ['فروردین', 'اردیبهشت', 'خرداد', 'تیر', 'مرداد', 'شهریور', 'مهر', 'آبان', 'آذر', 'دی', 'بهمن', 'اسفند'];
-        $date[1] = str_replace($months, ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'], $date[1]);
-        return new self(intval($date[0]), intval($date[1]), intval($date[2]));
+        if ($delimiter) $date_array = explode("$delimiter", $date_string);
+        else {
+            preg_match_all("/(\d{4}).+?(\d\d?).+?(\d\d?)/u", $date_string, $matches);
+            $date_array[0] = $matches[1][0]; // Year
+            $date_array[1] = $matches[2][0]; // Month
+            $date_array[2] = $matches[3][0]; // Day
+        }
+
+        $date_array[1] = str_replace(
+            ['فروردین', 'اردیبهشت', 'خرداد', 'تیر', 'مرداد', 'شهریور', 'مهر', 'آبان', 'آذر', 'دی', 'بهمن', 'اسفند'],
+            ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'], $date_array[1]
+        );
+        return new self(intval($date_array[0]), intval($date_array[1]), intval($date_array[2]));
     }
 
     /**
