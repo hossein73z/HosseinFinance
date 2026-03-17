@@ -22,7 +22,7 @@ function getPressedButton(string $text, int|string $parent_btn_id, bool $admin, 
         conditions: [
             'id' => $ids['merged'],
             'admin_key' => $admin,
-            "JSON_VALUE(attrs, '$.text')" => $text
+            'attrs->>"$.text"' => $text
         ],
         single: true
     );
