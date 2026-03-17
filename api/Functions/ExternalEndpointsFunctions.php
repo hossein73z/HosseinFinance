@@ -26,7 +26,7 @@ function sendToTelegram(
     // Handle Proxy Settings (Optional on Vercel as it is usually not blocked)
     // $proxy = getenv('PROXY_SETTINGS');
 
-    //$response = stream_request($url, "POST", $data, proxy: $proxy);
+    // $response = stream_request($url, "POST", $data, proxy: $proxy);
     $response = stream_request(url: $url, method: "POST", data: $data);
     $result = json_decode($response, true);
 
@@ -35,6 +35,7 @@ function sendToTelegram(
         // Vercel Log: Appears in "Runtime Logs"
         error_log("Telegram JSON Error: " . json_last_error_msg());
         error_log("Raw Response: " . $response);
+        error_log("Sent Request: $method -> " . json_encode($data));
         return false;
     }
 
