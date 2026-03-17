@@ -1760,10 +1760,10 @@ function createHoldingDetailText(
         }
 
         if ($attribute == 'date' && isset($holding['date'])) {
-            $date = dateStringToArray($holding['date']);
+            $date = JalaliDate::fromString($holding['date'])->toPersianMonths();
             $tree .=
                 "\n   ┤── تاریخ خرید: " .
-                beautifulNumber("$date[2] $date[1] $date[0]", null);
+                beautifulNumber("$date[day] $date[month] $date[year]", null);
         }
 
         if ($attribute == 'org_amount') {
@@ -1818,7 +1818,7 @@ function createHoldingDetailText(
         $tree = markdownScape($tree);
 
         $asset_name = beautifulNumber(markdownScape($holding['asset_name']), null);
-        $holding['asset_name'] = "[$asset_name](https://t.me/" . BOT_ID . "?start=viewHolding_holdingId{$holding['id']}" . ($mssg_id ? "_mssgId" . $mssg_id : '') . ")" . '‏';
+        $holding['asset_name'] = "[$asset_name](https://ble.ir/" . BOT_ID . "?start=viewHolding_holdingId{$holding['id']}" . ($mssg_id ? "_mssgId" . $mssg_id : '') . ")" . '‏';
     }
 
     return $holding['asset_name'] . $tree . "\n";
@@ -1914,17 +1914,6 @@ function createLoanDetailText(array $loan, string $mssg_id): string
         $text .= "\n‏    $num\) {$inst['is_paid']}  $date:  $amt    [تغییر وضعیت پرداخت]($link)";
     }
     return $text;
-}
-
-function dateStringToArray(string $date, string $delimiter = '-'): array
-{
-    // TODO: This function needs to be a method of Jalali object
-
-    $date = preg_split("/$delimiter/u", $date);
-    $months = ['فروردین', 'اردیبهشت', 'خرداد', 'تیر', 'مرداد', 'شهریور', 'مهر', 'آبان', 'آذر', 'دی', 'بهمن', 'اسفند'];
-    $date[1] = str_replace(['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'], $months, $date[1]);
-
-    return $date;
 }
 
 function calculateProLos(float $p1, float $p2, float $amount = 1, float $conversion_rate = 1): float
