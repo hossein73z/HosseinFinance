@@ -29,7 +29,7 @@ class JalaliDate
      * Static constructor from string.
      * Supported format: year/month/day
      */
-    public static function fromString(string $date_string, ?string $delimiter = null): self
+    public static function fromString(string $date_string, ?string $delimiter = '/'): self
     {
         if ($delimiter) $date_array = explode("$delimiter", $date_string);
         else {
@@ -61,6 +61,17 @@ class JalaliDate
     public function format(string $delimiter = '/'): string
     {
         return sprintf('%04d%s%02d%s%02d', $this->jy, $delimiter, $this->jm, $delimiter, $this->jd);
+    }
+
+    /**
+     * Change month number, to Persian name.
+     * Returns array instead of JalaliDate object.
+     */
+    public function toPersianMonths(): array
+    {
+        $month = ['فروردین', 'اردیبهشت', 'خرداد', 'تیر', 'مرداد', 'شهریور', 'مهر', 'آبان', 'آذر', 'دی', 'بهمن', 'اسفند'][$this->jm + 1];
+        return ['year' => $this->jy, 'month' => $month, 'day' => $this->jd];
+
     }
 
     /**
