@@ -331,7 +331,7 @@ function choosePath(
 #[NoReturn]
 function backButton(User $user, DatabaseManager $db): void
 {
-    $progress = $user->getProgress() ? json_decode($user->getProgress(), true) : null;
+    $progress = $user->getProgress();
     $current_level = $db->read(
         table: 'buttons',
         conditions: ['id' => $user->getLastBtn()],
@@ -643,7 +643,7 @@ function sendHoldingDetail(array $holding, array $data, string $user_base_curren
 
 function checkAndAddEditHoldingButton(array $data, User $user, DatabaseManager $db): array
 {
-    $progress = json_decode($user->getProgress(), true);
+    $progress = $user->getProgress();
     if ($progress && key($progress) === 'view_holding') {
         $holding = getHoldingsWithAssetDetails(['h.id' => $progress['view_holding']['holding_id'], 'h.user_id' => $user->getId()], $db, true);
         if ($holding) {
@@ -961,7 +961,7 @@ function handleLoansTextMessage(User $user, array $data, array $message, Databas
 
     // Add '✏ ویرایش' button to the keyboard if use is viewing a loan.
     // This works with irreverent texts and wrong loan or installment id.
-    $progress = json_decode($user->getProgress(), true);
+    $progress = $user->getProgress();
     if ($progress && key($progress) === 'view_loan') {
         $loan = getLoansWithInstallments(['l.id' => $progress['view_loan']['loan_id'], 'l.user_id' => $user->getId()], $db)[0];
         if ($loan) {
@@ -1817,7 +1817,7 @@ function createHoldingDetailText(
         $tree = markdownScape($tree);
 
         $asset_name = beautifulNumber(markdownScape($holding['asset_name']), null);
-        $holding['asset_name'] = "[$asset_name](https://ble.ir/" . BOT_ID . "?start=viewHolding_holdingId{$holding['id']}" . ($mssg_id ? "_mssgId" . $mssg_id : '') . ")" . '‏';
+        $holding['asset_name'] = "[$asset_name](https://t.me/" . BOT_ID . "?start=viewHolding_holdingId{$holding['id']}" . ($mssg_id ? "_mssgId" . $mssg_id : '') . ")" . '‏';
     }
 
     return $holding['asset_name'] . $tree . "\n";

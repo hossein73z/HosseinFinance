@@ -71,9 +71,10 @@ class User implements JsonSerializable
         return $this;
     }
 
-    public function getProgress(): ?string
+    public function getProgress(): ?array
     {
-        return $this->progress;
+        if ($this->progress) return json_decode($this->progress, true);
+        else return null;
     }
 
     public function isAdmin(): bool
@@ -112,9 +113,9 @@ class User implements JsonSerializable
         return $this;
     }
 
-    public function setProgress(?string $progress): self
+    public function setProgress(?array $progress): self
     {
-        $this->progress = $progress;
+        $this->progress = ($this->progress === null) ? null : json_encode($progress);
         return $this;
     }
 
