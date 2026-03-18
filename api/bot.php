@@ -1904,6 +1904,7 @@ function createLoansView(array $loans, ?string $mssg_id = null): string
     foreach ($loans as $loan) {
 
         $todayJ = JalaliDate::fromGregorian();
+        $due_date = $todayJ;
         $next_payment = null;
 
         $installments = &$loan['installments'];
@@ -1940,7 +1941,9 @@ function createLoansView(array $loans, ?string $mssg_id = null): string
 
         $detail = "\n‏      │  \n‏      ┤─ مبلغ وام\: " . markdownScape(beautifulNumber($loan['total_amount'])) .
             "\n‏      ┤─ تاریخ دریافت\: " . markdownScape(beautifulNumber($loan['received_date'], null));
-        if ($daysRemaining) $detail .= "\n‏      ┤─ قسط بعدی\: " . beautifulNumber($daysRemaining) . ' روز دیگر';
+        if ($daysRemaining)
+            $detail .= "\n‏      ┤─ قسط بعدی\: " . beautifulNumber($daysRemaining) . ' روز دیگر' .
+                ' (' . beautifulNumber($due_date->format(), null) . ')';
 
         $detail .= $installments_detail;
 
