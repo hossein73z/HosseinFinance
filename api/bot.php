@@ -406,10 +406,15 @@ function level_0(
 
     // Update user's level and progress
     if ($response) {
-        $db->update(
-            table: 'users',
-            data: ['last_btn' => $level_button->getId(), 'progress' => null],
-            conditions: ['id' => $user->getId()]
+        $db->update('users', ['last_btn' => $level_button->getId(), 'progress' => null], ['id' => $user->getId()]);
+        $db->upsert(
+            table: 'special_messages',
+            data: [
+                'user_id' => $user->getId(),
+                'type' => 'level_' . $level_button->getId() . '_initial',
+                'is_active' => true,
+                'message_id' => $response['result']['message_id']
+            ]
         );
     }
 
@@ -481,10 +486,15 @@ function level_1(
 
     // Update user's level and progress
     if ($response) {
-        $db->update(
-            table: 'users',
-            data: ['last_btn' => $level_button->getId(), 'progress' => null],
-            conditions: ['id' => $user->getId()]
+        $db->update('users', ['last_btn' => $level_button->getId(), 'progress' => null], ['id' => $user->getId()]);
+        $db->upsert(
+            table: 'special_messages',
+            data: [
+                'user_id' => $user->getId(),
+                'type' => 'level_' . $level_button->getId() . '_initial',
+                'is_active' => true,
+                'message_id' => $response['result']['message_id']
+            ]
         );
         // Send Informative message
         sendAllHoldings($user, $db);
@@ -775,10 +785,15 @@ function level_2(
 
     // Update user's level and progress
     if ($response) {
-        $db->update(
-            table: 'users',
-            data: ['last_btn' => $level_button->getId(), 'progress' => null],
-            conditions: ['id' => $user->getId()]
+        $db->update('users', ['last_btn' => $level_button->getId(), 'progress' => null], ['id' => $user->getId()]);
+        $db->upsert(
+            table: 'special_messages',
+            data: [
+                'user_id' => $user->getId(),
+                'type' => 'level_' . $level_button->getId() . '_initial',
+                'is_active' => true,
+                'message_id' => $response['result']['message_id']
+            ]
         );
         // Send Informative message
         sendAllLoans($user, $db);
@@ -1146,10 +1161,15 @@ function level_5(
 
     // Update user's level and progress
     if ($response) {
-        $db->update(
-            table: 'users',
-            data: ['last_btn' => $level_button->getId(), 'progress' => null],
-            conditions: ['id' => $user->getId()]
+        $db->update('users', ['last_btn' => $level_button->getId(), 'progress' => null], ['id' => $user->getId()]);
+        $db->upsert(
+            table: 'special_messages',
+            data: [
+                'user_id' => $user->getId(),
+                'type' => 'level_' . $level_button->getId() . '_initial',
+                'is_active' => true,
+                'message_id' => $response['result']['message_id']
+            ]
         );
         // Send Informative message
         sendFavorites($user, $db);
@@ -1594,10 +1614,15 @@ function level_8(
 
     // Update user's level and progress
     if ($response) {
-        $db->update(
-            table: 'users',
-            data: ['last_btn' => $level_button->getId(), 'progress' => null],
-            conditions: ['id' => $user->getId()]
+        $db->update('users', ['last_btn' => $level_button->getId(), 'progress' => null], ['id' => $user->getId()]);
+        $db->upsert(
+            table: 'special_messages',
+            data: [
+                'user_id' => $user->getId(),
+                'type' => 'level_' . $level_button->getId() . '_initial',
+                'is_active' => true,
+                'message_id' => $response['result']['message_id']
+            ]
         );
         // Send Informative message
         sendSelectBaseCurrencyMessage($user, $db);
