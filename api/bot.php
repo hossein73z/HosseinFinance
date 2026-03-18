@@ -1257,10 +1257,13 @@ function handlePricesCallback(
                 ['text' => '❌ لغو ❌', 'callback_data' => json_encode(['show_favorites' => null])]
             ]];
 
+            // Read assets excluding the ones already in user's list of favorites
             $assets = $db->query(
-                "select a.* from assets a
-                     left join favorites f on f.asset_name = a.name
-                     where a.asset_type = '$query_data[new_fav_type]' and (f.user_id is null or f.user_id!=" . $user->getId() . ")"
+                "select a.* from assets a " .
+                "left join favorites f on f.asset_name = a.name where " . // Join favorites to filter out existing ones
+                "a.asset_type = '$query_data[new_fav_type]' and" . ///////// Get assets with the received type
+                "(f.user_id is null or" . /////////////////////////////////// Include assets which are not in favorites table
+                " f.user_id!=" . $user->getId() . ")" ////////////////////// Exclude assets which are already in user's list
             )->fetchAll();
 
             if ($assets) {
