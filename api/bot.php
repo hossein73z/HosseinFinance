@@ -111,12 +111,12 @@ function handleIncomingMessage(array $message, DatabaseManager $db): void
     // Global Command Routing
     $text = $message['text'] ?? '';
 
-    // TODO: if ($text === '/start') /**/ level_0(user: $user, db: $db);
-    if ($text === '/holdings') /********/ level_1(user: $user, db: $db);
-    if ($text === '/loans') /***********/ level_2(user: $user, db: $db);
-    if ($text === '/prices') /**********/ level_5(user: $user, db: $db);
-    if ($text === '/ai') /**************/ level_6(user: $user, db: $db);
-    if ($text === '/base_currency') /***/ sendSelectBaseCurrencyMessage($user, $db);
+    if ($text === '/start') /**********/ level_0(user: $user, db: $db);
+    if ($text === '/holdings') /*******/ level_1(user: $user, db: $db);
+    if ($text === '/loans') /**********/ level_2(user: $user, db: $db);
+    if ($text === '/prices') /*********/ level_5(user: $user, db: $db);
+    if ($text === '/ai') /*************/ level_6(user: $user, db: $db);
+    if ($text === '/base_currency') /**/ sendSelectBaseCurrencyMessage($user, $db);
 
     $pressed_button = getPressedButton(text: $text, parent_btn_id: $user->getLastBtn(), admin: $user->isAdmin(), db: $db);
 
@@ -224,6 +224,7 @@ function callbackHandler(User $user, array $callback_query, DatabaseManager $db)
 {
     $message = $callback_query['message'];
 
+    if ($user->getLastBtn() == 0) level_0(user: $user, db: $db, message: $message, callback_query: $callback_query);
     if ($user->getLastBtn() == 1) level_1(user: $user, db: $db, message: $message, callback_query: $callback_query);
     if ($user->getLastBtn() == 2) level_2(user: $user, db: $db, message: $message, callback_query: $callback_query);
     if ($user->getLastBtn() == 5) level_5(user: $user, db: $db, message: $message, callback_query: $callback_query);
@@ -254,6 +255,7 @@ function specialButtonHandler(User $user, Button $pressed_button, DatabaseManage
 function normalButtonHandler(User $user, Button $pressed_button, DatabaseManager $db): void
 {
     // Route the button to corresponding level
+    if ($pressed_button->getId() == 0) level_0(user: $user, db: $db, level_button: $pressed_button);
     if ($pressed_button->getId() == 1) level_1(user: $user, db: $db, level_button: $pressed_button);
     if ($pressed_button->getId() == 2) level_2(user: $user, db: $db, level_button: $pressed_button);
     if ($pressed_button->getId() == 5) level_5(user: $user, db: $db, level_button: $pressed_button);
@@ -284,6 +286,7 @@ function normalButtonHandler(User $user, Button $pressed_button, DatabaseManager
 #[NoReturn]
 function nonButtonHandler(User $user, array $message, DatabaseManager $db): void
 {
+    if ($user->getLastBtn() == 0) level_0(user: $user, db: $db, message: $message);
     if ($user->getLastBtn() == 1) level_1(user: $user, db: $db, message: $message);
     if ($user->getLastBtn() == 2) level_2(user: $user, db: $db, message: $message);
     if ($user->getLastBtn() == 5) level_5(user: $user, db: $db, message: $message);
@@ -365,6 +368,76 @@ function cancelButton(User $user, $db): void
     backButton($user, $db);
 }
 
+// ==========================================
+//          LEVEL 0: Main Menu
+// ==========================================
+
+#[NoReturn]
+function level_0(
+    User            $user,
+    DatabaseManager $db,
+    ?Button         $level_button = null,
+    ?array          $message = null,
+    ?array          $callback_query = null): void
+{
+
+    // Initialize button object if null is given
+    $level_button = $level_button ?? Button::fromDbRow($db->read('buttons', ['id' => 0], true));
+
+    // Create keyboards
+    $keyboard = createKeyboardsArray(parent_btn_id: $level_button->getId(), admin: $user->isAdmin(), db: $db);
+
+    $data = [
+        'chat_id' => $user->getid(),
+        'text' => $level_button->getText(),
+        'reply_markup' => [
+            'keyboard' => $keyboard,
+            'resize_keyboard' => true,
+            'is_persistent' => true,
+            'input_field_placeholder' => $level_button->getText()
+        ]
+    ];
+
+    if ($callback_query) handleMainMenuCallBack($user, $callback_query, $message);
+    if ($message) handleMainMenuTextMessage($data);
+
+    // Send initial message
+    $response = sendToTelegram('sendMessage', $data);
+
+    // Update user's level and progress
+    if ($response) {
+        $db->update(
+            table: 'users',
+            data: ['last_btn' => $level_button->getId(), 'progress' => null],
+            conditions: ['id' => $user->getId()]
+        );
+    }
+
+    exit();
+}
+
+#[NoReturn]
+function handleMainMenuCallBack(User $user, array $callback_query, array $message): void
+{
+    sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
+    // $query_data = json_decode($callback_query['data'], true);
+
+    sendToTelegram('editMessageText', [
+        'chat_id' => $user->getid(),
+        'message_id' => $message['message_id'],
+        'text' => 'این پیام منقضی شده است.'
+    ]);
+    exit();
+}
+
+#[NoReturn]
+function handleMainMenuTextMessage(array $data): void
+{
+    $data['text'] = 'پیام نامفهوم است!';
+    sendToTelegram('sendMessage', $data);
+    exit();
+
+}
 
 // ==========================================
 //          LEVEL 1: HOLDINGS
@@ -1085,7 +1158,6 @@ function level_5(
     exit();
 }
 
-// TODO: make the messages fill the space horizontally
 #[NoReturn]
 function handlePricesCallback(
     User            $user,
