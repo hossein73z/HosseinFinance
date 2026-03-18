@@ -1872,49 +1872,58 @@ function createLoansView(array $loans, ?string $mssg_id = null): string
 
 function createLoanDetailText(array $loan, string $mssg_id): string
 {
-    $installments = $loan['installments'];
-    $paid_count = $overdue_count = $remaining_count = 0;
-    $paid_sum = $overdue_sum = $remaining_sum = 0;
-
+    $installments = &$loan['installments'];
     if ($installments) {
-        foreach ($installments as &$inst) {
+
+        $paid_count = $overdue_count = $remaining_count = 0;
+        $paid_sum = $overdue_sum = $remaining_sum = 0;
+
+        $installments_text = '';
+
+        foreach ($installments as $i => &$installment) {
+
+            // Create date objects
             $todayJ = JalaliDate::fromGregorian();
-            $due_date = JalaliDate::fromString($inst['due_date']);
+            $due_date = JalaliDate::fromString($installment['due_date']);
 
-            if ($inst['is_paid'] == 1) {
-                $inst['is_paid'] = "🟢";
+            // Add payment status icon and calculate status counts and sums
+            if ($installment['is_paid'] == 1) {
+                $installment['is_paid'] = "🟢";
                 $paid_count++;
-                $paid_sum += $inst['amount'];
-            } elseif ($due_date->diffInDays($todayJ) < 0 ) {
-                $inst['is_paid'] = "🔴";
+                $paid_sum += $installment['amount'];
+            } elseif ($due_date->diffInDays($todayJ) < 0) {
+                $installment['is_paid'] = "🔴";
                 $overdue_count++;
-                $overdue_sum += $inst['amount'];
+                $overdue_sum += $installment['amount'];
             } else {
-                $inst['is_paid'] = "⚪";
+                $installment['is_paid'] = "⚪";
                 $remaining_count++;
-                $remaining_sum += $inst['amount'];
+                $remaining_sum += $installment['amount'];
             }
+
+            // Create installment text
+            $num = beautifulNumber(intval($i) + 1, null);
+            $date = beautifulNumber($due_date->format(), null);
+            $amount = beautifulNumber($installment['amount']);
+            $link = "https://t.me/" . BOT_ID . "?start=toggleInstPayment_instId{$installment['id']}_mssgId$mssg_id";
+
+            $installments_text .= "\n‏    $num\) {$installment['is_paid']}  $date:  $amount    [تغییر وضعیت پرداخت]($link)";
+
         }
-        unset($inst);
-    }
 
-    $text = "‏*" . markdownScape($loan['name']) . "*:\n" .
-        "\n مبلغ وام\: " . markdownScape(beautifulNumber($loan['total_amount'])) .
-        "\n تاریخ دریافت\: " . markdownScape(beautifulNumber($loan['received_date'], null)) .
-        "\n کل بازپرداخت\: " . markdownScape(beautifulNumber(array_sum(array_column($installments, 'amount')))) .
-        "\n " . markdownScape(beautifulNumber($paid_count) . " قسط پرداخت‌شده، معادل " . beautifulNumber($paid_sum)) .
-        "\n " . markdownScape(beautifulNumber($remaining_count) . " قسط باقی‌مانده، معادل " . beautifulNumber($remaining_sum)) .
-        "\n " . markdownScape(beautifulNumber($overdue_count) . " قسط معوقه، معادل " . beautifulNumber($overdue_sum)) .
-        "\n جزئیات اقساط\: ";
+        $text = "‏*" . markdownScape($loan['name']) . "*:\n" .
+            "\n مبلغ وام\: " . markdownScape(beautifulNumber($loan['total_amount'])) .
+            "\n تاریخ دریافت\: " . markdownScape(beautifulNumber($loan['received_date'], null)) .
+            "\n کل بازپرداخت\: " . markdownScape(beautifulNumber(array_sum(array_column($installments, 'amount')))) .
+            "\n " . markdownScape(beautifulNumber($paid_count) . " قسط پرداخت‌شده، معادل " . beautifulNumber($paid_sum)) .
+            "\n " . markdownScape(beautifulNumber($remaining_count) . " قسط باقی‌مانده، معادل " . beautifulNumber($remaining_sum)) .
+            "\n " . markdownScape(beautifulNumber($overdue_count) . " قسط معوقه، معادل " . beautifulNumber($overdue_sum)) .
+            "\n جزئیات اقساط\: ";
 
-    foreach ($installments as $index => $inst) {
-        $num = beautifulNumber(intval($index) + 1, null);
-        $date = beautifulNumber($due_date->format(), null);
-        $amt = beautifulNumber($inst['amount']);
-        $link = "https://t.me/" . BOT_ID . "?start=toggleInstPayment_instId{$inst['id']}_mssgId$mssg_id";
+        $text .= $installments_text;
 
-        $text .= "\n‏    $num\) {$inst['is_paid']}  $date:  $amt    [تغییر وضعیت پرداخت]($link)";
-    }
+    } else $text = 'هیچ قسطی برای این وام ثبت نشده است!';
+
     return $text;
 }
 
