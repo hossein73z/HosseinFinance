@@ -959,7 +959,6 @@ function handleLoansTextMessage(User $user, array $data, array $message, Databas
         }
     }
 
-
     // Add '✏ ویرایش' button to the keyboard if use is viewing a loan.
     // This works with irreverent texts and wrong loan or installment id.
     $progress = json_decode($user->getProgress(), true);
@@ -1879,11 +1878,14 @@ function createLoanDetailText(array $loan, string $mssg_id): string
 
     if ($installments) {
         foreach ($installments as &$inst) {
+            $todayJ = JalaliDate::fromGregorian();
+            $due_date = JalaliDate::fromString($inst['due_date']);
+
             if ($inst['is_paid'] == 1) {
                 $inst['is_paid'] = "🟢";
                 $paid_count++;
                 $paid_sum += $inst['amount'];
-            } elseif ($inst['due_date'] < getJalaliDate()) {
+            } elseif ($due_date->diffInDays($todayJ) < 0 ) {
                 $inst['is_paid'] = "🔴";
                 $overdue_count++;
                 $overdue_sum += $inst['amount'];
@@ -1907,7 +1909,7 @@ function createLoanDetailText(array $loan, string $mssg_id): string
 
     foreach ($installments as $index => $inst) {
         $num = beautifulNumber(intval($index) + 1, null);
-        $date = beautifulNumber($inst['due_date'], null);
+        $date = beautifulNumber($due_date->format(), null);
         $amt = beautifulNumber($inst['amount']);
         $link = "https://t.me/" . BOT_ID . "?start=toggleInstPayment_instId{$inst['id']}_mssgId$mssg_id";
 
