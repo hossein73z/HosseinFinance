@@ -1831,23 +1831,32 @@ function createLoansView(array $loans, ?string $mssg_id = null): string
         $todayJ = JalaliDate::fromGregorian();
         $next_payment = null;
 
-        $installments_per_year = [];
         $installments = &$loan['installments'];
-        foreach ($installments as &$installment) {
+        if ($installments) {
+            $installments_per_year = [];
+            foreach ($installments as &$installment) {
 
-            $due_date = JalaliDate::fromString($installment['due_date']);
-            $installment['due_date'] = $due_date;
+                $due_date = JalaliDate::fromString($installment['due_date']);
+                $installment['due_date'] = $due_date;
 
-            if ($installment['is_paid'] == 1) $installments_per_year[$due_date->jy][] = "🟢";
-            else {
+                if ($installment['is_paid'] == 1) $installments_per_year[$due_date->jy][] = "🟢";
+                else {
 
-                if ($due_date->diffInDays($todayJ) >= 0 &&
-                    ($next_payment === null || $due_date->diffInDays($next_payment) <= 0)
-                ) $next_payment = $due_date;
+                    if ($due_date->diffInDays($todayJ) >= 0 &&
+                        ($next_payment === null || $due_date->diffInDays($next_payment) <= 0)
+                    ) $next_payment = $due_date;
 
-                $installments_per_year[$due_date->jy][] = ($due_date->diffInDays($todayJ) < 0) ? "🔴" : "⚪";
+                    $installments_per_year[$due_date->jy][] = ($due_date->diffInDays($todayJ) < 0) ? "🔴" : "⚪";
+                }
             }
-        }
+
+            $installments_detail = "\n‏      ┘─ وضعیت اقساط\: ";
+            foreach ($installments_per_year as $year => $year_installments) {
+                $prefix = (array_key_last($installments_per_year) != $year) ? "\n‏          ┤─ " : "\n‏          ┘─ ";
+                $installments_detail .= $prefix . beautifulNumber($year, null) . '\: ' . implode('', $year_installments);
+            }
+
+        } else $installments_detail = '';
 
         $daysRemaining = $next_payment?->diffInDays($todayJ);
 
@@ -1858,13 +1867,8 @@ function createLoansView(array $loans, ?string $mssg_id = null): string
             "\n‏      ┤─ تاریخ دریافت\: " . markdownScape(beautifulNumber($loan['received_date'], null));
         if ($daysRemaining) $detail .= "\n‏      ┤─ قسط بعدی\: " . beautifulNumber($daysRemaining) . ' روز دیگر';
 
-        if ($installments) {
-            $detail .= "\n‏      ┘─ وضعیت اقساط\: ";
-            foreach ($installments_per_year as $year => $year_installments) {
-                $prefix = (array_key_last($installments_per_year) != $year) ? "\n‏          ┤─ " : "\n‏          ┘─ ";
-                $detail .= $prefix . beautifulNumber($year, null) . '\: ' . implode('', $year_installments);
-            }
-        }
+        $detail .= $installments_detail;
+
         $text .= $loan_name . $detail . "\n";
     }
     return $text;
