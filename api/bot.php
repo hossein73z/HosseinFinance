@@ -475,7 +475,7 @@ function level_1(
         $db->update('users', ['last_btn' => $level_button->getId(), 'progress' => null], ['id' => $user->getId()]);
 
         // Send Informative message
-        sendAllHoldings($user, $db);
+        sendAllHoldings($user, $db, $response['result']['message_id']);
     }
 
     exit();
@@ -612,7 +612,7 @@ function handleHoldingsTextMessage(User $user, array $data, array $message, Data
 {
 
     // Check for supported deep-link(s)
-    $matched = preg_match('/^\/start viewHolding_holdingId(\d+)(_mssgId(\d+))?$/m', $message['text'], $matches);
+    $matched = preg_match('/^\/start viewHolding_holdingId(\d+)(_holdingsMssgId(\d+))?(_initMssgId(\d+))?$/m', $message['text'], $matches);
     if ($matched && !empty($matches[1])) {
 
         $holding_id = $matches[1];
@@ -620,9 +620,10 @@ function handleHoldingsTextMessage(User $user, array $data, array $message, Data
         $holding = getHoldingsWithAssetDetails(['h.id' => $holding_id, 'h.user_id' => $user->getId()], $db, true);
         if ($holding) {
 
-            // Delete holding and deep-link messages
-            sendToTelegram('deleteMessage', ['chat_id' => $user->getid(), 'message_id' => $matches[3]]);
-            sendToTelegram('deleteMessage', ['chat_id' => $user->getid(), 'message_id' => $message['message_id']]);
+            // Delete redundant messages
+            sendToTelegram('deleteMessage', ['chat_id' => $user->getid(), 'message_id' => $matches[5]]); ////////// // Initial
+            sendToTelegram('deleteMessage', ['chat_id' => $user->getid(), 'message_id' => $matches[3]]); ////////// // Holdings
+            sendToTelegram('deleteMessage', ['chat_id' => $user->getid(), 'message_id' => $message['message_id']]); // Deep-Link
 
             sendHoldingDetail($holding, $data, $user->getBaseCurrency());
             $db->update(
@@ -641,7 +642,7 @@ function handleHoldingsTextMessage(User $user, array $data, array $message, Data
     exit();
 }
 
-function sendAllHoldings(User $user, DatabaseManager $db): void
+function sendAllHoldings(User $user, DatabaseManager $db, int|string $initial_mssg_id = null): void
 {
     $holdings = getHoldingsWithAssetDetails(['user_id' => $user->getId()], $db);
     if ($holdings) {
@@ -658,7 +659,8 @@ function sendAllHoldings(User $user, DatabaseManager $db): void
                     markdown: 'MarkdownV2',
                     user_base_currency: $user->getBaseCurrency(),
                     attributes: ['space', 'org_amount', 'org_total_price', 'space', 'profit'],
-                    mssg_id: $temp_mssg['result']['message_id']
+                    holding_mssg_id: $temp_mssg['result']['message_id'],
+                    initial_mssg_id: $initial_mssg_id
                 );
             }
 
@@ -1829,7 +1831,8 @@ function createHoldingDetailText(
         'space',
         'profit'
     ],
-    ?string $mssg_id = null): string
+    ?string $holding_mssg_id = null,
+    ?string $initial_mssg_id = null): string
 {
     // Create tree view for each presented attribute
     $tree = '';
@@ -1898,7 +1901,7 @@ function createHoldingDetailText(
         $tree = markdownScape($tree);
 
         $asset_name = beautifulNumber(markdownScape($holding['asset_name']), null);
-        $holding['asset_name'] = "[$asset_name](https://ble.ir/" . BOT_ID . "?start=viewHolding_holdingId{$holding['id']}" . ($mssg_id ? "_mssgId" . $mssg_id : '') . ")" . '‏';
+        $holding['asset_name'] = "[$asset_name](https://ble.ir/" . BOT_ID . "?start=viewHolding_holdingId{$holding['id']}" . ($holding_mssg_id ? "_holdingsMssgId" . $holding_mssg_id : '') . ($initial_mssg_id ? "_initMssgId" . $initial_mssg_id : '') . ")" . '‏';
     }
 
     return $holding['asset_name'] . $tree . "\n";
