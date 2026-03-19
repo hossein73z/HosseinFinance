@@ -1774,8 +1774,8 @@ function createWebAppBtn(string $text, string $path, array $params = []): array
     $params['api_key'] = DB_API_SECRET;
 
     return [
-        'text' => $text,
-        'web_app' => ['url' => $url . '?' . http_build_query($params)]
+        'text' => 'WebApp: ' . $text,
+//        'web_app' => ['url' => $url . '?' . http_build_query($params)]
     ];
 }
 
@@ -1898,7 +1898,7 @@ function createHoldingDetailText(
         $tree = markdownScape($tree);
 
         $asset_name = beautifulNumber(markdownScape($holding['asset_name']), null);
-        $holding['asset_name'] = "[$asset_name](https://t.me/" . BOT_ID . "?start=viewHolding_holdingId{$holding['id']}" . ($mssg_id ? "_mssgId" . $mssg_id : '') . ")" . '‏';
+        $holding['asset_name'] = "[$asset_name](https://ble.ir/" . BOT_ID . "?start=viewHolding_holdingId{$holding['id']}" . ($mssg_id ? "_mssgId" . $mssg_id : '') . ")" . '‏';
     }
 
     return $holding['asset_name'] . $tree . "\n";
@@ -1942,7 +1942,7 @@ function createLoansView(array $loans, ?string $mssg_id = null): string
 
         $daysRemaining = $next_payment?->diffInDays($todayJ);
 
-        $deep_link = "https://t.me/" . BOT_ID . "?start=showLoan_loanId{$loan['id']}" . ($mssg_id ? "_mssgId" . $mssg_id : '');
+        $deep_link = "https://ble.ir/" . BOT_ID . "?start=showLoan_loanId{$loan['id']}" . ($mssg_id ? "_mssgId" . $mssg_id : '');
         $loan_name = "\n‏\-* [" . markdownScape(beautifulNumber($loan['name'], null)) . "]($deep_link)*";
 
         $detail = "\n‏      │  \n‏      ┤─ مبلغ وام\: " . markdownScape(beautifulNumber($loan['total_amount'])) .
@@ -1993,7 +1993,7 @@ function createLoanDetailText(array $loan, string $mssg_id): string
             $num = beautifulNumber(intval($i) + 1, null);
             $date = beautifulNumber($due_date->format(), null);
             $amount = beautifulNumber($installment['amount']);
-            $link = "https://t.me/" . BOT_ID . "?start=toggleInstPayment_instId{$installment['id']}_mssgId$mssg_id";
+            $link = "https://ble.ir/" . BOT_ID . "?start=toggleInstPayment_instId{$installment['id']}_mssgId$mssg_id";
 
             $installments_text .= "\n‏    $num\) {$installment['is_paid']}  $date:  $amount    [تغییر وضعیت پرداخت]($link)";
 
