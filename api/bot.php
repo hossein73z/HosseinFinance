@@ -767,7 +767,7 @@ function level_2(
         $db->update('users', ['last_btn' => $level_button->getId(), 'progress' => null], ['id' => $user->getId()]);
 
         // Send Informative message
-        sendAllLoans($user, $db);
+        sendAllLoans($user, $db, $response['result']['message_id']);
     }
 
     exit();
@@ -960,17 +960,18 @@ function handleLoansTextMessage(User $user, array $data, array $message, Databas
 {
 
     // Show loan detail
-    $matched = preg_match("/^\/start showLoan_loanId(\d+?)_mssgId(\d+?)$/m", $message['text'], $matches);
+    $matched = preg_match("/^\/start showLoan_loanId(\d+?)(_loansMssgId(\d+?))?(_initMssgId(\d+?))?$/m", $message['text'], $matches);
     if ($matched && !empty($matches[1])) {
 
         $loan = getLoansWithInstallments(['l.id' => $matches[1], 'l.user_id' => $user->getId()], $db)[0];
 
         if ($loan) {
-            /** else: Default Irrelevance message will be sent */
+            /** else: Send default Irrelevance message */
 
-            // Delete loans and deep-link messages
-            sendToTelegram('deleteMessage', ['chat_id' => $user->getid(), 'message_id' => $matches[2]]);
-            sendToTelegram('deleteMessage', ['chat_id' => $user->getid(), 'message_id' => $message['message_id']]);
+            // Delete redundant messages
+            sendToTelegram('deleteMessage', ['chat_id' => $user->getid(), 'message_id' => $matches[5]]); ////////// // Initial
+            sendToTelegram('deleteMessage', ['chat_id' => $user->getid(), 'message_id' => $matches[3]]); ////////// // Loans
+            sendToTelegram('deleteMessage', ['chat_id' => $user->getid(), 'message_id' => $message['message_id']]); // Deep-Link
 
             sendLoanDetail($loan, $data);
 
@@ -1046,7 +1047,7 @@ function handleLoansTextMessage(User $user, array $data, array $message, Databas
 
 }
 
-function sendAllLoans(User $user, DatabaseManager $db): void
+function sendAllLoans(User $user, DatabaseManager $db, ?string $initial_mssg_id = null): void
 {
     $loans = getLoansWithInstallments(['l.user_id' => $user->getId()], $db);
 
@@ -1057,7 +1058,7 @@ function sendAllLoans(User $user, DatabaseManager $db): void
             sendToTelegram('editMessageText', [
                 'chat_id' => $user->getid(),
                 'message_id' => $temp_mssg['result']['message_id'],
-                'text' => createLoansView($loans, $temp_mssg['result']['message_id']),
+                'text' => createLoansView($loans, $temp_mssg['result']['message_id'], $initial_mssg_id),
                 'parse_mode' => 'MarkdownV2'
             ]);
         }
@@ -1907,7 +1908,7 @@ function createHoldingDetailText(
     return $holding['asset_name'] . $tree . "\n";
 }
 
-function createLoansView(array $loans, ?string $mssg_id = null): string
+function createLoansView(array $loans, ?string $loans_mssg_id = null, ?string $initial_mssg_id = null): string
 {
     $text = 'وام‌های ثبت شده‌ی شما: ' . "\n";
     foreach ($loans as $loan) {
@@ -1945,7 +1946,7 @@ function createLoansView(array $loans, ?string $mssg_id = null): string
 
         $daysRemaining = $next_payment?->diffInDays($todayJ);
 
-        $deep_link = "https://ble.ir/" . BOT_ID . "?start=showLoan_loanId{$loan['id']}" . ($mssg_id ? "_mssgId" . $mssg_id : '');
+        $deep_link = "https://ble.ir/" . BOT_ID . "?start=showLoan_loanId{$loan['id']}" . ($loans_mssg_id ? "_loansMssgId" . $loans_mssg_id : '') . ($initial_mssg_id ? "_initMssgId" . $initial_mssg_id : '');
         $loan_name = "\n‏\-* [" . markdownScape(beautifulNumber($loan['name'], null)) . "]($deep_link)*";
 
         $detail = "\n‏      │  \n‏      ┤─ مبلغ وام\: " . markdownScape(beautifulNumber($loan['total_amount'])) .
