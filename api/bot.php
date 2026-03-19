@@ -116,6 +116,7 @@ function handleIncomingMessage(array $message, DatabaseManager $db): void
     if ($text === '/loans') /**********/ level_2(user: $user, db: $db);
     if ($text === '/prices') /*********/ level_5(user: $user, db: $db);
     if ($text === '/ai') /*************/ level_6(user: $user, db: $db);
+    if ($text === '/favorites') /******/ sendFavorites($user, $db);
     if ($text === '/base_currency') /**/ sendSelectBaseCurrencyMessage($user, $db);
 
     $matched = preg_match('/\/(.+?)_(.+?)$/u', $text, $matches);
@@ -479,7 +480,8 @@ function level_1(
         $db->update('users', ['last_btn' => $level_button->getId(), 'progress' => null], ['id' => $user->getId()]);
 
         if ($command_data) {
-            $holding = getHoldingsWithAssetDetails(['h.id' => $command_data, 'h.user_id' => $user->getId()], $db, true);
+            $asset_name = base64_decode($command_data);
+            $holding = getHoldingsWithAssetDetails(['a.name' => $asset_name, 'h.user_id' => $user->getId()], $db, true);
             sendHoldingDetail($holding, $data, $user->getBaseCurrency());
 
         } else sendAllHoldings($user, $db, $response['result']['message_id']);
@@ -716,7 +718,8 @@ function sendAllHoldings(User $user, DatabaseManager $db, int|string $initial_ms
  */
 function sendHoldingDetail(array $holding, array $data, string $user_base_currency = 'ریال'): void
 {
-    $data['text'] = '/holding_' . $holding['id'] . ' ' . $holding['asset_name'];
+    $data['text'] = '/holding_' . base64_encode($holding['asset_name']) . "\n";
+    $data['text'] .= 'جزئیات دارایی «' . $holding['asset_name'] . '»';
     array_unshift($data['reply_markup']['keyboard'], [
         createWebAppBtn('✏ ویرایش ' . beautifulNumber($holding['asset_name'], null), '/assets/add_holding.html', ['data' => base64_encode(json_encode($holding))])
     ]);
@@ -1323,7 +1326,6 @@ function handlePricesCallback(
             sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
             sendToTelegram('editMessageText', $data);
             sendFavorites($user, $db);
-            exit();
 
         // Show confirmation message for deleting a favorite
         case 'del_fav':
@@ -1359,7 +1361,6 @@ function handlePricesCallback(
             sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
             sendToTelegram('editMessageText', $data);
             sendFavorites($user, $db);
-            exit();
 
         // Start showing live price updates on the current message
         case 'set_live':
@@ -1367,7 +1368,6 @@ function handlePricesCallback(
             deleteOldActiveLiveMessage($user, $message['message_id'], $db);
             setLiveMessage($user->getId(), $query_data['set_live'], $message['message_id'], $db);
             sendFavorites($user, $db, $message['message_id']);
-            exit();
 
         // Logic for price alerts can be added here
         case 'price_alert':
@@ -1378,7 +1378,6 @@ function handlePricesCallback(
         case 'show_favorites':
             sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
             sendFavorites($user, $db, $message['message_id']);
-            exit();
 
         default:
             sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
@@ -1475,6 +1474,7 @@ function setLiveMessage(int|string $user_id, bool $activate, int|string $message
  * @param int|string|null $message_id ID of the message to be edited. If `null`, a new message is sent and immediately edited
  * @return void
  */
+#[NoReturn]
 function sendFavorites(User $user, DatabaseManager $db, int|string|null $message_id = null): void
 {
     $message_id = ($message_id !== null) ?
@@ -1495,6 +1495,7 @@ function sendFavorites(User $user, DatabaseManager $db, int|string|null $message
             'inline_keyboard' => createFavoritesInlineKeyboard($user->getId(), $message_id, $db, boolval($favorites))
         ]
     ]);
+    exit();
 }
 
 /**
