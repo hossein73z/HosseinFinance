@@ -137,19 +137,15 @@ function handleCallbackQuery(array $callback_query, DatabaseManager $db): void
     if ($user) {
         $user = User::fromDbRow($user);
 
-        $data = ['chat_id' => $user->getid(), 'message_id' => $message['message_id']];
-
         $query_data = $callback_query['data'] ? json_decode($callback_query['data'], true) : null;
         if (!$query_data) {
-            sendToTelegram('deleteMessage', $data);
+            sendToTelegram('deleteMessage', ['chat_id' => $user->getid(), 'message_id' => $message['message_id']]);
             exit();
         }
 
-        $data['text'] = '📢 خطای ناشناخته!';
         $query_key = array_key_first($query_data);
 
         // Handling not-level-based callback queries
-        // TODO: Send json decoded query data to levels`
         if ($query_key == 'set_base_currency') {
             level_8($user, $db, null, $message, $callback_query);
         }
@@ -305,7 +301,7 @@ function choosePath(
     ?array          $callback_query = null,
     DatabaseManager $db = null): void
 {
-    if ($callback_query) // TODO: Send json decoded query data to levels`
+    if ($callback_query)
         callbackHandler($user, $callback_query, $db);
     if ($pressed_button)
         if (str_starts_with($pressed_button->getId(), "s"))
