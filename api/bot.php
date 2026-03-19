@@ -118,6 +118,9 @@ function handleIncomingMessage(array $message, DatabaseManager $db): void
     if ($text === '/ai') /*************/ level_6(user: $user, db: $db);
     if ($text === '/base_currency') /**/ sendSelectBaseCurrencyMessage($user, $db);
 
+    $matched = preg_match('/\/(.+?)_(.+?)$/u', $text, $matches);
+    if ($matched && $matches[1] == 'holding') level_1(user: $user, db: $db, command_data: $matches[2]);
+
     $pressed_button = getPressedButton(text: $text, parent_btn_id: $user->getLastBtn(), admin: $user->isAdmin(), db: $db);
 
     choosePath(pressed_button: $pressed_button, message: $message, user: $user, db: $db);
@@ -440,7 +443,8 @@ function level_1(
     DatabaseManager $db,
     ?Button         $level_button = null,
     ?array          $message = null,
-    ?array          $callback_query = null): void
+    ?array          $callback_query = null,
+    ?string         $command_data = null): void
 {
 
     // Initialize button object if null is given
@@ -474,8 +478,11 @@ function level_1(
     if ($response) {
         $db->update('users', ['last_btn' => $level_button->getId(), 'progress' => null], ['id' => $user->getId()]);
 
-        // Send Informative message
-        sendAllHoldings($user, $db, $response['result']['message_id']);
+        if ($command_data) {
+            $holding = getHoldingsWithAssetDetails(['h.id' => $command_data, 'h.user_id' => $user->getId()], $db, true);
+            sendHoldingDetail($holding, $data, $user->getBaseCurrency());
+
+        } else sendAllHoldings($user, $db, $response['result']['message_id']);
     }
 
     exit();
@@ -625,7 +632,7 @@ function handleHoldingsWebAppData(User $user, array $data, array $message, Datab
 function handleHoldingsTextMessage(User $user, array $data, array $message, DatabaseManager $db): void
 {
 
-    // Check for supported deep-link(s)
+    // Show holding detail
     $matched = preg_match('/^\/start viewHolding_holdingId(\d+)(_holdingsMssgId(\d+))?(_initMssgId(\d+))?$/m', $message['text'], $matches);
     if ($matched && !empty($matches[1])) {
 
@@ -709,7 +716,7 @@ function sendAllHoldings(User $user, DatabaseManager $db, int|string $initial_ms
  */
 function sendHoldingDetail(array $holding, array $data, string $user_base_currency = 'ریال'): void
 {
-    $data['text'] = $holding['asset_name'];
+    $data['text'] = '/holding_' . $holding['id'] . ' ' . $holding['asset_name'];
     array_unshift($data['reply_markup']['keyboard'], [
         createWebAppBtn('✏ ویرایش ' . beautifulNumber($holding['asset_name'], null), '/assets/add_holding.html', ['data' => base64_encode(json_encode($holding))])
     ]);
