@@ -106,7 +106,7 @@ function validateWebhookSecurity(string $input): void
 #[NoReturn]
 function handleIncomingMessage(array $message, DatabaseManager $db): void
 {
-    $user = getOrCreateUser($message['chat'], $db);
+    $user = getOrCreateUser($message['from'], $db);
 
     // Global Command Routing
     $text = $message['text'] ?? '';
@@ -128,10 +128,11 @@ function handleIncomingMessage(array $message, DatabaseManager $db): void
  */
 function handleCallbackQuery(array $callback_query, DatabaseManager $db): void
 {
-    $message = $callback_query['message'];
+    $message = &$callback_query['message'];
+
     $user = $db->read(
         table: 'users',
-        conditions: ['id' => $message['chat']['id']],
+        conditions: ['id' => $callback_query['from']['id']],
         single: true);
 
     if ($user) {
@@ -165,11 +166,11 @@ function handleCallbackQuery(array $callback_query, DatabaseManager $db): void
 /**
  * Retrieves an existing user or registers a new one.
  */
-function getOrCreateUser(array $chat, DatabaseManager $db): User
+function getOrCreateUser(array $from, DatabaseManager $db): User
 {
     $user = $db->read(
         table: 'users',
-        conditions: ['id' => $chat['id']],
+        conditions: ['id' => $from['id']],
         single: true);
 
     if (!$user) {
@@ -179,10 +180,10 @@ function getOrCreateUser(array $chat, DatabaseManager $db): User
         $new_user_id = $db->create(
             table: 'users',
             data: [
-                'id' => $chat['id'],
-                'first_name' => $chat['first_name'] ?? 'N/A',
-                'last_name' => $chat['last_name'] ?? null,
-                'username' => $chat['username'] ?? null,
+                'id' => $from['id'],
+                'first_name' => $from['first_name'] ?? 'N/A',
+                'last_name' => $from['last_name'] ?? null,
+                'username' => $from['username'] ?? null,
                 'settings' => json_encode(['base_currency' => 'ریال']),
                 'progress' => null,
                 'is_admin' => ($admins) ? 0 : 1, // First user is admin
@@ -192,11 +193,11 @@ function getOrCreateUser(array $chat, DatabaseManager $db): User
         if ($new_user_id) {
             $user = $db->read(
                 table: 'users',
-                conditions: ['id' => $chat['id']],
+                conditions: ['id' => $from['id']],
                 single: true
             );
         } else {
-            error_log("[ERROR] Failed to create new user: " . $chat['id']);
+            error_log("[ERROR] Failed to create new user: " . $from['id']);
             exit();
         }
     }
