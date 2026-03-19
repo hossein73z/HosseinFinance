@@ -139,32 +139,19 @@ function handleCallbackQuery(array $callback_query, DatabaseManager $db): void
 
         $data = ['chat_id' => $user->getid(), 'message_id' => $message['message_id']];
 
-        $query_data = json_decode($callback_query['data'], true);
-        if (!$query_data) sendToTelegram('deleteMessage', $data);
+        $query_data = $callback_query['data'] ? json_decode($callback_query['data'], true) : null;
+        if (!$query_data) {
+            sendToTelegram('deleteMessage', $data);
+            exit();
+        }
 
         $data['text'] = '📢 خطای ناشناخته!';
         $query_key = array_key_first($query_data);
 
-        // Handling non-level-based callback queries
+        // Handling not-level-based callback queries
+        // TODO: Send json decoded query data to levels`
         if ($query_key == 'set_base_currency') {
-
-            // Change user's base currency setting
-            $user->setBaseCurrency($query_data['set_base_currency']);
-            try {
-                $db->update(
-                    table: 'users',
-                    data: ['settings' => json_encode($user->getSettings())],
-                    conditions: ['id' => $user->getId()],
-                );
-                $data['text'] = '✅ ارز پایه با موفقیت به «' . $query_data['set_base_currency'] . '» تغییر کرد';
-            } catch (Exception $e) {
-                error_log('Error changing base currency: ' . $e->getMessage());
-                $data['text'] = '❌ خطای پایگاه داده!';
-            }
-
-            sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
-            sendToTelegram('editMessageText', $data);
-            exit();
+            level_8($user, $db, null, $message, $callback_query);
         }
 
         // Handling level-based callback queries
@@ -318,7 +305,7 @@ function choosePath(
     ?array          $callback_query = null,
     DatabaseManager $db = null): void
 {
-    if ($callback_query)
+    if ($callback_query) // TODO: Send json decoded query data to levels`
         callbackHandler($user, $callback_query, $db);
     if ($pressed_button)
         if (str_starts_with($pressed_button->getId(), "s"))
@@ -1606,7 +1593,7 @@ function level_8(
         ]
     ];
 
-    if ($callback_query) handleBaseCurrencyCallback($user, $callback_query, $message);
+    if ($callback_query) handleBaseCurrencyCallback($user, $callback_query, $message, $db);
     if ($message) handleBaseCurrencyTextMessage($data);
 
     // Send initial message
@@ -1632,14 +1619,41 @@ function level_8(
 }
 
 #[NoReturn]
-function handleBaseCurrencyCallback(User $user, array $callback_query, array $message): void
+function handleBaseCurrencyCallback(User $user, array $callback_query, array $message, DatabaseManager $db): void
 {
-    sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
-    sendToTelegram('editMessageText', [
+    $data = [
         'chat_id' => $user->getid(),
         'message_id' => $message['message_id'],
-        'text' => 'این پیام منقضی شده است.'
-    ]);
+        'text' => 'این پیام منقضی شده است.'];
+
+    $query_data = $callback_query['data'] ? json_decode($callback_query['data'], true) : null;
+    if (!$query_data) {
+        sendToTelegram('deleteMessage', $data);
+        exit();
+    }
+
+    $query_key = array_key_first($query_data);
+    if ($query_key == 'set_base_currency') {
+
+        $user->setBaseCurrency($query_data['set_base_currency']);
+        try {
+            $db->update(
+                table: 'users',
+                data: ['settings' => json_encode($user->getSettings())],
+                conditions: ['id' => $user->getId()],
+            );
+            $data['text'] = '✅ ارز پایه با موفقیت به «' . $query_data['set_base_currency'] . '» تغییر کرد';
+        } catch (Exception $e) {
+            error_log('Error changing base currency: ' . $e->getMessage());
+            $data['text'] = '❌ خطای پایگاه داده!';
+        }
+
+        sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
+        sendToTelegram('editMessageText', $data);
+        exit();
+    }
+
+    sendToTelegram('editMessageText', $data);
     exit();
 }
 
