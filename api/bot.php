@@ -402,15 +402,6 @@ function level_0(
     // Update user's level and progress
     if ($response) {
         $db->update('users', ['last_btn' => $level_button->getId(), 'progress' => null], ['id' => $user->getId()]);
-        $db->upsert(
-            table: 'special_messages',
-            data: [
-                'user_id' => $user->getId(),
-                'type' => 'level_' . $level_button->getId() . '_initial',
-                'is_active' => true,
-                'message_id' => $response['result']['message_id']
-            ]
-        );
     }
 
     exit();
@@ -482,15 +473,7 @@ function level_1(
     // Update user's level and progress
     if ($response) {
         $db->update('users', ['last_btn' => $level_button->getId(), 'progress' => null], ['id' => $user->getId()]);
-        $db->upsert(
-            table: 'special_messages',
-            data: [
-                'user_id' => $user->getId(),
-                'type' => 'level_' . $level_button->getId() . '_initial',
-                'is_active' => true,
-                'message_id' => $response['result']['message_id']
-            ]
-        );
+
         // Send Informative message
         sendAllHoldings($user, $db);
     }
@@ -637,10 +620,9 @@ function handleHoldingsTextMessage(User $user, array $data, array $message, Data
         $holding = getHoldingsWithAssetDetails(['h.id' => $holding_id, 'h.user_id' => $user->getId()], $db, true);
         if ($holding) {
 
-            // Delete received deep-link message
-            sendToTelegram('deleteMessage', ['chat_id' => $user->getid(), 'message_id' => $message['message_id']]);
-            // Delete holdings' message
+            // Delete holding and deep-link messages
             sendToTelegram('deleteMessage', ['chat_id' => $user->getid(), 'message_id' => $matches[3]]);
+            sendToTelegram('deleteMessage', ['chat_id' => $user->getid(), 'message_id' => $message['message_id']]);
 
             sendHoldingDetail($holding, $data, $user->getBaseCurrency());
             $db->update(
@@ -781,15 +763,7 @@ function level_2(
     // Update user's level and progress
     if ($response) {
         $db->update('users', ['last_btn' => $level_button->getId(), 'progress' => null], ['id' => $user->getId()]);
-        $db->upsert(
-            table: 'special_messages',
-            data: [
-                'user_id' => $user->getId(),
-                'type' => 'level_' . $level_button->getId() . '_initial',
-                'is_active' => true,
-                'message_id' => $response['result']['message_id']
-            ]
-        );
+
         // Send Informative message
         sendAllLoans($user, $db);
     }
@@ -982,7 +956,6 @@ function handleLoansWebAppData(User $user, array $data, array $message, Database
 #[NoReturn]
 function handleLoansTextMessage(User $user, array $data, array $message, DatabaseManager $db): void
 {
-    sendToTelegram('deleteMessage', ['chat_id' => $user->getid(), 'message_id' => $message['message_id']]);
 
     // Show loan detail
     $matched = preg_match("/^\/start showLoan_loanId(\d+?)_mssgId(\d+?)$/m", $message['text'], $matches);
@@ -991,9 +964,11 @@ function handleLoansTextMessage(User $user, array $data, array $message, Databas
         $loan = getLoansWithInstallments(['l.id' => $matches[1], 'l.user_id' => $user->getId()], $db)[0];
 
         if ($loan) {
+            /** else: Default Irrelevance message will be sent */
 
-            // Delete loans message
+            // Delete loans and deep-link messages
             sendToTelegram('deleteMessage', ['chat_id' => $user->getid(), 'message_id' => $matches[2]]);
+            sendToTelegram('deleteMessage', ['chat_id' => $user->getid(), 'message_id' => $message['message_id']]);
 
             sendLoanDetail($loan, $data);
 
@@ -1010,6 +985,9 @@ function handleLoansTextMessage(User $user, array $data, array $message, Databas
     $matched = preg_match("/^\/start toggleInstPayment_instId(\d+?)_mssgId(\d+?)$/m", $message['text'], $matches);
     if ($matched && !empty($matches[1])) {
 
+        // Delete deep-link message
+        sendToTelegram('deleteMessage', ['chat_id' => $user->getid(), 'message_id' => $message['message_id']]);
+
         $installment = $db->read(
             table: 'installments i',
             conditions: ['i.id' => $matches[1], 'l.user_id' => $user->getId()],
@@ -1019,6 +997,8 @@ function handleLoansTextMessage(User $user, array $data, array $message, Databas
         );
 
         if ($installment) {
+            /** else: Default Irrelevance message will be sent */
+
             $db->update(
                 table: 'installments',
                 data: ['is_paid' => !$installment['is_paid']],
@@ -1041,8 +1021,10 @@ function handleLoansTextMessage(User $user, array $data, array $message, Databas
         }
     }
 
-    // Add '✏ ویرایش' button to the keyboard if use is viewing a loan.
-    // This works with irreverent texts and wrong loan or installment id.
+    /**
+     * Add '✏ ویرایش' button to the keyboard if usee is viewing a loan.
+     * This works with irreverent texts and wrong loan or installment id.
+     */
     $progress = $user->getProgress();
     if ($progress && key($progress) === 'view_loan') {
         $loan = getLoansWithInstallments(['l.id' => $progress['view_loan']['loan_id'], 'l.user_id' => $user->getId()], $db)[0];
@@ -1156,15 +1138,7 @@ function level_5(
     // Update user's level and progress
     if ($response) {
         $db->update('users', ['last_btn' => $level_button->getId(), 'progress' => null], ['id' => $user->getId()]);
-        $db->upsert(
-            table: 'special_messages',
-            data: [
-                'user_id' => $user->getId(),
-                'type' => 'level_' . $level_button->getId() . '_initial',
-                'is_active' => true,
-                'message_id' => $response['result']['message_id']
-            ]
-        );
+
         // Send Informative message
         sendFavorites($user, $db);
     }
@@ -1607,15 +1581,7 @@ function level_8(
     // Update user's level and progress
     if ($response) {
         $db->update('users', ['last_btn' => $level_button->getId(), 'progress' => null], ['id' => $user->getId()]);
-        $db->upsert(
-            table: 'special_messages',
-            data: [
-                'user_id' => $user->getId(),
-                'type' => 'level_' . $level_button->getId() . '_initial',
-                'is_active' => true,
-                'message_id' => $response['result']['message_id']
-            ]
-        );
+
         // Send Informative message
         sendSelectBaseCurrencyMessage($user, $db);
     }
