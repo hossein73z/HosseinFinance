@@ -147,13 +147,23 @@ function handleCallbackQuery(array $callback_query, DatabaseManager $db): void
         $query_data = json_decode($callback_query['data'], true);
         $query_key = array_key_first($query_data);
 
-        // Handling not-level-based callback queries
-        if ($query_key == 'set_base_currency') {
-            level_8($user, $db, null, $message, $callback_query);
+        switch ($query_key) {
+            case 'set_base_currency':
+                level_8($user, $db, null, $message, $callback_query);
+            case 'edit_fav':
+            case 'new_fav_type':
+            case 'new_fav_name':
+            case 'del_fav':
+            case 'conf_del_fav':
+            case 'set_live':
+            case 'price_alert':
+            case 'show_favorites':
+                level_5($user, $db, null, $message, $callback_query);
+
+            default:
+                choosePath(message: $message, user: $user, callback_query: $callback_query, db: $db);
         }
 
-        // Handling level-based callback queries
-        choosePath(message: $message, user: $user, callback_query: $callback_query, db: $db);
     } else {
         sendToTelegram('editMessageText', [
             'text' => 'برای استفاده از این رباط ابتدا دستور /start را ارسال کنید.',
