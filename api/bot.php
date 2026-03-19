@@ -137,12 +137,13 @@ function handleCallbackQuery(array $callback_query, DatabaseManager $db): void
     if ($user) {
         $user = User::fromDbRow($user);
 
-        $query_data = $callback_query['data'] ? json_decode($callback_query['data'], true) : null;
-        if (!$query_data) {
+        $query_data = &$callback_query['data'];
+        if ($query_data === null) {
             sendToTelegram('deleteMessage', ['chat_id' => $user->getid(), 'message_id' => $message['message_id']]);
             exit();
         }
 
+        $query_data = json_decode($callback_query['data'], true);
         $query_key = array_key_first($query_data);
 
         // Handling not-level-based callback queries
@@ -408,7 +409,7 @@ function level_0(
 function handleMainMenuCallBack(User $user, array $callback_query, array $message): void
 {
     sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
-    // $query_data = json_decode($callback_query['data'], true);
+    // $query_data = $callback_query['data'];
 
     sendToTelegram('editMessageText', [
         'chat_id' => $user->getid(),
@@ -490,7 +491,7 @@ function level_1(
 function handleHoldingsCallback(User $user, array $callback_query, array $message): void
 {
     sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
-    // $query_data = json_decode($callback_query['data'], true);
+    // $query_data = $callback_query['data'];
 
     sendToTelegram('editMessageText', [
         'chat_id' => $user->getid(),
@@ -790,8 +791,7 @@ function handleLoansCallback(User $user, array $callback_query, array $data, arr
 {
     sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
 
-    $query_data = json_decode($callback_query['data'], true);
-    if (!$query_data) exit();
+    $query_data = $callback_query['data'];
 
     $query_key = array_key_first($query_data);
     $data['message_id'] = $message['message_id'];
@@ -1175,9 +1175,7 @@ function handlePricesCallback(
         'message_id' => $message['message_id'],
     ];
 
-    $query_data = json_decode($callback_query['data'], true);
-    if (!$query_data)
-        sendToTelegram('deleteMessage', $data);
+    $query_data = $callback_query['data'];
 
     $data['text'] = '📢 خطای ناشناخته!';
 
@@ -1353,7 +1351,7 @@ function handlePricesCallback(
 
         // Logic for price alerts can be added here
         case 'price_alert':
-            sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
+            sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id'], 'text' => 'این بخش هنوز راه نیوفتاده است']);
             exit();
 
         // Show the main favorites' message
@@ -1622,11 +1620,7 @@ function handleBaseCurrencyCallback(User $user, array $callback_query, array $me
         'message_id' => $message['message_id'],
         'text' => 'این پیام منقضی شده است.'];
 
-    $query_data = $callback_query['data'] ? json_decode($callback_query['data'], true) : null;
-    if (!$query_data) {
-        sendToTelegram('deleteMessage', $data);
-        exit();
-    }
+    $query_data = $callback_query['data'];
 
     $query_key = array_key_first($query_data);
     if ($query_key == 'set_base_currency') {
