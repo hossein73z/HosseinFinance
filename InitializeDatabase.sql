@@ -34,6 +34,8 @@ VALUES ('4', '{"text": "👑 بخش مدیریت"}', 1, null, '0', '[["s0"]]');
 INSERT INTO buttons (id, attrs, admin_key, messages, belong_to, keyboards)
 VALUES ('5', '{"text": "💰 قیمت‌ها"}', 0, null, '3', '[["s2"], ["s0"]]');
 INSERT INTO buttons (id, attrs, admin_key, messages, belong_to, keyboards)
+VALUES ('5.1', '{"text": "هشدار قیمت"}', 0, null, '5', '[["s1"]]');
+INSERT INTO buttons (id, attrs, admin_key, messages, belong_to, keyboards)
 VALUES ('6', '{"text": "🤖 هوش مصنوعی"}', 0, null, '3', '[["s0"]]');
 INSERT INTO buttons (id, attrs, admin_key, messages, belong_to, keyboards)
 VALUES ('7', '{"text": "⚙ تنظیمات"}', 0, null, '0', '[["8"], ["s0"]]');
