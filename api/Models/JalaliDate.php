@@ -93,6 +93,80 @@ class JalaliDate
     }
 
     /**
+     * Add months (returns new JalaliDate object).
+     */
+    public function addMonths(int $months): self
+    {
+        $newYear = $this->jy + intdiv($months, 12);
+        $newMonth = $this->jm + ($months % 12);
+
+        if ($newMonth > 12) {
+            $newMonth -= 12;
+            $newYear++;
+        } elseif ($newMonth < 1) {
+            $newMonth += 12;
+            $newYear--;
+        }
+
+        // Number of days in this month
+        $daysInMonth = $this->getJalaliMonthLength($newYear, $newMonth);
+        $newDay = min($this->jd, $daysInMonth);
+
+        return new self($newYear, $newMonth, $newDay);
+    }
+
+    /**
+     * Subtract months (returns new JalaliDate object).
+     */
+    public function subMonths(int $months): self
+    {
+        return $this->addMonths(-$months);
+    }
+
+    /**
+     * Add years (returns new JalaliDate object).
+     */
+    public function addYears(int $years): self
+    {
+        $newYear = $this->jy + $years;
+        $daysInMonth = $this->getJalaliMonthLength($newYear, $this->jm);
+        $newDay = min($this->jd, $daysInMonth);
+
+        return new self($newYear, $this->jm, $newDay);
+    }
+
+    /**
+     * Subtract years (returns new JalaliDate object).
+     */
+    public function subYears(int $years): self
+    {
+        return $this->addYears(-$years);
+    }
+
+    /**
+     * Internal helper: get number of days in a Jalali month.
+     */
+    private function getJalaliMonthLength(int $jy, int $jm): int
+    {
+        if ($jm <= 6) return 31;
+        if ($jm <= 11) return 30;
+
+        // Esfand: 29 or leap year 30
+        return $this->isJalaliLeap($jy) ? 30 : 29;
+    }
+
+    /**
+     * Jalali leap year check.
+     * Accurate algorithm based on 33-year cycles.
+     */
+    private function isJalaliLeap(int $year): bool
+    {
+        $mod = ($year - 474) % 2820;
+        $mod = $mod < 0 ? $mod + 2820 : $mod;
+        return ((($mod + 474 + 38) * 682) % 2816) < 682;
+    }
+
+    /**
      * Days difference between two JalaliDate objects.
      */
     public function diffInDays(JalaliDate $other): int
