@@ -115,7 +115,7 @@ class User implements JsonSerializable
 
     public function setProgress(?array $progress): self
     {
-        $this->progress = ($this->progress === null) ? null : json_encode($progress);
+        $this->progress = ($progress === null) ? null : json_encode($progress);
         return $this;
     }
 
