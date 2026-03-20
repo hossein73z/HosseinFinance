@@ -1,6 +1,12 @@
 <?php
+
+use JetBrains\PhpStorm\NoReturn;
+
 require_once __DIR__ . '/../Libraries/DatabaseManager.php';
 require_once __DIR__ . '/../Functions/ExternalEndpointsFunctions.php';
+require_once __DIR__ . '/../Functions/StringHelper.php';
+require_once __DIR__ . '/../Functions/MessageFunctions.php';
+require_once __DIR__ . '/../Models/User.php';
 
 // --- CONFIGURATION ---
 define('PRICE_BOT_TOKEN', getenv('PRICE_BOT_TOKEN'));
@@ -151,6 +157,7 @@ if (preg_match_all('/\|[  ].*? ((\d\d?) (.*?) (\d\d\d\d)) -[  ](\d\d:\d\d)/ums
  * @return void
  * @throws Exception
  */
+#[NoReturn]
 function addPriceToDatabase(array $new_assets, string $asset_type, string $date, string $time): void
 {
     $db = DatabaseManager::getInstance(
@@ -186,12 +193,49 @@ function addPriceToDatabase(array $new_assets, string $asset_type, string $date,
 
     $db->upsertBatch('assets', $assets);
 
-    // Call listener with new prices
-    stream_request(
-        url: getenv('LISTENER_ENDPOINT') . '?secret=' . getenv('LISTENER_SECRET'),
-        method: 'PUT',
-        data: $assets
-    );
+    updateLiveMessages($assets, $db);
+}
 
-    $db->upsertBatch('assets', $assets);
+#[NoReturn]
+function updateLiveMessages(array $new_assets, DatabaseManager $db): void
+{
+    $asset_names = array_column($new_assets, 'name');
+
+    /* Find users with both these conditions:
+        - At least one of the new assets in their favorites.
+        - Active live favorite message.
+    */
+    $users = $db->query("
+        select
+            u.*,
+            sp.message_id as live_message_id,
+            concat('[',
+                group_concat(distinct json_object(
+                    'fav_id', f2.id,
+                    'id', a.id,
+                    'name', a.name,
+                    'emoji', a.emoji,
+                    'asset_type', a.asset_type,
+                    'price', a.price,
+                    'base_currency', a.base_currency,
+                    'date', a.date,
+                    'time', a.time
+                )),
+            ']') as fav_assets
+        from users u
+            join favorites f1 on u.id = f1.user_id
+            join favorites f2 on u.id = f2.user_id
+            join special_messages sp on u.id = sp.user_id
+            join assets a on f2.asset_name = a.name
+        where sp.is_active = 1 and f1.asset_name in ('" . implode("','", $asset_names) . "')
+        group by f2.user_id, sp.message_id;
+        ")->fetchAll();
+
+    foreach ($users as &$user) {
+        $user['fav_assets'] = json_decode($user['fav_assets'], true);
+
+        sendFavorites(User::fromDbRow($user), $db, $user['live_message_id']);
+    }
+
+    echo 'Done!';
 }
