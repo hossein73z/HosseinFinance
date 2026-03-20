@@ -121,6 +121,7 @@ function handleIncomingMessage(array $message, DatabaseManager $db): void
 
     $matched = preg_match('/\/(.+?)_(.+?)$/u', $text, $matches);
     if ($matched && $matches[1] == 'holding') level_1(user: $user, db: $db, command_data: $matches[2]);
+    if ($matched && $matches[1] == 'loan') level_2(user: $user, db: $db, command_data: $matches[2]);
 
     $pressed_button = getPressedButton(text: $text, parent_btn_id: $user->getLastBtn(), admin: $user->isAdmin(), db: $db);
 
@@ -480,8 +481,7 @@ function level_1(
         $db->update('users', ['last_btn' => $level_button->getId(), 'progress' => null], ['id' => $user->getId()]);
 
         if ($command_data) {
-            $asset_name = base64_decode($command_data);
-            $holding = getHoldingsWithAssetDetails(['a.name' => $asset_name, 'h.user_id' => $user->getId()], $db, true);
+            $holding = getHoldingsWithAssetDetails(['h.id' => $command_data, 'h.user_id' => $user->getId()], $db, true);
             sendHoldingDetail($holding, $data, $user->getBaseCurrency());
 
         } else sendAllHoldings($user, $db, $response['result']['message_id']);
@@ -718,7 +718,7 @@ function sendAllHoldings(User $user, DatabaseManager $db, int|string $initial_ms
  */
 function sendHoldingDetail(array $holding, array $data, string $user_base_currency = 'ریال'): void
 {
-    $data['text'] = '/holding_' . base64_encode($holding['asset_name']) . "\n";
+    $data['text'] = "/holding_$holding[id]\n";
     $data['text'] .= 'جزئیات دارایی «' . $holding['asset_name'] . '»';
     array_unshift($data['reply_markup']['keyboard'], [
         createWebAppBtn('✏ ویرایش ' . beautifulNumber($holding['asset_name'], null), '/assets/add_holding.html', ['data' => base64_encode(json_encode($holding))])
@@ -768,8 +768,8 @@ function level_2(
     DatabaseManager $db,
     ?Button         $level_button = null,
     ?array          $message = null,
-    ?array          $callback_query = null
-): void
+    ?array          $callback_query = null,
+    ?string         $command_data = null): void
 {
     // Initialize button object if null is given
     $level_button = $level_button ?? Button::fromDbRow($db->read('buttons', ['id' => 2], true));
@@ -801,9 +801,11 @@ function level_2(
     // Update user's level and progress
     if ($response) {
         $db->update('users', ['last_btn' => $level_button->getId(), 'progress' => null], ['id' => $user->getId()]);
+        if ($command_data) {
+            $loans = getLoansWithInstallments(['l.id' => $command_data, 'l.user_id' => $user->getId()], $db);
+            sendLoanDetail($loans[0], $data);
 
-        // Send Informative message
-        sendAllLoans($user, $db, $response['result']['message_id']);
+        } else sendAllLoans($user, $db, $response['result']['message_id']);
     }
 
     exit();
@@ -998,9 +1000,9 @@ function handleLoansTextMessage(User $user, array $data, array $message, Databas
     $matched = preg_match("/^\/start showLoan_loanId(\d+?)(_loansMssgId(\d+?))?(_initMssgId(\d+?))?$/m", $message['text'], $matches);
     if ($matched && !empty($matches[1])) {
 
-        $loan = getLoansWithInstallments(['l.id' => $matches[1], 'l.user_id' => $user->getId()], $db)[0];
+        $loans = getLoansWithInstallments(['l.id' => $matches[1], 'l.user_id' => $user->getId()], $db);
 
-        if ($loan) {
+        if ($loans) {
             /** else: Send default Irrelevance message */
 
             // Delete redundant messages
@@ -1008,11 +1010,11 @@ function handleLoansTextMessage(User $user, array $data, array $message, Databas
             sendToTelegram('deleteMessage', ['chat_id' => $user->getid(), 'message_id' => $matches[3]]); ////////// // Loans
             sendToTelegram('deleteMessage', ['chat_id' => $user->getid(), 'message_id' => $message['message_id']]); // Deep-Link
 
-            sendLoanDetail($loan, $data);
+            sendLoanDetail($loans[0], $data);
 
             $db->update(
                 table: 'users',
-                data: ['progress' => json_encode(['view_loan' => ['loan_id' => $loan['id']]])],
+                data: ['progress' => json_encode(['view_loan' => ['loan_id' => $loans['id']]])],
                 conditions: ['id' => $user->getId()]
             );
             exit();
@@ -1107,7 +1109,8 @@ function sendAllLoans(User $user, DatabaseManager $db, ?string $initial_mssg_id 
 function sendLoanDetail(array $loan, array $data): void
 {
 
-    $data['text'] = 'جزئیات وام «' . $loan['name'] . '»';
+    $data['text'] = "/loan_$loan[id]\n";
+    $data['text'] .= 'جزئیات وام «' . $loan['name'] . '»';
     array_unshift($data['reply_markup']['keyboard'], [createWebAppBtn('✏ ویرایش وام «' . $loan['name'] . '»', '/assets/add_loan.html', ['data' => base64_encode(json_encode($loan))])]);
 
     sendToTelegram('sendMessage', $data);
