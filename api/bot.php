@@ -111,6 +111,7 @@ function handleIncomingMessage(array $message, DatabaseManager $db): void
     // Global Command Routing
     $text = $message['text'] ?? '';
 
+    // Levels' Main Commands
     if ($text === '/start') /**********/ level_0(user: $user, db: $db);
     if ($text === '/holdings') /*******/ level_1(user: $user, db: $db);
     if ($text === '/loans') /**********/ level_2(user: $user, db: $db);
@@ -119,7 +120,8 @@ function handleIncomingMessage(array $message, DatabaseManager $db): void
     if ($text === '/favorites') /******/ sendFavorites($user, $db);
     if ($text === '/base_currency') /**/ sendSelectBaseCurrencyMessage($user, $db);
 
-    $matched = preg_match('/\/(.+?)_(.+?)$/u', $text, $matches);
+    // Levels' Sub Commands
+    $matched = preg_match('/\/(.+?)_(\d+?)$/u', $text, $matches);
     if ($matched && $matches[1] == 'holding') level_1(user: $user, db: $db, command_data: $matches[2]);
     if ($matched && $matches[1] == 'loan') level_2(user: $user, db: $db, command_data: $matches[2]);
 
@@ -482,7 +484,8 @@ function level_1(
 
         if ($command_data) {
             $holding = getHoldingsWithAssetDetails(['h.id' => $command_data, 'h.user_id' => $user->getId()], $db, true);
-            sendHoldingDetail($holding, $data, $user->getBaseCurrency());
+            if ($holding) sendHoldingDetail($holding, $data, $user->getBaseCurrency());
+            else sendAllHoldings($user, $db, $response['result']['message_id']);
 
         } else sendAllHoldings($user, $db, $response['result']['message_id']);
     }
@@ -803,7 +806,8 @@ function level_2(
         $db->update('users', ['last_btn' => $level_button->getId(), 'progress' => null], ['id' => $user->getId()]);
         if ($command_data) {
             $loans = getLoansWithInstallments(['l.id' => $command_data, 'l.user_id' => $user->getId()], $db);
-            sendLoanDetail($loans[0], $data);
+            if ($loans) sendLoanDetail($loans[0], $data);
+            else sendAllLoans($user, $db, $response['result']['message_id']);
 
         } else sendAllLoans($user, $db, $response['result']['message_id']);
     }
