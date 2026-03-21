@@ -191,9 +191,91 @@ function addPriceToDatabase(array $new_assets, string $asset_type, string $date,
         }
     }
 
+    sendPriceAlerts($assets, $db);
+
     $db->upsertBatch('assets', $assets);
 
     updateLiveMessages($assets, $db);
+}
+
+/**
+ * Finds related, active alerts.
+ * Returns an array of alerts, each with these keys:
+ *     id, user_id, asset_name, target_price, trigger_type,
+ *     asset_type, current_price, base_currency, new_price
+ */
+function getRelatedAlerts(array $assets, DatabaseManager $db): array|bool
+{
+    $asset_names = array_column($assets, 'name');
+
+    $alerts = $db->query("
+        select
+            alerts.id,
+            alerts.user_id,
+            alerts.asset_name,
+            alerts.target_price,
+            alerts.trigger_type,
+            alerts.is_active,
+            assets.asset_type,
+            assets.price as current_price,
+            assets.base_currency
+        from alerts
+            join assets on alerts.asset_name=assets.name
+        where
+            alerts.asset_name in ('" . implode("','", $asset_names) . "') and
+            alerts.is_active is true
+    ;")->fetchAll();
+
+    return filterTriggeredAlerts($alerts, $assets);
+}
+
+/**
+ * Removes not-triggered alert based on old and new prices
+ * and adds 'new_price' key-value to each alert.
+ */
+function filterTriggeredAlerts(array $alerts, array $assets): array|bool
+{
+    $asset_names = array_column($assets, 'name');
+
+    if ($alerts) foreach ($alerts as $i => &$alert) {
+
+        $asset_index = array_search($alert['asset_name'], $asset_names);
+        if ($asset_index !== false) {
+
+            $new_price = $assets[$asset_index]['price'];
+            $old_price = $alert['current_price'];
+
+            // Unset alert if target price is not between new and old prices
+            if (max($old_price, $new_price) <= $alert['target_price'] ||
+                min($old_price, $new_price) >= $alert['target_price']) {
+                unset($alerts[$i]);
+                continue;
+            }
+
+            $alert['new_price'] = $new_price;
+        }
+    }
+    return $alerts;
+}
+
+/**
+ * Finds triggered alerts and sends notifications to users
+ */
+function sendPriceAlerts(array $assets, DatabaseManager $db): void
+{
+    if ($assets) {
+
+        $alerts = getRelatedAlerts($assets, $db);
+        foreach ($alerts as $alert) {
+            $data = [
+                'chat_id' => $alert['user_id'],
+                'text' => 'هشدار قیمت برای «' . beautifulNumber($alert['asset_name'], null) . '» فعال شد.' .
+                    "\n" . 'قیمت هشدار: ' . beautifulNumber($alert['target_price']) .
+                    "\n" . 'قیمت کنونی: ' . beautifulNumber($alert['new_price']),
+            ];
+            sendToTelegram('sendMessage', $data);
+        }
+    }
 }
 
 #[NoReturn]
@@ -202,8 +284,8 @@ function updateLiveMessages(array $new_assets, DatabaseManager $db): void
     $asset_names = array_column($new_assets, 'name');
 
     /* Find users with both these conditions:
-        - At least one of the new assets in their favorites.
-        - Active live favorite message.
+     *     - At least one of the new assets in their favorites.
+     *     - Active live favorite message.
     */
     $users = $db->query("
         select
@@ -236,6 +318,4 @@ function updateLiveMessages(array $new_assets, DatabaseManager $db): void
 
         sendFavorites(User::fromDbRow($user), $db, $user['live_message_id']);
     }
-
-    echo 'Done!';
 }
