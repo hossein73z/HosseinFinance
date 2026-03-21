@@ -273,31 +273,15 @@ function sendPriceAlerts(array $assets, DatabaseManager $db): void
                     "\n" . 'قیمت هشدار: ' . beautifulNumber($alert['target_price']) .
                     "\n" . 'قیمت کنونی: ' . beautifulNumber($alert['new_price']),
             ];
-            sendToTelegram('sendMessage', $data);
+            $response = sendToTelegram('sendMessage', $data);
+            if ($response) $db->update('alerts', ['is_active' => false], ['id' => $alert['id']]);
         }
     }
 }
 
-#[NoReturn]
-function updateLiveMessages(array $new_assets, DatabaseManager $db): void
-{
-    $users = getUsersWithLiveMessage($new_assets, $db);
-    if ($users) foreach ($users as &$user) {
-        if (!$user['fav_assets']) continue;
-        $user['fav_assets'] = json_decode($user['fav_assets'], true);
-        sendFavorites(User::fromDbRow($user), $db, $user['live_message_id']);
-        /*
-         * TODO: With telegram, test with deleted message and deleted user
-         * On deleted message, inactivate or delete the live message.
-         * On deleted chat, remove the user from the database completely.
-         */
-
-    }
-}
-
 /** Finds users with both these conditions:
- *     - At least one of the asset names in their favorites.
- *     - Active live favorite message.
+ *    - At least one of the asset names in their favorites.
+ *    - Active live favorite message.
  */
 function getUsersWithLiveMessage(array $assets, DatabaseManager $db): array
 {
@@ -329,3 +313,22 @@ function getUsersWithLiveMessage(array $assets, DatabaseManager $db): array
         group by f2.user_id, sp.message_id;
         ")->fetchAll();
 }
+
+#[NoReturn]
+function updateLiveMessages(array $new_assets, DatabaseManager $db): void
+{
+    $users = getUsersWithLiveMessage($new_assets, $db);
+    if ($users) foreach ($users as &$user) {
+        if (!$user['fav_assets']) continue;
+        $user['fav_assets'] = json_decode($user['fav_assets'], true);
+        sendFavorites(User::fromDbRow($user), $db, $user['live_message_id']);
+        /*
+         * TODO
+         *  With telegram, test with deleted message and deleted user
+         *  NOTE: On deleted message, inactivate or delete the live message.
+         *  NOTE: On deleted chat, remove the user from the database completely.
+         */
+
+    }
+}
+
