@@ -281,13 +281,29 @@ function sendPriceAlerts(array $assets, DatabaseManager $db): void
 #[NoReturn]
 function updateLiveMessages(array $new_assets, DatabaseManager $db): void
 {
-    $asset_names = array_column($new_assets, 'name');
+    $users = getUsersWithLiveMessage($new_assets, $db);
+    if ($users) foreach ($users as &$user) {
+        if (!$user['fav_assets']) continue;
+        $user['fav_assets'] = json_decode($user['fav_assets'], true);
+        sendFavorites(User::fromDbRow($user), $db, $user['live_message_id']);
+        /*
+         * TODO: With telegram, test with deleted message and deleted user
+         * On deleted message, inactivate or delete the live message.
+         * On deleted chat, remove the user from the database completely.
+         */
 
-    /* Find users with both these conditions:
-     *     - At least one of the new assets in their favorites.
-     *     - Active live favorite message.
-    */
-    $users = $db->query("
+    }
+}
+
+/** Finds users with both these conditions:
+ *     - At least one of the asset names in their favorites.
+ *     - Active live favorite message.
+ */
+function getUsersWithLiveMessage(array $assets, DatabaseManager $db): array
+{
+    $asset_names = array_column($assets, 'name');
+
+    return $db->query("
         select
             u.*,
             sp.message_id as live_message_id,
@@ -312,10 +328,4 @@ function updateLiveMessages(array $new_assets, DatabaseManager $db): void
         where sp.is_active = 1 and f1.asset_name in ('" . implode("','", $asset_names) . "')
         group by f2.user_id, sp.message_id;
         ")->fetchAll();
-
-    foreach ($users as &$user) {
-        $user['fav_assets'] = json_decode($user['fav_assets'], true);
-
-        sendFavorites(User::fromDbRow($user), $db, $user['live_message_id']);
-    }
 }
