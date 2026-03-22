@@ -1814,6 +1814,8 @@ function handleAlertsCallback(User $user, array $callback_query, array $message,
 
     $query_key = array_key_first($query_data);
     switch ($query_key) {
+
+        // Add or remove alerts
         case 'mng_alerts':
 
             $action = $query_data[$query_key];
@@ -1853,7 +1855,38 @@ function handleAlertsCallback(User $user, array $callback_query, array $message,
             sendToTelegram('editMessageText', $data);
             exit();
 
+        // Show list of asset to select for new alert
+        case 'new_alert_type':
+            $data['reply_markup']['inline_keyboard'] = [[
+                ['text' => '🔙 برگشت 🔙', 'callback_data' => json_encode(['mng_alerts' => 'add_alert'])],
+                ['text' => '❌ لغو ❌', 'callback_data' => json_encode(['show_alerts' => null])]
+            ]];
+
+            // Read assets excluding the ones already in user's list of favorites
+            $assets = $db->query(
+                "select a.* from assets a " .
+                "left join alerts al on al.asset_name = a.name where " . // Join alers to filter out existing ones
+                "a.asset_type = '$query_data[$query_key]' and" . //////// Get assets with the received type
+                "(al.user_id is null or" . //////////////////////////////// Include assets which are not in alerts table
+                " al.user_id!=" . $user->getId() . ")" //////////////////// Exclude assets that user already has an alert for
+            )->fetchAll();
+
+            if ($assets) {
+                $data['text'] = 'گزینه‌ی مد نظر خود را از لیست زیر انتخاب کنید:';
+
+                foreach ($assets as $asset) array_unshift(
+                    $data['reply_markup']['inline_keyboard'],
+                    [['text' => beautifulNumber($asset['name'], null), 'callback_data' => json_encode(['new_alert_name' => $asset['name']])]]
+                );
+
+            } else $data['text'] = 'دسته‌بندی مورد نظر خالی‌ست!';
+
+            sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
+            sendToTelegram('editMessageText', $data);
+            exit();
+
         case 'show_alerts':
+            sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
             sendAlerts($user, $db, $message['message_id']);
             exit();
     }
