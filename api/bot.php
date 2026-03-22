@@ -1750,6 +1750,92 @@ function sendSelectBaseCurrencyMessage(User $user, DatabaseManager $db): void
 
 
 // ==========================================
+//          LEVEL 9: Alerts
+// ==========================================
+
+#[NoReturn]
+function level_9(
+    User            $user,
+    DatabaseManager $db,
+    ?Button         $level_button = null,
+    ?array          $message = null,
+    ?array          $callback_query = null
+): void
+{
+    // Initialize button object if null is given
+    $level_button = $level_button ?? Button::fromDbRow($db->read('buttons', ['id' => 9], true));
+
+    // Create keyboards
+    $keyboard = createKeyboardsArray(parent_btn_id: $level_button->getId(), admin: $user->isAdmin(), db: $db);
+
+    $data = [
+        'chat_id' => $user->getid(),
+        'text' => $level_button->getText(),
+        'reply_markup' => [
+            'keyboard' => $keyboard,
+            'resize_keyboard' => true,
+            'is_persistent' => true,
+            'input_field_placeholder' => $level_button->getText()
+        ]
+    ];
+
+    if ($callback_query) handleAlertsCallback($user/*, $callback_query*/, $message/*, $db*/);
+    if ($message) handleAlertsTextMessage($data);
+
+    // Send initial message
+    $response = sendToTelegram('sendMessage', $data);
+
+    // Update user's level and progress
+    if ($response) {
+        $db->update('users', ['last_btn' => $level_button->getId(), 'progress' => null], ['id' => $user->getId()]);
+
+        // Send Informative message
+        sendAlerts($user, $db);
+    }
+
+    exit();
+}
+
+#[NoReturn]
+function handleAlertsCallback(User $user/*, array $callback_query*/, array $message/*, DatabaseManager $db*/): void
+{
+    $data = [
+        'chat_id' => $user->getid(),
+        'message_id' => $message['message_id'],
+        'text' => 'این پیام منقضی شده است.'];
+
+//    $query_data = $callback_query['data'];
+
+//    $query_key = array_key_first($query_data);
+
+    sendToTelegram('editMessageText', $data);
+    exit();
+}
+
+#[NoReturn]
+function handleAlertsTextMessage(array $data): void
+{
+    // Send default message of this level
+    $data['text'] = 'پیام نامفهوم است!';
+    sendToTelegram('sendMessage', $data);
+    exit();
+
+}
+
+#[NoReturn]
+function sendAlerts(User $user, DatabaseManager $db): void
+{
+    $alerts = $db->read(
+        table: 'alerts',
+        conditions: ['alerts.user_id' => $user->getId()],
+        join: 'assets on assets.name = alerts.asset_name',
+    );
+
+    exit(json_encode($alerts));
+}
+
+
+// ==========================================
 //          DATA HANDLING & UI HELPERS
 // ==========================================
 

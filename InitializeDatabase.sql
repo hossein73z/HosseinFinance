@@ -21,32 +21,22 @@ CREATE TABLE IF NOT EXISTS `buttons`
     belong_to VARCHAR(36)      DEFAULT NULL,
     keyboards TEXT             DEFAULT NULL
 ) DEFAULT CHARSET = utf8mb4;
-INSERT INTO buttons (id, attrs, admin_key, messages, belong_to, keyboards)
-VALUES ('0', '{"text": "🏠 صفحه اصلی"}', 0, null, null, '[["1", "2"], ["3"], ["4", "7"]]');
-INSERT INTO buttons (id, attrs, admin_key, messages, belong_to, keyboards)
-VALUES ('1', '{"text": "💼 دارایی‌ها"}', 0, null, '0', '[["s0"]]');
-INSERT INTO buttons (id, attrs, admin_key, messages, belong_to, keyboards)
-VALUES ('2', '{"text": "🏦 وام و اقساط"}', 0, null, '0', '[["s0"]]');
-INSERT INTO buttons (id, attrs, admin_key, messages, belong_to, keyboards)
-VALUES ('3', '{"text": "🛠 ابزارها"}', 0, null, '0', '[["5"], ["6"], ["s0"]]');
-INSERT INTO buttons (id, attrs, admin_key, messages, belong_to, keyboards)
-VALUES ('4', '{"text": "👑 بخش مدیریت"}', 1, null, '0', '[["s0"]]');
-INSERT INTO buttons (id, attrs, admin_key, messages, belong_to, keyboards)
-VALUES ('5', '{"text": "💰 قیمت‌ها"}', 0, null, '3', '[["s2"], ["s0"]]');
-INSERT INTO buttons (id, attrs, admin_key, messages, belong_to, keyboards)
-VALUES ('5.1', '{"text": "هشدار قیمت"}', 0, null, '5', '[["s1"]]');
-INSERT INTO buttons (id, attrs, admin_key, messages, belong_to, keyboards)
-VALUES ('6', '{"text": "🤖 هوش مصنوعی"}', 0, null, '3', '[["s0"]]');
-INSERT INTO buttons (id, attrs, admin_key, messages, belong_to, keyboards)
-VALUES ('7', '{"text": "⚙ تنظیمات"}', 0, null, '0', '[["8"], ["s0"]]');
-INSERT INTO buttons (id, attrs, admin_key, messages, belong_to, keyboards)
-VALUES ('8', '{"text": "💲 ارز پایه"}', 0, null, '7', '[["s0"]]');
-INSERT INTO buttons (id, attrs, admin_key, messages, belong_to, keyboards)
-VALUES ('s0', '{"text": "🔙 برگشت 🔙"}', 0, null, null, null);
-INSERT INTO buttons (id, attrs, admin_key, messages, belong_to, keyboards)
-VALUES ('s1', '{"text": "❌ لغو ❌"}', 0, null, null, null);
-INSERT INTO buttons (id, attrs, admin_key, messages, belong_to, keyboards)
-VALUES ('s2', '{"text": "❤ علاقه‌مندی‌ها ❤"}', 0, null, null, null);
+INSERT INTO `buttons` (`id`, `attrs`, `admin_key`, `messages`, `belong_to`, `keyboards`)
+VALUES ('0', '{\"text\": \"🏠 صفحه اصلی\"}', 0, NULL, NULL, '[[\"1\", \"2\"], [\"3\"], [\"4\", \"7\"]]'),
+       ('1', '{\"text\": \"💼 دارایی‌ها\"}', 0, NULL, '0', '[[\"s0\"]]'),
+       ('2', '{\"text\": \"🏦 وام و اقساط\"}', 0, NULL, '0', '[[\"s0\"]]'),
+       ('3', '{\"text\": \"🛠 ابزارها\"}', 0, NULL, '0', '[[\"5\", \"9\"], [\"6\"], [\"s0\"]]'),
+       ('4', '{\"text\": \"👑 بخش مدیریت\"}', 1, NULL, '0', '[[\"s0\"]]'),
+       ('5', '{\"text\": \"💰 قیمت‌ها\"}', 0, NULL, '3', '[[\"s2\"], [\"s0\"]]'),
+       ('5.1', '{\"text\": \"هشدار قیمت\"}', 0, NULL, '5', '[[\"s1\"]]'),
+       ('6', '{\"text\": \"🤖 هوش مصنوعی\"}', 0, NULL, '3', '[[\"s0\"]]'),
+       ('7', '{\"text\": \"⚙ تنظیمات\"}', 0, NULL, '0', '[[\"8\"], [\"s0\"]]'),
+       ('8', '{\"text\": \"💲 ارز پایه\"}', 0, NULL, '7', '[[\"s0\"]]'),
+       ('9', '{\"text\": \"🔔 هشدارها\"}', 0, NULL, '3', '[[\"s0\"]]'),
+       ('s0', '{\"text\": \"🔙 برگشت 🔙\"}', 0, NULL, NULL, NULL),
+       ('s1', '{\"text\": \"❌ لغو ❌\"}', 0, NULL, NULL, NULL),
+       ('s2', '{\"text\": \"❤ علاقه‌مندی‌ها ❤\"}', 0, NULL, NULL, NULL);
+
 
 CREATE TABLE IF NOT EXISTS `assets`
 (
