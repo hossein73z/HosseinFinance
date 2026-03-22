@@ -1816,14 +1816,37 @@ function handleAlertsCallback(User $user, array $callback_query, array $message,
     switch ($query_key) {
         case 'mng_alerts':
 
+            $action = $query_data[$query_key];
             // Show alert management menu
-            if ($query_data[$query_key] == null) {
+            if ($action == null) {
                 $data['text'] = 'عملیات مورد نظر را انتخاب کنید:';
                 $data['reply_markup'] = ['inline_keyboard' => [
                     [['text' => 'افزودن هشدار', 'callback_data' => json_encode(['mng_alerts' => 'add_alert'])]],
                     [['text' => 'حذف هشدار', 'callback_data' => json_encode(['mng_alerts' => 'remove_alert'])]],
                     [['text' => '🔙 برگشت 🔙', 'callback_data' => json_encode(['show_alerts' => null])]],
                 ]];
+            }
+
+            // Show list of asset types to select for new alert
+            if ($action == 'add_alert') {
+                $asset_types = $db->read('assets', selectColumns: 'asset_type', distinct: true);
+
+                if ($asset_types) {
+                    $data['text'] = 'یکی از دسته‌بندی‌های زیر را انتخاب کنید:';
+                    $data['reply_markup']['inline_keyboard'] = [[
+                        ['text' => '🔙 برگشت 🔙', 'callback_data' => json_encode(['mng_alerts' => null])],
+                        ['text' => '❌ لغو ❌', 'callback_data' => json_encode(['show_alerts' => null])]
+                    ]];
+
+                    $asset_types = array_column($asset_types, 'asset_type');
+                    foreach ($asset_types as $asset_type) array_unshift(
+                        $data['reply_markup']['inline_keyboard'],
+                        [['text' => beautifulNumber($asset_type, null), 'callback_data' => json_encode(['new_alert_type' => $asset_type])]]
+                    );
+                } else {
+                    sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id'], 'text' => 'دسته‌بندی‌ای در سیستم یافت نشد!']);
+                    exit();
+                }
             }
 
             sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
