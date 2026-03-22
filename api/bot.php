@@ -156,6 +156,7 @@ function handleCallbackQuery(array $callback_query, DatabaseManager $db): void
         $query_key = array_key_first($query_data);
 
         switch ($query_key) {
+
             case 'set_base_currency':
                 level_8($user, $db, null, $message, $callback_query);
             case 'edit_fav':
@@ -168,6 +169,8 @@ function handleCallbackQuery(array $callback_query, DatabaseManager $db): void
             case 'alert_asset_name':
             case 'show_favorites':
                 level_5($user, $db, null, $message, $callback_query);
+            case 'mng_alerts':
+                level_9($user, $db, null, $message, $callback_query);
 
             default:
                 choosePath(message: $message, user: $user, callback_query: $callback_query, db: $db);
@@ -1782,7 +1785,7 @@ function level_9(
         ]
     ];
 
-    if ($callback_query) handleAlertsCallback($user/*, $callback_query*/, $message/*, $db*/);
+    if ($callback_query) handleAlertsCallback($user, $callback_query, $message, $db);
     if ($message) handleAlertsTextMessage($data);
 
     // Send initial message
@@ -1800,16 +1803,38 @@ function level_9(
 }
 
 #[NoReturn]
-function handleAlertsCallback(User $user/*, array $callback_query*/, array $message/*, DatabaseManager $db*/): void
+function handleAlertsCallback(User $user, array $callback_query, array $message, DatabaseManager $db): void
 {
     $data = [
         'chat_id' => $user->getid(),
         'message_id' => $message['message_id'],
         'text' => 'این پیام منقضی شده است.'];
 
-//    $query_data = $callback_query['data'];
+    $query_data = $callback_query['data'];
 
-//    $query_key = array_key_first($query_data);
+    $query_key = array_key_first($query_data);
+    switch ($query_key) {
+        case 'mng_alerts':
+
+            // Show alert management menu
+            if ($query_data[$query_key] == null) {
+                $data['text'] = 'عملیات مورد نظر را انتخاب کنید:';
+                $data['reply_markup'] = ['inline_keyboard' => [
+                    [['text' => 'افزودن هشدار', 'callback_data' => json_encode(['mng_alerts' => 'add_alert'])]],
+                    [['text' => 'حذف هشدار', 'callback_data' => json_encode(['mng_alerts' => 'remove_alert'])]],
+                    [['text' => '🔙 برگشت 🔙', 'callback_data' => json_encode(['show_alerts' => null])]],
+                ]];
+            }
+
+            sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
+            sendToTelegram('editMessageText', $data);
+            exit();
+
+        case 'show_alerts':
+            sendAlerts($user, $db, $message['message_id']);
+            exit();
+    }
+
 
     sendToTelegram('editMessageText', $data);
     exit();
@@ -1825,9 +1850,12 @@ function handleAlertsTextMessage(array $data): void
 
 }
 
-#[NoReturn]
-function sendAlerts(User $user, DatabaseManager $db): void
+function sendAlerts(User $user, DatabaseManager $db, int|string|null $message_id = null): void
 {
+    $message_id = ($message_id !== null) ?
+        $message_id :
+        sendLoadingMessage($user->getid(), 'در حال دریافت اطلاعات لیست علاقه‌مندی‌ها ...')['result']['message_id'];
+
     $alerts = $db->read(
         table: 'alerts',
         conditions: ['user_id' => $user->getId()],
@@ -1845,13 +1873,17 @@ function sendAlerts(User $user, DatabaseManager $db): void
     $data = [
         'text' => 'هشدارهای شما:' . "\n",
         'chat_id' => $user->getid(),
+        'message_id' => $message_id,
+        'reply_markup' => ['inline_keyboard' => [
+            [['text' => 'مدیریت هشدارها', 'callback_data' => json_encode(['mng_alerts' => null])]]
+        ]]
     ];
     $text = &$data['text'];
     foreach ($alerts as $alert) {
-        $text .= "\n  - " . beautifulNumber($alert['asset_name'], null) . ': ' . beautifulNumber($alert['current_price']);
+        $text .= "\n  - " . beautifulNumber($alert['asset_name'], null) . ': ' . beautifulNumber($alert['target_price']);
     }
 
-    sendToTelegram('sendMessage', $data);
+    sendToTelegram('editMessageText', $data);
 }
 
 
@@ -1919,7 +1951,7 @@ function getLoansWithInstallments(array $conditions, DatabaseManager $db): bool|
         groupBy: 'l.id'
     );
     if ($loans)
-        foreach ($loans as $i => $loan) {
+        foreach ($loans as $i => $loan) { // TODO: Change to `&$loan`
             $loan['installments'] = json_decode($loan['installments'], true);
             if ($loan['installments'][0]['id'] == null) $loans[$i]['installments'] = null;
             else $loans[$i]['installments'] = $loan['installments'];
