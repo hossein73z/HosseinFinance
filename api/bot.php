@@ -232,6 +232,7 @@ function callbackHandler(User $user, array $callback_query, DatabaseManager $db)
     if ($user->getLastBtn() == 1) level_1(user: $user, db: $db, message: $message, callback_query: $callback_query);
     if ($user->getLastBtn() == 2) level_2(user: $user, db: $db, message: $message, callback_query: $callback_query);
     if ($user->getLastBtn() == 5) level_5(user: $user, db: $db, message: $message, callback_query: $callback_query);
+    if ($user->getLastBtn() == 9) level_9(user: $user, db: $db, message: $message, callback_query: $callback_query);
     if ($user->getLastBtn() == 6) level_6(user: $user, db: $db, message: $message, callback_query: $callback_query);
     if ($user->getLastBtn() == 8) level_8(user: $user, db: $db, message: $message, callback_query: $callback_query);
 
@@ -263,6 +264,7 @@ function normalButtonHandler(User $user, Button $pressed_button, DatabaseManager
     if ($pressed_button->getId() == 1) level_1(user: $user, db: $db, level_button: $pressed_button);
     if ($pressed_button->getId() == 2) level_2(user: $user, db: $db, level_button: $pressed_button);
     if ($pressed_button->getId() == 5) level_5(user: $user, db: $db, level_button: $pressed_button);
+    if ($pressed_button->getId() == 9) level_9(user: $user, db: $db, level_button: $pressed_button);
     if ($pressed_button->getId() == 6) level_6(user: $user, db: $db);
     if ($pressed_button->getId() == 8) level_8(user: $user, db: $db, level_button: $pressed_button);
 
@@ -295,6 +297,7 @@ function nonButtonHandler(User $user, array $message, DatabaseManager $db): void
     if ($user->getLastBtn() == '2') /****/ level_2(user: $user, db: $db, message: $message);
     if ($user->getLastBtn() == '5') /****/ level_5(user: $user, db: $db, message: $message);
     if ($user->getLastBtn() == '5.1') /**/ level_5_1(user: $user, db: $db, message: $message);
+    if ($user->getLastBtn() == '9') /****/ level_9(user: $user, db: $db, message: $message);
     if ($user->getLastBtn() == '6') /****/ level_6(user: $user, db: $db, message: $message);
     if ($user->getLastBtn() == '8') /****/ level_8(user: $user, db: $db, message: $message);
 
@@ -1270,7 +1273,7 @@ function level_5_1(
                     } else $data['text'] = '❌ خطای پایگاه داده!';
 
                     sendToTelegram('sendMessage', $data);
-                    level_5($user->setProgress(null), $db);
+                    level_9($user->setProgress(null), $db);
                 }
             }
         }
@@ -1827,11 +1830,28 @@ function sendAlerts(User $user, DatabaseManager $db): void
 {
     $alerts = $db->read(
         table: 'alerts',
-        conditions: ['alerts.user_id' => $user->getId()],
-        join: 'assets on assets.name = alerts.asset_name',
+        conditions: ['user_id' => $user->getId()],
+        selectColumns: '
+            alerts.*,
+            assets.emoji,
+            assets.asset_type,
+            assets.price as current_price,
+            assets.base_currency,
+            assets.date as update_date,
+            assets.time as update_time',
+        join: 'join assets on assets.name = alerts.asset_name'
     );
 
-    exit(json_encode($alerts));
+    $data = [
+        'text' => 'هشدارهای شما:' . "\n",
+        'chat_id' => $user->getid(),
+    ];
+    $text = &$data['text'];
+    foreach ($alerts as $alert) {
+        $text .= "\n  - " . beautifulNumber($alert['asset_name'], null) . ': ' . beautifulNumber($alert['current_price']);
+    }
+
+    sendToTelegram('sendMessage', $data);
 }
 
 
