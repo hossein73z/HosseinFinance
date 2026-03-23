@@ -1402,18 +1402,15 @@ function handlePricesCallback(User $user, array $callback_query, array $message,
 
         // Ask user to input alert price
         case 'alert_asset_name':
-            /**
-             * Deletes the query message, answers the callback
-             * then redirect user to level s3 with a progress:
-             *     parent_btn: user's last button (Because this query can be called from all the levels)
-             *     data: 'set_alert' -> 'asset_name'
-             * (Doesn't update the user in database)
-             */
 
             sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
             sendToTelegram('deleteMessage', ['chat_id' => $user->getid(), 'message_id' => $message['message_id']]);
 
-            empty_level($user->setProgress(['parent_btn' => $user->getLastBtn(), 'data' => ['set_alert' => ['asset_name' => $query_data['alert_asset_name']]]]), $db, 5);
+            $user = $user->setProgress([
+                'parent_btn' => $user->getLastBtn(),
+                'data' => ['set_alert' => ['asset_name' => $query_data['alert_asset_name']]]
+            ]);
+            empty_level($user, $db, 5);
 
         // Show the main favorites' message
         case 'show_favorites':
