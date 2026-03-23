@@ -1799,6 +1799,18 @@ function handleAlertsCallback(User $user, array $callback_query, array $message,
             sendToTelegram('editMessageText', $data);
             exit();
 
+        case 'new_alert_name':
+            /**
+             * Deletes the query message, answers the callback
+             * then redirect user to level s3 with a progress
+             * (Doesn't update the user in database)
+             */
+
+            sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
+            sendToTelegram('deleteMessage', ['chat_id' => $user->getid(), 'message_id' => $message['message_id']]);
+
+            empty_level($user->setProgress(['parent_btn' => 9, 'set_alert' => ['asset_name' => $query_data['new_alert_name']]]), $db, /* TODO: Seems to be redundant */9);
+
         case 'show_alerts':
             sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
             sendAlerts($user, $db, $message['message_id']);
