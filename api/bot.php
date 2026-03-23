@@ -175,7 +175,7 @@ function handleCallbackQuery(array $callback_query, DatabaseManager $db): void
             case 'mng_alerts':
             case 'new_alert_type':
             case 'show_alerts':
-                level_9($user, $db, null, $message, $callback_query);
+                level_8($user, $db, null, $message, $callback_query);
 
             default:
                 choosePath(message: $message, user: $user, callback_query: $callback_query, db: $db);
@@ -240,7 +240,6 @@ function callbackHandler(User $user, array $callback_query, DatabaseManager $db)
     if ($user->getLastBtn() == 1) level_1(user: $user, db: $db, message: $message, callback_query: $callback_query);
     if ($user->getLastBtn() == 2) level_2(user: $user, db: $db, message: $message, callback_query: $callback_query);
     if ($user->getLastBtn() == 5) level_5(user: $user, db: $db, message: $message, callback_query: $callback_query);
-    if ($user->getLastBtn() == 9) level_9(user: $user, db: $db, message: $message, callback_query: $callback_query);
     if ($user->getLastBtn() == 6) level_6(user: $user, db: $db, message: $message, callback_query: $callback_query);
     if ($user->getLastBtn() == 8) level_8(user: $user, db: $db, message: $message, callback_query: $callback_query);
 
@@ -271,7 +270,6 @@ function normalButtonHandler(User $user, Button $pressed_button, DatabaseManager
     if ($pressed_button->getId() == 1) level_1(user: $user, db: $db, level_button: $pressed_button);
     if ($pressed_button->getId() == 2) level_2(user: $user, db: $db, level_button: $pressed_button);
     if ($pressed_button->getId() == 5) level_5(user: $user, db: $db, level_button: $pressed_button);
-    if ($pressed_button->getId() == 9) level_9(user: $user, db: $db, level_button: $pressed_button);
     if ($pressed_button->getId() == 6) level_6(user: $user, db: $db);
     if ($pressed_button->getId() == 8) level_8(user: $user, db: $db, level_button: $pressed_button);
 
@@ -303,7 +301,6 @@ function nonButtonHandler(User $user, array $message, DatabaseManager $db): void
     if ($user->getLastBtn() == '1') /***/ level_1(user: $user, db: $db, message: $message);
     if ($user->getLastBtn() == '2') /***/ level_2(user: $user, db: $db, message: $message);
     if ($user->getLastBtn() == '5') /***/ level_5(user: $user, db: $db, message: $message);
-    if ($user->getLastBtn() == '9') /***/ level_9(user: $user, db: $db, message: $message);
     if ($user->getLastBtn() == '6') /***/ level_6(user: $user, db: $db, message: $message);
     if ($user->getLastBtn() == '8') /***/ level_8(user: $user, db: $db, message: $message);
 
@@ -1541,73 +1538,8 @@ function level_6(
 }
 
 // ==========================================
-//          LEVEL 8: Base Currency
+//          Base Currency
 // ==========================================
-
-#[NoReturn]
-function level_8(
-    User            $user,
-    DatabaseManager $db,
-    ?Button         $level_button = null,
-    ?array          $message = null,
-    ?array          $callback_query = null
-): void
-{
-    // Initialize button object if null is given
-    $level_button = $level_button ?? Button::fromDbRow($db->read('buttons', ['id' => 8], true));
-
-    // Create keyboards
-    $keyboard = createKeyboardsArray(parent_btn_id: $level_button->getId(), admin: $user->isAdmin(), db: $db);
-
-    $data = [
-        'chat_id' => $user->getid(),
-        'text' => $level_button->getText(),
-        'reply_markup' => [
-            'keyboard' => $keyboard,
-            'resize_keyboard' => true,
-            'is_persistent' => true,
-            'input_field_placeholder' => $level_button->getText()
-        ]
-    ];
-
-    if ($callback_query) handleBaseCurrencyCallback($user, $message);
-    if ($message) handleBaseCurrencyTextMessage($data);
-
-    // Send initial message
-    $response = sendToTelegram('sendMessage', $data);
-
-    // Update user's level and progress
-    if ($response) {
-        $db->update('users', ['last_btn' => $level_button->getId(), 'progress' => null], ['id' => $user->getId()]);
-
-        // Send Informative message
-        sendSelectBaseCurrencyMessage($user, $db);
-    }
-
-    exit();
-}
-
-#[NoReturn]
-function handleBaseCurrencyCallback(User $user, array $message): void
-{
-    $data = [
-        'chat_id' => $user->getid(),
-        'message_id' => $message['message_id'],
-        'text' => 'این پیام منقضی شده است.'];
-
-    sendToTelegram('editMessageText', $data);
-    exit();
-}
-
-#[NoReturn]
-function handleBaseCurrencyTextMessage(array $data): void
-{
-    // Send default message of this level
-    $data['text'] = 'پیام نامفهوم است!';
-    sendToTelegram('sendMessage', $data);
-    exit();
-
-}
 
 #[NoReturn]
 function sendSelectBaseCurrencyMessage(User $user, DatabaseManager $db): void
@@ -1675,11 +1607,11 @@ function setBaseCurrency(User $user, array $callback_query, array $message, Data
 
 
 // ==========================================
-//          LEVEL 9: Alerts
+//          LEVEL 8: Alerts
 // ==========================================
 
 #[NoReturn]
-function level_9(
+function level_8(
     User            $user,
     DatabaseManager $db,
     ?Button         $level_button = null,
@@ -1688,7 +1620,7 @@ function level_9(
 ): void
 {
     // Initialize button object if null is given
-    $level_button = $level_button ?? Button::fromDbRow($db->read('buttons', ['id' => 9], true));
+    $level_button = $level_button ?? Button::fromDbRow($db->read('buttons', ['id' => 8], true));
 
     // Create keyboards
     $keyboard = createKeyboardsArray(parent_btn_id: $level_button->getId(), admin: $user->isAdmin(), db: $db);
@@ -1814,7 +1746,7 @@ function handleAlertsCallback(User $user, array $callback_query, array $message,
             sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
             sendToTelegram('deleteMessage', ['chat_id' => $user->getid(), 'message_id' => $message['message_id']]);
 
-            empty_level($user->setProgress(['parent_btn' => 9, 'data' => ['set_alert' => ['asset_name' => $query_data['new_alert_name']]]]), $db);
+            empty_level($user->setProgress(['parent_btn' => 8, 'data' => ['set_alert' => ['asset_name' => $query_data['new_alert_name']]]]), $db);
 
         case 'show_alerts':
             sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
