@@ -258,6 +258,7 @@ function specialButtonHandler(User $user, Button $pressed_button, DatabaseManage
 {
     if ($pressed_button->getId() === "s0") backButton($user, $db);
     if ($pressed_button->getId() === "s2") sendFavorites($user, $db);
+    if ($pressed_button->getId() === "s4") sendSelectBaseCurrencyMessage($user, $db);
 
     exit();
 }
