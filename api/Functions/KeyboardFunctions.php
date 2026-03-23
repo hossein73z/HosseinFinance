@@ -4,23 +4,29 @@
  * Finds the button that was pressed based on its text and the parent's ID.
  *
  * @param string $text The text of the button that was pressed.
- * @param int|string $parent_btn_id The ID of the parent button whose keyboard contained the pressed button.
+ * @param int|string|null $parent_btn_id The ID of the parent button whose keyboard contained the pressed button.
  * @param bool $admin Whether the user is an admin.
  * @param DatabaseManager $db The database manager instance.
  * @return Button|null The Button instance of the pressed button, or null if not found.
  */
-function getPressedButton(string $text, int|string $parent_btn_id, bool $admin, DatabaseManager $db): ?Button
+function getPressedButton(string $text, int|string|null $parent_btn_id, bool $admin, DatabaseManager $db): ?Button
 {
-    // Get the IDs of all buttons in the parent's keyboard.
-    $ids = getKeyboardsIDs($parent_btn_id, $db);
-    if (!$ids) return null;
+    // Get the IDs of all sub-buttons.
+    if ($parent_btn_id !== null) {
+        $ids = getKeyboardsIDs($parent_btn_id, $db);
+        if (!$ids) return null;
+        else $ids = $ids['merged'];
+    } else {
+        $ids = $db->read('buttons', selectColumns: 'id', distinct: true);
+        $ids = array_column($ids, 'id');
+    }
 
     $admin = ($admin) ? [true, false] : false;
 
     $pressed_button_row = $db->read(
         table: 'buttons',
         conditions: [
-            'id' => $ids['merged'],
+            'id' => $ids,
             'admin_key' => $admin,
             'attrs->>"$.text"' => $text
         ],
