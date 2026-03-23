@@ -174,8 +174,9 @@ function handleCallbackQuery(array $callback_query, DatabaseManager $db): void
 
             case 'mng_alerts':
             case 'new_alert_type':
+            case 'new_alert_name':
             case 'show_alerts':
-                level_8($user, $db, null, $message, $callback_query);
+                managePriceAlerts($user, $callback_query, $message, $db);
 
             default:
                 choosePath(message: $message, user: $user, callback_query: $callback_query, db: $db);
@@ -1637,7 +1638,7 @@ function level_8(
         ]
     ];
 
-    if ($callback_query) handleAlertsCallback($user, $callback_query, $message, $db);
+    if ($callback_query) handleAlertsCallback($user, $message);
     if ($message) handleAlertsTextMessage($data);
 
     // Send initial message
@@ -1655,7 +1656,65 @@ function level_8(
 }
 
 #[NoReturn]
-function handleAlertsCallback(User $user, array $callback_query, array $message, DatabaseManager $db): void
+function handleAlertsCallback(User $user, array $message): void
+{
+    $data = [
+        'chat_id' => $user->getid(),
+        'message_id' => $message['message_id'],
+        'text' => 'این پیام منقضی شده است.'];
+
+    sendToTelegram('editMessageText', $data);
+    exit();
+}
+
+#[NoReturn]
+function handleAlertsTextMessage(array $data): void
+{
+    // Send default message of this level
+    $data['text'] = 'پیام نامفهوم است!';
+    sendToTelegram('sendMessage', $data);
+    exit();
+
+}
+
+function sendAlerts(User $user, DatabaseManager $db, int|string|null $message_id = null): void
+{
+    $message_id = ($message_id !== null) ?
+        $message_id :
+        sendLoadingMessage($user->getid(), 'در حال دریافت اطلاعات لیست علاقه‌مندی‌ها ...')['result']['message_id'];
+
+    $alerts = $db->read(
+        table: 'alerts',
+        conditions: ['user_id' => $user->getId()],
+        selectColumns: '
+            alerts.*,
+            assets.emoji,
+            assets.asset_type,
+            assets.price as current_price,
+            assets.base_currency,
+            assets.date as update_date,
+            assets.time as update_time',
+        join: 'join assets on assets.name = alerts.asset_name'
+    );
+
+    $data = [
+        'text' => 'هشدارهای شما:' . "\n",
+        'chat_id' => $user->getid(),
+        'message_id' => $message_id,
+        'reply_markup' => ['inline_keyboard' => [
+            [['text' => 'مدیریت هشدارها', 'callback_data' => json_encode(['mng_alerts' => null])]]
+        ]]
+    ];
+    $text = &$data['text'];
+    foreach ($alerts as $alert) {
+        $text .= "\n  - " . beautifulNumber($alert['asset_name'], null) . ': ' . beautifulNumber($alert['target_price']);
+    }
+
+    sendToTelegram('editMessageText', $data);
+}
+
+#[NoReturn]
+function managePriceAlerts(User $user, array $callback_query, array $message, DatabaseManager $db): void
 {
     $data = [
         'chat_id' => $user->getid(),
@@ -1671,7 +1730,8 @@ function handleAlertsCallback(User $user, array $callback_query, array $message,
         case 'mng_alerts':
 
             $action = $query_data[$query_key];
-            // Show alert management menu
+
+            // Show alerts' management menu
             if ($action == null) {
                 $data['text'] = 'عملیات مورد نظر را انتخاب کنید:';
                 $data['reply_markup'] = ['inline_keyboard' => [
@@ -1738,72 +1798,23 @@ function handleAlertsCallback(User $user, array $callback_query, array $message,
             exit();
 
         case 'new_alert_name':
-            /**
-             * Deletes the query message, answers the callback
-             * then redirect user to level s3 with a progress
-             * (Doesn't update the user in database)
-             */
 
             sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
             sendToTelegram('deleteMessage', ['chat_id' => $user->getid(), 'message_id' => $message['message_id']]);
 
-            empty_level($user->setProgress(['parent_btn' => 8, 'data' => ['set_alert' => ['asset_name' => $query_data['new_alert_name']]]]), $db);
+            $user = $user->setProgress(['parent_btn' => $user->getLastBtn(), 'data' => ['set_alert' => ['asset_name' => $query_data['new_alert_name']]]]);
+            empty_level($user, $db, $user->getLastBtn());
 
+        // Show main list of alerts
         case 'show_alerts':
             sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
             sendAlerts($user, $db, $message['message_id']);
             exit();
     }
 
-
     sendToTelegram('editMessageText', $data);
     exit();
-}
 
-#[NoReturn]
-function handleAlertsTextMessage(array $data): void
-{
-    // Send default message of this level
-    $data['text'] = 'پیام نامفهوم است!';
-    sendToTelegram('sendMessage', $data);
-    exit();
-
-}
-
-function sendAlerts(User $user, DatabaseManager $db, int|string|null $message_id = null): void
-{
-    $message_id = ($message_id !== null) ?
-        $message_id :
-        sendLoadingMessage($user->getid(), 'در حال دریافت اطلاعات لیست علاقه‌مندی‌ها ...')['result']['message_id'];
-
-    $alerts = $db->read(
-        table: 'alerts',
-        conditions: ['user_id' => $user->getId()],
-        selectColumns: '
-            alerts.*,
-            assets.emoji,
-            assets.asset_type,
-            assets.price as current_price,
-            assets.base_currency,
-            assets.date as update_date,
-            assets.time as update_time',
-        join: 'join assets on assets.name = alerts.asset_name'
-    );
-
-    $data = [
-        'text' => 'هشدارهای شما:' . "\n",
-        'chat_id' => $user->getid(),
-        'message_id' => $message_id,
-        'reply_markup' => ['inline_keyboard' => [
-            [['text' => 'مدیریت هشدارها', 'callback_data' => json_encode(['mng_alerts' => null])]]
-        ]]
-    ];
-    $text = &$data['text'];
-    foreach ($alerts as $alert) {
-        $text .= "\n  - " . beautifulNumber($alert['asset_name'], null) . ': ' . beautifulNumber($alert['target_price']);
-    }
-
-    sendToTelegram('editMessageText', $data);
 }
 
 // ==========================================
