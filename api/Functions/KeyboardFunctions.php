@@ -11,34 +11,22 @@
  */
 function getPressedButton(string $text, int|string|null $parent_btn_id, bool $admin, DatabaseManager $db): ?Button
 {
-    // Get the IDs of all sub-buttons.
-    if ($parent_btn_id !== null) {
-        $ids = getKeyboardsIDs($parent_btn_id, $db);
-        if (!$ids) return null;
-        else $ids = $ids['merged'];
-    } else {
-        $ids = $db->read('buttons', selectColumns: 'id', distinct: true);
-        $ids = array_column($ids, 'id');
-    }
+    $admin = ($admin) ? [0, 1] : [0];
 
-    $admin = ($admin) ? [true, false] : false;
+    $pressed_button = $db->query("
+        select
+            b2.*
+        from buttons b1
+        join buttons b2 on json_search(b1.keyboards, 'all', b2.id) is not null
+        where
+            b1.id = '$parent_btn_id' and
+            b2.attrs->>'$.text' = '$text' and
+            b1.admin_key in ('" . implode("','", $admin) . "') and
+            b2.admin_key in ('" . implode("','", $admin) . "')
+    ;")->fetch();
 
-    $pressed_button_row = $db->read(
-        table: 'buttons',
-        conditions: [
-            'id' => $ids,
-            'admin_key' => $admin,
-            'attrs->>"$.text"' => $text
-        ],
-        single: true
-    );
-
-    // If a row is found, convert the array into a Button object
-    if ($pressed_button_row) {
-        return Button::fromDbRow($pressed_button_row);
-    }
-
-    return null;
+    if ($pressed_button) return Button::fromDbRow($pressed_button);
+    else return null;
 }
 
 /**
