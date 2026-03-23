@@ -79,32 +79,6 @@ function createKeyboardsArray(int|string $parent_btn_id, bool $admin, DatabaseMa
 }
 
 /**
- * Fetches and parses the keyboard button IDs associated with a given parent button ID.
- *
- * @param int|string $btn_id The ID of the button whose associated keyboards should be retrieved.
- * @param DatabaseManager $db The database manager instance.
- * @return array|bool An array containing 'merged' (all IDs flat) and 'separate' (IDs grouped by row), or false on failure.
- */
-function getKeyboardsIDs(int|string $btn_id, DatabaseManager $db): bool|array
-{
-    // Fetch the parent button data.
-    $button = $db->read(table: 'buttons', conditions: ['id' => $btn_id], single: true);
-    // Check if the button exists and has keyboard definitions.
-    if (!$button || !isset($button['keyboards']) || !$button['keyboards']) return false;
-
-    $ids = [];
-    // Decode the JSON and flatten all button IDs into a single 'merged' array.
-    foreach (json_decode($button['keyboards']) as $keyboard_ids) {
-        foreach ($keyboard_ids as $keyboard_id) {
-            $ids[] = $keyboard_id;
-        }
-    }
-
-    // Return both the flat list and the original row-separated structure.
-    return ['merged' => $ids, 'separate' => json_decode($button['keyboards'])];
-}
-
-/**
  * Generates a string representation of the nested button text tree structure, starting from the root (ID 0).
  *
  * @param array $buttons An array of all button data, indexed by their ID.
