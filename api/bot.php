@@ -158,7 +158,7 @@ function handleCallbackQuery(array $callback_query, DatabaseManager $db): void
         switch ($query_key) {
 
             case 'set_base_currency':
-                level_8($user, $db, null, $message, $callback_query);
+                setBaseCurrency($user, $callback_query, $message, $db);
 
             case 'edit_fav':
             case 'new_fav_type':
@@ -169,6 +169,7 @@ function handleCallbackQuery(array $callback_query, DatabaseManager $db): void
             case 'price_alert':
             case 'alert_asset_name':
             case 'show_favorites':
+                // TODO: Move alert related callbacks to separate function from the level
                 level_5($user, $db, null, $message, $callback_query);
 
             case 'mng_alerts':
@@ -1569,7 +1570,7 @@ function level_8(
         ]
     ];
 
-    if ($callback_query) handleBaseCurrencyCallback($user, $callback_query, $message, $db);
+    if ($callback_query) handleBaseCurrencyCallback($user, $message);
     if ($message) handleBaseCurrencyTextMessage($data);
 
     // Send initial message
@@ -1587,35 +1588,12 @@ function level_8(
 }
 
 #[NoReturn]
-function handleBaseCurrencyCallback(User $user, array $callback_query, array $message, DatabaseManager $db): void
+function handleBaseCurrencyCallback(User $user, array $message): void
 {
     $data = [
         'chat_id' => $user->getid(),
         'message_id' => $message['message_id'],
         'text' => 'این پیام منقضی شده است.'];
-
-    $query_data = $callback_query['data'];
-
-    $query_key = array_key_first($query_data);
-    if ($query_key == 'set_base_currency') {
-
-        $user->setBaseCurrency($query_data['set_base_currency']);
-        try {
-            $db->update(
-                table: 'users',
-                data: ['settings' => json_encode($user->getSettings())],
-                conditions: ['id' => $user->getId()],
-            );
-            $data['text'] = '✅ ارز پایه با موفقیت به «' . $query_data['set_base_currency'] . '» تغییر کرد';
-        } catch (Exception $e) {
-            error_log('Error changing base currency: ' . $e->getMessage());
-            $data['text'] = '❌ خطای پایگاه داده!';
-        }
-
-        sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
-        sendToTelegram('editMessageText', $data);
-        exit();
-    }
 
     sendToTelegram('editMessageText', $data);
     exit();
@@ -1657,6 +1635,41 @@ function sendSelectBaseCurrencyMessage(User $user, DatabaseManager $db): void
 
         sendToTelegram('sendMessage', $data);
     }
+    exit();
+}
+
+#[NoReturn]
+function setBaseCurrency(User $user, array $callback_query, array $message, DatabaseManager $db): void
+{
+    $data = [
+        'chat_id' => $user->getid(),
+        'message_id' => $message['message_id'],
+        'text' => 'این پیام منقضی شده است.'];
+
+    $query_data = $callback_query['data'];
+
+    $query_key = array_key_first($query_data);
+    if ($query_key == 'set_base_currency') {
+
+        $user->setBaseCurrency($query_data['set_base_currency']);
+        try {
+            $db->update(
+                table: 'users',
+                data: ['settings' => json_encode($user->getSettings())],
+                conditions: ['id' => $user->getId()],
+            );
+            $data['text'] = '✅ ارز پایه با موفقیت به «' . $query_data['set_base_currency'] . '» تغییر کرد';
+        } catch (Exception $e) {
+            error_log('Error changing base currency: ' . $e->getMessage());
+            $data['text'] = '❌ خطای پایگاه داده!';
+        }
+
+        sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
+        sendToTelegram('editMessageText', $data);
+        exit();
+    }
+
+    sendToTelegram('editMessageText', $data);
     exit();
 }
 
