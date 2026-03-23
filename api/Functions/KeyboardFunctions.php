@@ -39,34 +39,43 @@ function getPressedButton(string $text, int|string|null $parent_btn_id, bool $ad
  */
 function createKeyboardsArray(int|string $parent_btn_id, bool $admin, DatabaseManager $db): ?array
 {
-    // Get the separate and merged IDs for the keyboard layout.
-    $ids = getKeyboardsIDs($parent_btn_id, $db);
-    if (!$ids) return null;
+    $admin = ($admin) ? [0, 1] : [0];
 
-    $admin = ($admin) ? [true, false] : false;
-    // Read all button data using the merged list of IDs.
-    $buttons = $db->read('buttons', ['id' => $ids['merged'], 'admin_key' => $admin]);
+    $buttons = $db->query("
+        select
+            json_objectagg(
+                b2.id,
+                json_object(
+                    'attrs', b2.attrs,
+                    'main_ids', b1.keyboards
+                )
+            ) as buttons
+        from buttons b1
+        join buttons b2 on json_search(b1.keyboards, 'all', b2.id) is not null
+        where
+            b1.id = '$parent_btn_id' and
+            b1.admin_key in ('" . implode("','", $admin) . "') and
+            b2.admin_key in ('" . implode("','", $admin) . "')
+    ;")->fetch();
+
     if (!$buttons) return null;
+    else $buttons = json_decode($buttons['buttons'], true);
 
-    // Convert the buttons array to be indexed by their 'id' for quick lookup.
-    $buttons = array_reduce($buttons, function ($carry, $item) {
-        $carry[$item['id']] = $item;
-        return $carry;
-    }, []);
+    $id_structure = json_decode(array_values($buttons)[0]['main_ids']);
 
-    $telegram_keyboard = [];
-    // Iterate through the separate (row-based) IDs to build the Telegram keyboard structure.
-    foreach ($ids['separate'] as $index => $btn_ids) {
-        foreach ($btn_ids as $btn_id) {
+    $keyboard = [];
+    foreach ($id_structure as $row => $id_row) {
+        foreach ($id_row as $id) {
+
             // Check if button exists in fetched data
-            if (isset($buttons[$btn_id])) {
-                // Decode the attributes JSON to get the text
-                $attrs = json_decode($buttons[$btn_id]['attrs'], true);
-                $telegram_keyboard[$index][] = $attrs;
+            // Crucial for excluding not-admin buttons
+            if (isset($buttons[$id])) {
+                $attrs = json_decode($buttons[$id]['attrs'], true);
+                $keyboard[$row][] = $attrs;
             }
         }
     }
-    return $telegram_keyboard;
+    return $keyboard;
 }
 
 /**
