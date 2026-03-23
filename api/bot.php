@@ -166,12 +166,11 @@ function handleCallbackQuery(array $callback_query, DatabaseManager $db): void
             case 'del_fav':
             case 'conf_del_fav':
             case 'set_live':
-            case 'price_alert':
-            case 'alert_asset_name':
             case 'show_favorites':
                 // TODO: Move alert related callbacks to separate function from the level
                 level_5($user, $db, null, $message, $callback_query);
 
+            case 'fav_alert':
             case 'mng_alerts':
             case 'new_alert_type':
             case 'new_alert_name':
@@ -1373,45 +1372,6 @@ function handlePricesCallback(User $user, array $callback_query, array $message,
             setLiveMessage($user->getId(), $query_data['set_live'], $message['message_id'], $db);
             sendFavorites($user, $db, $message['message_id']);
 
-        // Show list of favorites for creating alert
-        case 'price_alert':
-
-            $favorites = $db->read(
-                table: 'favorites f',
-                conditions: ['f.user_id' => $user->getId()],
-                selectColumns: 'a.*, f.id as fav_id',
-                join: 'JOIN assets a ON a.name=f.asset_name',
-                orderBy: ['asset_type' => 'ASC']
-            );
-
-            $data['text'] = 'یکی از گزینه‌های زیر را انتخاب کنید:';
-            $data['reply_markup']['inline_keyboard'] = [
-                [['text' => '🔙 برگشت 🔙', 'callback_data' => json_encode(['show_favorites' => null])]]
-            ];
-
-            foreach ($favorites as $favorite) {
-                array_unshift(
-                    $data['reply_markup']['inline_keyboard'],
-                    [['text' => beautifulNumber($favorite['name'], null), 'callback_data' => json_encode(['alert_asset_name' => $favorite['name']])]]
-                );
-            }
-
-            sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
-            sendToTelegram('editMessageText', $data);
-            exit();
-
-        // Ask user to input alert price
-        case 'alert_asset_name':
-
-            sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
-            sendToTelegram('deleteMessage', ['chat_id' => $user->getid(), 'message_id' => $message['message_id']]);
-
-            $user = $user->setProgress([
-                'parent_btn' => $user->getLastBtn(),
-                'data' => ['set_alert' => ['asset_name' => $query_data['alert_asset_name']]]
-            ]);
-            empty_level($user, $db, 5);
-
         // Show the main favorites' message
         case 'show_favorites':
             sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
@@ -1768,20 +1728,29 @@ function managePriceAlerts(User $user, array $callback_query, array $message, Da
             exit();
 
         // Show list of asset to select for new alert
+        case 'fav_alert':
         case 'new_alert_type':
-            $data['reply_markup']['inline_keyboard'] = [[
-                ['text' => '🔙 برگشت 🔙', 'callback_data' => json_encode(['mng_alerts' => 'add_alert'])],
-                ['text' => '❌ لغو ❌', 'callback_data' => json_encode(['show_alerts' => null])]
-            ]];
 
-            // Read assets excluding the ones already in user's list of favorites
-            $assets = $db->query(
-                "select a.* from assets a " .
-                "left join alerts al on al.asset_name = a.name where " . // Join alers to filter out existing ones
-                "a.asset_type = '$query_data[$query_key]' and" . //////// Get assets with the received type
-                "(al.user_id is null or" . //////////////////////////////// Include assets which are not in alerts table
-                " al.user_id!=" . $user->getId() . ")" //////////////////// Exclude assets that user already has an alert for
-            )->fetchAll();
+            if ($query_key == 'fav_alert') {
+                $data['reply_markup']['inline_keyboard'] = [[
+                    ['text' => '🔙 برگشت 🔙', 'callback_data' => json_encode(['show_favorites' => null])]
+                ]];
+
+                $assets = $db->read(
+                    table: 'favorites f',
+                    conditions: ['f.user_id' => $user->getId()],
+                    selectColumns: 'a.*, f.id as fav_id',
+                    join: 'JOIN assets a ON a.name=f.asset_name',
+                    orderBy: ['asset_type' => 'ASC']
+                );
+
+            } else {
+                $data['reply_markup']['inline_keyboard'] = [[
+                    ['text' => '🔙 برگشت 🔙', 'callback_data' => json_encode(['mng_alerts' => 'add_alert'])],
+                    ['text' => '❌ لغو ❌', 'callback_data' => json_encode(['show_alerts' => null])]
+                ]];
+                $assets = $db->read('assets', ['asset_type' => $query_data[$query_key]]);
+            }
 
             if ($assets) {
                 $data['text'] = 'گزینه‌ی مد نظر خود را از لیست زیر انتخاب کنید:';
