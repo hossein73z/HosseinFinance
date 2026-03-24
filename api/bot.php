@@ -175,6 +175,7 @@ function handleCallbackQuery(array $callback_query, DatabaseManager $db): void
             case 'new_alert_type':
             case 'new_alert_name':
             case 'del_alert':
+            case 'conf_del_alert':
             case 'show_alerts':
                 managePriceAlerts($user, $callback_query, $message, $db);
 
@@ -1823,6 +1824,27 @@ function managePriceAlerts(User $user, array $callback_query, array $message, Da
 
             sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
             sendToTelegram('editMessageText', $data);
+            exit();
+
+        // Delete alert and send alerts' message to the user
+        case 'conf_del_alert':
+
+            $alert_id = $query_data[$query_key];
+            try {
+                $db->delete(
+                    table: 'alerts',
+                    conditions: ['id' => $alert_id],
+                    resetAutoIncrement: true
+                );
+                $data['text'] = '✅ حذف موفقیت آمیز بود!';
+            } catch (Exception $e) {
+                error_log('Error deleting a favorite: ' . $e->getMessage());
+                $data['text'] = '❌ خطای پایگاه داده!';
+            }
+
+            sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
+            sendToTelegram('editMessageText', $data);
+            sendAlerts($user, $db);
             exit();
 
         // Show main list of alerts
