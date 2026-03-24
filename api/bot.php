@@ -174,6 +174,7 @@ function handleCallbackQuery(array $callback_query, DatabaseManager $db): void
             case 'mng_alerts':
             case 'new_alert_type':
             case 'new_alert_name':
+            case 'del_alert':
             case 'show_alerts':
                 managePriceAlerts($user, $callback_query, $message, $db);
 
@@ -1808,6 +1809,21 @@ function managePriceAlerts(User $user, array $callback_query, array $message, Da
 
             $user = $user->setProgress(['parent_btn' => $user->getLastBtn(), 'data' => ['set_alert' => ['asset_name' => $query_data['new_alert_name']]]]);
             empty_level($user, $db, $user->getLastBtn());
+
+        // Ask user to confirm deleting alert
+        case 'del_alert':
+            $alert_id = $query_data[$query_key];
+            echo $alert_id;
+
+            $data['text'] = 'آیا از حذف اطمینان دارید؟';
+            $data['reply_markup']['inline_keyboard'] = [[
+                ['text' => 'لغو', 'callback_data' => json_encode(['show_alerts' => null])],
+                ['text' => 'تایید', 'callback_data' => json_encode(['conf_del_alert' => $alert_id])],
+            ]];
+
+            sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
+            sendToTelegram('editMessageText', $data);
+            exit();
 
         // Show main list of alerts
         case 'show_alerts':
