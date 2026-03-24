@@ -1723,13 +1723,48 @@ function managePriceAlerts(User $user, array $callback_query, array $message, Da
                 }
             }
 
+            // Show list of alerts to delete
+            if ($action == 'remove_alert') {
+                $alerts = $db->read(
+                    table: 'alerts',
+                    conditions: ['user_id' => $user->getId()],
+                    selectColumns: '
+                        alerts.*,
+                        assets.emoji,
+                        assets.asset_type,
+                        assets.price as current_price,
+                        assets.base_currency,
+                        assets.date as update_date,
+                        assets.time as update_time',
+                    join: 'join assets on assets.name = alerts.asset_name'
+                );
+
+                if ($alerts) {
+                    $data['text'] = 'کدام مورد را می‌خواهید حذف کنید؟';
+
+                    $data['reply_markup']['inline_keyboard'] = [[
+                        ['text' => '🔙 برگشت 🔙', 'callback_data' => json_encode(['mng_alerts' => null])],
+                        ['text' => '❌ لغو ❌', 'callback_data' => json_encode(['show_alerts' => null])]
+                    ]];
+
+                    foreach ($alerts as $alert) array_unshift(
+                        $data['reply_markup']['inline_keyboard'],
+                        [['text' => beautifulNumber($alert['asset_name'], null) . ' @ ' . beautifulNumber($alert['target_price']), 'callback_data' => json_encode(['del_alert' => $alert['id']])]]
+                    );
+
+                } else {
+                    sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id'], 'text' => 'شما هشداری ثبت نکرده‌اید!']);
+                    exit();
+                }
+            }
+
             sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
             sendToTelegram('editMessageText', $data);
             exit();
 
         // Show list of asset to select for new alert
-        case 'fav_alert':
-        case 'new_alert_type':
+        case 'fav_alert': // A request from favorites message
+        case 'new_alert_type': // A request from alert manager message
 
             if ($query_key == 'fav_alert') {
                 $data['reply_markup']['inline_keyboard'] = [[
