@@ -1656,21 +1656,25 @@ function sendAlerts(User $user, DatabaseManager $db, int|string|null $message_id
             assets.base_currency,
             assets.date as update_date,
             assets.time as update_time',
-        join: 'join assets on assets.name = alerts.asset_name'
+        join: 'join assets on assets.name = alerts.asset_name',
+        orderBy: ['assets.asset_type' => 'ASC', 'alerts.asset_name' => 'ASC', 'alerts.target_price' => 'ASC']
     );
 
     $data = [
-        'text' => 'هشدارهای شما:' . "\n",
+        'text' => &$text,
         'chat_id' => $user->getid(),
         'message_id' => $message_id,
         'reply_markup' => ['inline_keyboard' => [
             [['text' => 'مدیریت هشدارها', 'callback_data' => json_encode(['mng_alerts' => null])]]
         ]]
     ];
-    $text = &$data['text'];
-    foreach ($alerts as $alert) {
-        $text .= "\n  - " . beautifulNumber($alert['asset_name'], null) . ': ' . beautifulNumber($alert['target_price']);
-    }
+
+    if ($alerts) {
+        $text = 'هشدارهای شما:' . "\n";
+        foreach ($alerts as $alert) {
+            $text .= "\n  - " . beautifulNumber($alert['asset_name'], null) . ': ' . beautifulNumber($alert['target_price']);
+        }
+    } else $text = 'شما هشداری ثبت نکرده‌اید!';
 
     sendToTelegram('editMessageText', $data);
 }
@@ -1751,7 +1755,7 @@ function managePriceAlerts(User $user, array $callback_query, array $message, Da
 
                     foreach ($alerts as $alert) array_unshift(
                         $data['reply_markup']['inline_keyboard'],
-                        [['text' => beautifulNumber($alert['asset_name'], null) . ' @ ' . beautifulNumber($alert['target_price']), 'callback_data' => json_encode(['del_alert' => $alert['id']])]]
+                        [['text' => beautifulNumber($alert['asset_name'], null) . ': ' . beautifulNumber($alert['target_price']), 'callback_data' => json_encode(['del_alert' => $alert['id']])]]
                     );
 
                 } else {
