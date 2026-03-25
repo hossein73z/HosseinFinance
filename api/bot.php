@@ -2217,7 +2217,7 @@ function createLoansView(array $loans, ?string $loans_mssg_id = null, ?string $i
                         ($next_payment === null || !$due_date->diff($next_payment)->invert)
                     ) $next_payment = $due_date;
 
-                    $installments_per_year[$j_due_year][] = (!$due_date->diff($today)) ? "🔴" : "⚪";
+                    $installments_per_year[$j_due_year][] = (!$due_date->diff($today)->invert) ? "🔴" : "⚪";
                 }
             }
 
@@ -2268,7 +2268,7 @@ function createLoanDetailText(array $loan, string $mssg_id): string
                 $installment['is_paid'] = "🟢";
                 $paid_count++;
                 $paid_sum += $installment['amount'];
-            } elseif ($due_date->diff($today)) {
+            } elseif (!$due_date->diff($today)->invert) {
                 $installment['is_paid'] = "🔴";
                 $overdue_count++;
                 $overdue_sum += $installment['amount'];
