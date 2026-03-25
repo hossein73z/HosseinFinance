@@ -2213,9 +2213,9 @@ function createLoansView(array $loans, ?string $loans_mssg_id = null, ?string $i
                 if ($installment['is_paid'] == 1) $installments_per_year[$j_due_year][] = "🟢";
                 else {
 
-                    if ($due_date->diff($today)->invert &&
-                        ($next_payment === null || !$due_date->diff($next_payment)->invert)
-                    ) $next_payment = $due_date;
+                    if ($due_date->diff($today)->invert)
+                        if ($next_payment === null || !$due_date->diff($next_payment)->invert)
+                            $next_payment = $due_date;
 
                     $installments_per_year[$j_due_year][] = (!$due_date->diff($today)->invert) ? "🔴" : "⚪";
                 }
@@ -2238,7 +2238,7 @@ function createLoansView(array $loans, ?string $loans_mssg_id = null, ?string $i
             "\n‏      ┤─ تاریخ دریافت\: " . markdownScape(beautifulNumber(JalaliDate::fromGregorianString($loan['received_date'])->format(), null));
         if ($daysRemaining)
             $detail .= "\n‏      ┤─ قسط بعدی\: " . beautifulNumber($daysRemaining) . ' روز دیگر' .
-                ' (' . beautifulNumber(JalaliDate::fromGregorian($due_date)->format(), null) . ')';
+                ' (' . beautifulNumber(JalaliDate::fromGregorian($next_payment)->format(), null) . ')';
 
         $detail .= $installments_detail;
 
