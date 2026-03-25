@@ -2055,27 +2055,9 @@ function getLoansWithInstallments(array $conditions, DatabaseManager $db): bool|
         groupBy: 'l.id'
     );
     if ($loans)
-
-        # HACK: Below loop is supposed to just decode installments json,
-        #  but for now it also changes the Gregorian date to Jalali too.
-        # Todo: Remove Jalali implementation
-        # Todo: If possible, make the query read installments as array.
         foreach ($loans as &$loan) {
-
-            $received_date = DateTime::createFromFormat('Y-m-d', $loan['received_date']);
-            $loan['received_date'] = JalaliDate::fromGregorian($received_date->format('Y'), $received_date->format('m'), $received_date->format('d'))->format();
-
             $loan['installments'] = json_decode($loan['installments'], true);
             if ($loan['installments'][0]['id'] == null) $loan['installments'] = null;
-            else {
-                foreach ($loan['installments'] as &$installment) {
-                    $due_date = DateTime::createFromFormat('Y-m-d', $installment['due_date']);
-                    $installment['due_date'] = JalaliDate::fromGregorian($due_date->format('Y'), $due_date->format('m'), $due_date->format('d'))->format();
-
-                    $alert_date = DateTime::createFromFormat('Y-m-d', $installment['alert_date']);
-                    $installment['alert_date'] = JalaliDate::fromGregorian($alert_date->format('Y'), $alert_date->format('m'), $alert_date->format('d'))->format();
-                }
-            }
         }
     return $loans;
 }
@@ -2214,8 +2196,8 @@ function createLoansView(array $loans, ?string $loans_mssg_id = null, ?string $i
     $text = 'وام‌های ثبت شده‌ی شما: ' . "\n";
     foreach ($loans as $loan) {
 
-        $todayJ = JalaliDate::fromGregorian();
-        $due_date = $todayJ;
+        $today = new DateTime();
+        $due_date = new DateTime();
         $next_payment = null;
 
         $installments = &$loan['installments'];
@@ -2223,17 +2205,19 @@ function createLoansView(array $loans, ?string $loans_mssg_id = null, ?string $i
             $installments_per_year = [];
             foreach ($installments as &$installment) {
 
-                $due_date = JalaliDate::fromString($installment['due_date']);
+                $due_date = DateTime::createFromFormat('Y-m-d', $installment['due_date']);
                 $installment['due_date'] = $due_date;
 
-                if ($installment['is_paid'] == 1) $installments_per_year[$due_date->jy][] = "🟢";
+                $j_due_year = JalaliDate::fromGregorian($due_date)->jy;
+
+                if ($installment['is_paid'] == 1) $installments_per_year[$j_due_year][] = "🟢";
                 else {
 
-                    if ($due_date->diffInDays($todayJ) >= 0 &&
-                        ($next_payment === null || $due_date->diffInDays($next_payment) <= 0)
+                    if ($due_date->diff($today)->invert &&
+                        ($next_payment === null || !$due_date->diff($next_payment)->invert)
                     ) $next_payment = $due_date;
 
-                    $installments_per_year[$due_date->jy][] = ($due_date->diffInDays($todayJ) < 0) ? "🔴" : "⚪";
+                    $installments_per_year[$j_due_year][] = (!$due_date->diff($today)) ? "🔴" : "⚪";
                 }
             }
 
@@ -2245,7 +2229,7 @@ function createLoansView(array $loans, ?string $loans_mssg_id = null, ?string $i
 
         } else $installments_detail = '';
 
-        $daysRemaining = $next_payment?->diffInDays($todayJ);
+        $daysRemaining = $next_payment?->diff($today)->days;
 
         $deep_link = "https://ble.ir/" . BOT_ID . "?start=showLoan_loanId{$loan['id']}" . ($loans_mssg_id ? "_loansMssgId" . $loans_mssg_id : '') . ($initial_mssg_id ? "_initMssgId" . $initial_mssg_id : '');
         $loan_name = "\n‏\-* [" . markdownScape(beautifulNumber($loan['name'], null)) . "]($deep_link)*";
@@ -2254,7 +2238,7 @@ function createLoansView(array $loans, ?string $loans_mssg_id = null, ?string $i
             "\n‏      ┤─ تاریخ دریافت\: " . markdownScape(beautifulNumber($loan['received_date'], null));
         if ($daysRemaining)
             $detail .= "\n‏      ┤─ قسط بعدی\: " . beautifulNumber($daysRemaining) . ' روز دیگر' .
-                ' (' . beautifulNumber($due_date->format(), null) . ')';
+                ' (' . beautifulNumber($due_date->format('Y-m-d'), null) . ')';
 
         $detail .= $installments_detail;
 

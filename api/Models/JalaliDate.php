@@ -19,9 +19,10 @@ class JalaliDate
     /**
      * Static constructor from Gregorian date.
      */
-    public static function fromGregorian(int|string|null $gy = null, int|string|null $gm = null, int|string|null $gd = null): self
+    public static function fromGregorian(array|DateTime|null $Ymd = null): self
     {
-        $jalali = self::gregorianToJalali($gy, $gm, $gd);
+        if (in_array(gettype($Ymd), ['array', 'NULL'])) $jalali = self::gregorianToJalali($Ymd[0], $Ymd[1], $Ymd[2]);
+        else $jalali = self::gregorianToJalali($Ymd->format('Y'), $Ymd->format('m'), $Ymd->format('d'));
         return new self($jalali['jy'], $jalali['jm'], $jalali['jd']);
     }
 
