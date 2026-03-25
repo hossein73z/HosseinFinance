@@ -121,7 +121,7 @@ CREATE TABLE IF NOT EXISTS `loans`
     user_id       INT                   NOT NULL,
     name          VARCHAR(191)          NOT NULL,
     total_amount  NUMERIC(18, 8)        NOT NULL,
-    received_date VARCHAR(10) DEFAULT NULL,
+    received_date VARCHAR(10) DEFAULT NULL, # TODO: Change to date to store Gregorian
     alert_offset  INT         DEFAULT 0 NOT NULL,
     created_at    TIMESTAMP   DEFAULT CURRENT_TIMESTAMP,
 
@@ -130,11 +130,12 @@ CREATE TABLE IF NOT EXISTS `loans`
 
 CREATE TABLE IF NOT EXISTS `installments`
 (
-    id       INT AUTO_INCREMENT PRIMARY KEY,
-    loan_id  INT            NOT NULL,
-    amount   NUMERIC(18, 8) NOT NULL,
-    due_date VARCHAR(10)    NOT NULL,
-    is_paid  BOOLEAN        NOT NULL DEFAULT 0,
+    id         INT AUTO_INCREMENT PRIMARY KEY,
+    loan_id    INT            NOT NULL,
+    amount     NUMERIC(18, 8) NOT NULL,
+    due_date   VARCHAR(10)    NOT NULL,              # TODO: Change to date to store Gregorian
+    alert_date VARCHAR(10)             DEFAULT NULL, # TODO: Change to date to store Gregorian
+    is_paid    BOOLEAN        NOT NULL DEFAULT 0,
 
     UNIQUE INDEX idx_unique_installment (loan_id, due_date),
     FOREIGN KEY (loan_id) REFERENCES loans (id) ON DELETE CASCADE

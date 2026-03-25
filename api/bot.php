@@ -851,6 +851,16 @@ function handleLoansCallback(User $user, array $callback_query, array $data, arr
 #[NoReturn]
 function handleLoansWebAppData(User $user, array $data, array $message, DatabaseManager $db): void
 {
+    /*
+     * TODO
+     *  1. Convert all date related columns to Gregorian.
+     *  2. Change all date related columns' type to Date.
+     *  3. Add Triggers
+     *      `after insert` trigger for installments and
+     *      `after update` trigger for loans table
+     *      to automatically calculate `alert_date` column.
+     */
+
     $web_app_data = json_decode($message['web_app_data']['data'], true);
     // Add new loan and installments
     if (isset($web_app_data['loans']) &&
@@ -2036,6 +2046,7 @@ function getLoansWithInstallments(array $conditions, DatabaseManager $db): bool|
                         "loan_id", i.loan_id,
                         "amount", i.amount,
                         "due_date", i.due_date,
+                        "alert_date", i.alert_date,
                         "is_paid", i.is_paid
                     ) ORDER BY due_date ASC
                 ),
