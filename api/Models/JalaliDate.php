@@ -17,13 +17,31 @@ class JalaliDate
     }
 
     /**
-     * Static constructor from Gregorian date.
+     * Static constructor from Gregorian date array.
+     * Format: [Y, m, d]
      */
-    public static function fromGregorian(array|DateTime|null $Ymd = null): self
+    public static function fromGregorian(array|null $Ymd = null): self
     {
-        if (in_array(gettype($Ymd), ['array', 'NULL'])) $jalali = self::gregorianToJalali($Ymd[0], $Ymd[1], $Ymd[2]);
-        else $jalali = self::gregorianToJalali($Ymd->format('Y'), $Ymd->format('m'), $Ymd->format('d'));
+        $jalali = self::gregorianToJalali($Ymd[0], $Ymd[1], $Ymd[2]);
         return new self($jalali['jy'], $jalali['jm'], $jalali['jd']);
+    }
+
+    /**
+     * Static constructor from Gregorian date as DateTime object.
+     */
+    public static function fromGregorianDateTimeObject(DateTime $Ymd): self
+    {
+        $jalali = self::gregorianToJalali($Ymd->format('Y'), $Ymd->format('m'), $Ymd->format('d'));
+        return new self($jalali['jy'], $jalali['jm'], $jalali['jd']);
+    }
+
+    /**
+     * Static constructor from Gregorian string.
+     */
+    public static function fromGregorianString(string $date_string, string $format = 'Y-m-d'): self
+    {
+        $g_date = DateTime::createFromFormat($format, $date_string);
+        return self::fromGregorianDateTimeObject($g_date);
     }
 
     /**
@@ -45,15 +63,6 @@ class JalaliDate
             ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'], $date_array[1]
         );
         return new self(intval($date_array[0]), intval($date_array[1]), intval($date_array[2]));
-    }
-
-    /**
-     * Static constructor from Gregorian string.
-     */
-    public static function fromGregorianString(string $date_string, string $format = 'Y-m-d'): self
-    {
-        $g_date = DateTime::createFromFormat($format, $date_string);
-        return self::fromGregorian($g_date);
     }
 
     /**
@@ -92,11 +101,11 @@ class JalaliDate
         $gregorian = $this->toGregorian();
         $newDate = clone $gregorian;
         $newDate->modify("$days days");
-        return self::fromGregorian(
+        return self::fromGregorian([
             $newDate->format('Y'),
             $newDate->format('m'),
             $newDate->format('d')
-        );
+        ]);
     }
 
     /**

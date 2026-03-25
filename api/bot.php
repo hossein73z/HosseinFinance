@@ -2197,7 +2197,6 @@ function createLoansView(array $loans, ?string $loans_mssg_id = null, ?string $i
     foreach ($loans as $loan) {
 
         $today = new DateTime();
-        $due_date = new DateTime();
         $next_payment = null;
 
         $installments = &$loan['installments'];
@@ -2208,7 +2207,7 @@ function createLoansView(array $loans, ?string $loans_mssg_id = null, ?string $i
                 $due_date = DateTime::createFromFormat('Y-m-d', $installment['due_date']);
                 $installment['due_date'] = $due_date;
 
-                $j_due_year = JalaliDate::fromGregorian($due_date)->jy;
+                $j_due_year = JalaliDate::fromGregorianDateTimeObject($due_date)->jy;
 
                 if ($installment['is_paid'] == 1) $installments_per_year[$j_due_year][] = "🟢";
                 else {
@@ -2238,7 +2237,7 @@ function createLoansView(array $loans, ?string $loans_mssg_id = null, ?string $i
             "\n‏      ┤─ تاریخ دریافت\: " . markdownScape(beautifulNumber(JalaliDate::fromGregorianString($loan['received_date'])->format(), null));
         if ($daysRemaining)
             $detail .= "\n‏      ┤─ قسط بعدی\: " . beautifulNumber($daysRemaining) . ' روز دیگر' .
-                ' (' . beautifulNumber(JalaliDate::fromGregorian($next_payment)->format(), null) . ')';
+                ' (' . beautifulNumber(JalaliDate::fromGregorianDateTimeObject($next_payment)->format(), null) . ')';
 
         $detail .= $installments_detail;
 
@@ -2280,7 +2279,7 @@ function createLoanDetailText(array $loan, string $mssg_id): string
 
             // Create installment text
             $inst_num = beautifulNumber(intval($i) + 1, null);
-            $date = beautifulNumber(JalaliDate::fromGregorian($due_date)->format(), null);
+            $date = beautifulNumber(JalaliDate::fromGregorianDateTimeObject($due_date)->format(), null);
             $amount = beautifulNumber($installment['amount']);
             $link = "https://ble.ir/" . BOT_ID . "?start=toggleInstPayment_instId{$installment['id']}_mssgId$mssg_id";
 
