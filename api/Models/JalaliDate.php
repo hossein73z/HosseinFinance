@@ -47,12 +47,12 @@ class JalaliDate
     }
 
     /**
-     * Converts Jalali to Gregorian (returns [y,m,d]).
+     * Convert Jalali date to Gregorian DateTime object.
      */
-    public function toGregorian(): array
+    public function toGregorian(): DateTime
     {
         [$gy, $gm, $gd] = self::jalaliToGregorian($this->jy, $this->jm, $this->jd);
-        return [$gy, $gm, $gd];
+        return new DateTime("$gy-$gm-$gd");
     }
 
     /**
@@ -79,9 +79,14 @@ class JalaliDate
      */
     public function addDays(int $days): self
     {
-        [$gy, $gm, $gd] = $this->toGregorian();
-        $newTs = mktime(0, 0, 0, $gm, $gd + $days, $gy);
-        return self::fromGregorian(date('Y', $newTs), date('m', $newTs), date('d', $newTs));
+        $gregorian = $this->toGregorian();
+        $newDate = clone $gregorian;
+        $newDate->modify("$days days");
+        return self::fromGregorian(
+            $newDate->format('Y'),
+            $newDate->format('m'),
+            $newDate->format('d')
+        );
     }
 
     /**
@@ -171,13 +176,12 @@ class JalaliDate
      */
     public function diffInDays(JalaliDate $other): int
     {
-        [$gy1, $gm1, $gd1] = $this->toGregorian();
-        [$gy2, $gm2, $gd2] = $other->toGregorian();
+        $gregorian1 = $this->toGregorian();
+        $gregorian2 = $other->toGregorian();
+        $diff = $gregorian1->diff($gregorian2);
+        $days = $diff->days;
 
-        $ts1 = mktime(0, 0, 0, $gm1, $gd1, $gy1);
-        $ts2 = mktime(0, 0, 0, $gm2, $gd2, $gy2);
-
-        return (int)round(($ts1 - $ts2) / 86400);
+        return $diff->invert ? $days : -$days;
     }
 
     /* ----------------------------- Internal Conversion Methods ------------------------------ */
