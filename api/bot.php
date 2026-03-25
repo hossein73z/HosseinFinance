@@ -2055,9 +2055,27 @@ function getLoansWithInstallments(array $conditions, DatabaseManager $db): bool|
         groupBy: 'l.id'
     );
     if ($loans)
+
+        # HACK: Below loop is supposed to just decode installments json,
+        #  but for now it also changes the Gregorian date to Jalali too.
+        # Todo: Remove Jalali implementation
+        # Todo: If possible, make the query read installments as array.
         foreach ($loans as &$loan) {
+
+            $received_date = DateTime::createFromFormat('Y-m-d', $loan['received_date']);
+            $loan['received_date'] = JalaliDate::fromGregorian($received_date->format('Y'), $received_date->format('m'), $received_date->format('d'))->format();
+
             $loan['installments'] = json_decode($loan['installments'], true);
             if ($loan['installments'][0]['id'] == null) $loan['installments'] = null;
+            else {
+                foreach ($loan['installments'] as &$installment) {
+                    $due_date = DateTime::createFromFormat('Y-m-d', $installment['due_date']);
+                    $installment['due_date'] = JalaliDate::fromGregorian($due_date->format('Y'), $due_date->format('m'), $due_date->format('d'))->format();
+
+                    $alert_date = DateTime::createFromFormat('Y-m-d', $installment['alert_date']);
+                    $installment['alert_date'] = JalaliDate::fromGregorian($alert_date->format('Y'), $alert_date->format('m'), $alert_date->format('d'))->format();
+                }
+            }
         }
     return $loans;
 }
