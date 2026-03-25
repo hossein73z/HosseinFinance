@@ -2235,10 +2235,10 @@ function createLoansView(array $loans, ?string $loans_mssg_id = null, ?string $i
         $loan_name = "\n‏\-* [" . markdownScape(beautifulNumber($loan['name'], null)) . "]($deep_link)*";
 
         $detail = "\n‏      │  \n‏      ┤─ مبلغ وام\: " . markdownScape(beautifulNumber($loan['total_amount'])) .
-            "\n‏      ┤─ تاریخ دریافت\: " . markdownScape(beautifulNumber($loan['received_date'], null));
+            "\n‏      ┤─ تاریخ دریافت\: " . markdownScape(beautifulNumber(JalaliDate::fromGregorianString($loan['received_date'])->format(), null));
         if ($daysRemaining)
             $detail .= "\n‏      ┤─ قسط بعدی\: " . beautifulNumber($daysRemaining) . ' روز دیگر' .
-                ' (' . beautifulNumber($due_date->format('Y-m-d'), null) . ')';
+                ' (' . beautifulNumber(JalaliDate::fromGregorian($due_date)->format(), null) . ')';
 
         $detail .= $installments_detail;
 
@@ -2279,18 +2279,18 @@ function createLoanDetailText(array $loan, string $mssg_id): string
             }
 
             // Create installment text
-            $num = beautifulNumber(intval($i) + 1, null);
-            $date = beautifulNumber($due_date->format('Y-m-d'), null);
+            $inst_num = beautifulNumber(intval($i) + 1, null);
+            $date = beautifulNumber(JalaliDate::fromGregorian($due_date)->format(), null);
             $amount = beautifulNumber($installment['amount']);
             $link = "https://ble.ir/" . BOT_ID . "?start=toggleInstPayment_instId{$installment['id']}_mssgId$mssg_id";
 
-            $installments_text .= "\n‏    $num\) {$installment['is_paid']}  $date:  $amount    [تغییر وضعیت پرداخت]($link)";
+            $installments_text .= "\n‏    $inst_num\) {$installment['is_paid']}  $date:  $amount    [تغییر وضعیت پرداخت]($link)";
 
         }
 
         $text = "‏*" . markdownScape($loan['name']) . "*:\n" .
             "\n مبلغ وام\: " . markdownScape(beautifulNumber($loan['total_amount'])) .
-            "\n تاریخ دریافت\: " . markdownScape(beautifulNumber($loan['received_date'], null)) .
+            "\n تاریخ دریافت\: " . markdownScape(beautifulNumber(JalaliDate::fromGregorianString($loan['received_date'])->format(), null)) .
             "\n کل بازپرداخت\: " . markdownScape(beautifulNumber(array_sum(array_column($installments, 'amount')))) .
             "\n " . markdownScape(beautifulNumber($paid_count) . " قسط پرداخت‌شده، معادل " . beautifulNumber($paid_sum)) .
             "\n " . markdownScape(beautifulNumber($remaining_count) . " قسط باقی‌مانده، معادل " . beautifulNumber($remaining_sum)) .
