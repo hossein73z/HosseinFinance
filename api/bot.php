@@ -2030,27 +2030,23 @@ function getLoansWithInstallments(array $conditions, DatabaseManager $db): bool|
         selectColumns: '
             l.*,
             CONCAT("[",
-                IFNULL(
-                    GROUP_CONCAT(
-                        JSON_OBJECT(
-                            "id", i.id,
-                            "loan_id", i.loan_id,
-                            "amount", i.amount,
-                            "due_date", i.due_date,
-                            "is_paid", i.is_paid
-                        ) ORDER BY due_date ASC
-                    ),
-                    ""),
-                "]") AS installments
-            ',
+                GROUP_CONCAT(
+                    JSON_OBJECT(
+                        "id", i.id,
+                        "loan_id", i.loan_id,
+                        "amount", i.amount,
+                        "due_date", i.due_date,
+                        "is_paid", i.is_paid
+                    ) ORDER BY due_date ASC
+                ),
+            "]") AS installments',
         join: 'LEFT JOIN installments i on i.loan_id = l.id',
         groupBy: 'l.id'
     );
     if ($loans)
-        foreach ($loans as $i => $loan) { // TODO: Change to `&$loan`
+        foreach ($loans as &$loan) {
             $loan['installments'] = json_decode($loan['installments'], true);
-            if ($loan['installments'][0]['id'] == null) $loans[$i]['installments'] = null;
-            else $loans[$i]['installments'] = $loan['installments'];
+            if ($loan['installments'][0]['id'] == null) $loan['installments'] = null;
         }
     return $loans;
 }
