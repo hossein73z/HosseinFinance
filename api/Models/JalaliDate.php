@@ -48,6 +48,15 @@ class JalaliDate
     }
 
     /**
+     * Static constructor from Gregorian string.
+     */
+    public static function fromGregorianString(string $date_string, string $format = 'Y-m-d'): self
+    {
+        $g_date = DateTime::createFromFormat($format, $date_string);
+        return self::fromGregorian($g_date);
+    }
+
+    /**
      * Convert Jalali date to Gregorian DateTime object.
      */
     public function toGregorian(): DateTime
