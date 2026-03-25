@@ -1033,7 +1033,7 @@ function handleLoansTextMessage(User $user, array $data, array $message, Databas
 
             $db->update(
                 table: 'users',
-                data: ['progress' => json_encode(['view_loan' => ['loan_id' => $loans['id']]])],
+                data: ['progress' => json_encode(['view_loan' => ['loan_id' => $loans[0]['id']]])],
                 conditions: ['id' => $user->getId()]
             );
             exit();
@@ -2260,15 +2260,15 @@ function createLoanDetailText(array $loan, string $mssg_id): string
         foreach ($installments as $i => &$installment) {
 
             // Create date objects
-            $todayJ = JalaliDate::fromGregorian();
-            $due_date = JalaliDate::fromString($installment['due_date']);
+            $today = new DateTime();
+            $due_date = DateTime::createFromFormat('Y-m-d', $installment['due_date']);
 
             // Add payment status icon and calculate status counts and sums
             if ($installment['is_paid'] == 1) {
                 $installment['is_paid'] = "🟢";
                 $paid_count++;
                 $paid_sum += $installment['amount'];
-            } elseif ($due_date->diffInDays($todayJ) < 0) {
+            } elseif ($due_date->diff($today)) {
                 $installment['is_paid'] = "🔴";
                 $overdue_count++;
                 $overdue_sum += $installment['amount'];
@@ -2280,7 +2280,7 @@ function createLoanDetailText(array $loan, string $mssg_id): string
 
             // Create installment text
             $num = beautifulNumber(intval($i) + 1, null);
-            $date = beautifulNumber($due_date->format(), null);
+            $date = beautifulNumber($due_date->format('Y-m-d'), null);
             $amount = beautifulNumber($installment['amount']);
             $link = "https://ble.ir/" . BOT_ID . "?start=toggleInstPayment_instId{$installment['id']}_mssgId$mssg_id";
 
