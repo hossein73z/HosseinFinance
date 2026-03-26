@@ -22,14 +22,14 @@ class JalaliDate
      */
     public static function fromGregorian(array|null $Ymd = null): self
     {
-        $jalali = self::gregorianToJalali($Ymd[0], $Ymd[1], $Ymd[2]);
+        $jalali = self::gregorianToJalali($Ymd ? $Ymd[0] : null, $Ymd ? $Ymd[1] : null, $Ymd ? $Ymd[2] : null);
         return new self($jalali['jy'], $jalali['jm'], $jalali['jd']);
     }
 
     /**
      * Static constructor from Gregorian date as DateTime object.
      */
-    public static function fromGregorianDateTimeObject(DateTime $Ymd): self
+    public static function fromGregorianObject(DateTime $Ymd): self
     {
         $jalali = self::gregorianToJalali($Ymd->format('Y'), $Ymd->format('m'), $Ymd->format('d'));
         return new self($jalali['jy'], $jalali['jm'], $jalali['jd']);
@@ -41,7 +41,7 @@ class JalaliDate
     public static function fromGregorianString(string $date_string, string $format = 'Y-m-d'): self
     {
         $g_date = DateTime::createFromFormat($format, $date_string);
-        return self::fromGregorianDateTimeObject($g_date);
+        return self::fromGregorianObject($g_date);
     }
 
     /**
