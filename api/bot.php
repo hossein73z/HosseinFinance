@@ -2,6 +2,8 @@
 // Load core configuration and constants.
 use JetBrains\PhpStorm\NoReturn;
 
+date_default_timezone_set('Asia/Tehran');
+
 // --- VERCEL CONFIGURATION ---
 define('SHARED_SECRET', getenv('SHARED_SECRET'));
 define('BOT_ID', getenv('BOT_ID'));
@@ -2060,18 +2062,16 @@ function getLoansWithInstallments(array $conditions, DatabaseManager $db, bool $
             $loan['installments'] = json_decode($loan['installments'], true);
             if ($loan['installments'][0]['id'] == null) $loan['installments'] = null;
 
-            date_default_timezone_set('Asia/Tehran');
-
             // Objectify received date column
             $loan['received_date'] = DateTime::createFromFormat('Y-m-d', $loan['received_date']);
             if ($jalali_dates) $loan['received_date'] = JalaliDate::fromGregorianObject($loan['received_date']);
 
             $loan['installments_summary']['paid_count'] = 0;
             $loan['installments_summary']['overdue_count'] = 0;
-            $loan['installments_summary']['undue_count'] = 0;
+            $loan['installments_summary']['remaining_count'] = 0;
             $loan['installments_summary']['paid_sum'] = 0;
             $loan['installments_summary']['overdue_sum'] = 0;
-            $loan['installments_summary']['undue_sum'] = 0;
+            $loan['installments_summary']['remaining_sum'] = 0;
             foreach ($loan['installments'] as &$installment) {
 
                 $installment['is_paid'] = boolval($installment['is_paid']);
@@ -2087,10 +2087,10 @@ function getLoansWithInstallments(array $conditions, DatabaseManager $db, bool $
                 // Initialize installments' summary
                 if ($installment['is_paid']) $summary_key_word = 'paid';
                 elseif ($installment['is_due']) $summary_key_word = 'overdue';
-                if (!$installment['is_due']) $summary_key_word = 'undue';
+                else $summary_key_word = 'remaining';
 
-                if (isset($summary_key_word)) $loan['installments_summary'][$summary_key_word . '_count'] += 1;
-                if (isset($summary_key_word)) $loan['installments_summary'][$summary_key_word . '_sum'] += $installment['amount'];
+                $loan['installments_summary'][$summary_key_word . '_count'] += 1;
+                $loan['installments_summary'][$summary_key_word . '_sum'] += $installment['amount'];
 
                 // Change dates to Jalali
                 if ($jalali_dates) $installment['due_date'] = JalaliDate::fromGregorianObject($installment['due_date']);
@@ -2333,7 +2333,7 @@ function createLoanDetailText(array $loan, string $mssg_id): string
             "\n تاریخ دریافت\: " . markdownScape(beautifulNumber($loan['received_date']->format(), null)) .
             "\n کل بازپرداخت\: " . markdownScape(beautifulNumber(array_sum(array_column($installments, 'amount')))) .
             "\n " . markdownScape(beautifulNumber($loan['installments_summary']['paid_count']) . " قسط پرداخت‌شده، معادل " . beautifulNumber($loan['installments_summary']['paid_sum'])) .
-            "\n " . markdownScape(beautifulNumber($loan['installments_summary']['undue_count']) . " قسط سررسید نشده، معادل " . beautifulNumber($loan['installments_summary']['undue_sum'])) .
+            "\n " . markdownScape(beautifulNumber($loan['installments_summary']['remaining_count']) . " قسط باقی مانده، معادل " . beautifulNumber($loan['installments_summary']['remaining_sum'])) .
             "\n " . markdownScape(beautifulNumber($loan['installments_summary']['overdue_count']) . " قسط معوقه، معادل " . beautifulNumber($loan['installments_summary']['overdue_sum'])) .
             "\n جزئیات اقساط\: ";
 
