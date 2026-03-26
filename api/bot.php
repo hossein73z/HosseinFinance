@@ -852,13 +852,12 @@ function handleLoansCallback(User $user, array $callback_query, array $data, arr
 function handleLoansWebAppData(User $user, array $data, array $message, DatabaseManager $db): void
 {
     /*
-     * TODO
-     *  1. Convert all date related columns to Gregorian.
-     *  2. Change all date related columns' type to Date.
-     *  3. Add Triggers
-     *      `after insert` trigger for installments and
-     *      `after update` trigger for loans table
-     *      to automatically calculate `alert_date` column.
+     * TODO: Add Triggers to automatically calculate `alert_date` column:
+     *  `after insert` trigger for installments and
+     *  `after update` trigger for loans table
+     *
+     * TODO: When using telegram, handle showing,
+     *  editing and inserting dates in Gregorian
      */
 
     $web_app_data = json_decode($message['web_app_data']['data'], true);
@@ -2032,7 +2031,7 @@ function getHoldingsWithAssetDetails(array $conditions, DatabaseManager $db, boo
     );
 }
 
-function getLoansWithInstallments(array $conditions, DatabaseManager $db): bool|array
+function getLoansWithInstallments(array $conditions, DatabaseManager $db, bool $jalali_dates = false): bool|array
 {
     $loans = $db->read(
         table: 'loans l',
@@ -2056,8 +2055,20 @@ function getLoansWithInstallments(array $conditions, DatabaseManager $db): bool|
     );
     if ($loans)
         foreach ($loans as &$loan) {
+
+            // Decode installments JSON into an array of installments
             $loan['installments'] = json_decode($loan['installments'], true);
             if ($loan['installments'][0]['id'] == null) $loan['installments'] = null;
+
+            // Convert all dates to Jalali
+            if ($jalali_dates) {
+
+                $loan['received_date'] = JalaliDate::fromGregorianString($loan['received_date'])->format();
+                foreach ($loan['installments'] as &$installment) {
+                    $installment['due_date'] = JalaliDate::fromGregorianString($installment['due_date'])->format();
+                    $installment['alert_date'] = JalaliDate::fromGregorianString($installment['alert_date'])->format();
+                }
+            }
         }
     return $loans;
 }
