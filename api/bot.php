@@ -1103,7 +1103,7 @@ function handleLoansTextMessage(User $user, array $data, array $message, Databas
 
 }
 
-function sendAllLoans(User $user, DatabaseManager $db, ?string $initial_mssg_id = null): void
+function sendAllLoans(User $user, DatabaseManager $db, ?string $initial_mssg_id = null, bool $summerized = true): void
 {
     $loans = getLoansWithInstallments(['l.user_id' => $user->getId()], $db, true);
 
@@ -1114,7 +1114,7 @@ function sendAllLoans(User $user, DatabaseManager $db, ?string $initial_mssg_id 
             sendToTelegram('editMessageText', [
                 'chat_id' => $user->getid(),
                 'message_id' => $temp_mssg['result']['message_id'],
-                'text' => createLoansView($loans, $temp_mssg['result']['message_id'], $initial_mssg_id),
+                'text' => createLoansView($loans, $temp_mssg['result']['message_id'], $initial_mssg_id, $summerized),
                 'parse_mode' => 'MarkdownV2'
             ]);
         }
@@ -2034,6 +2034,7 @@ function getHoldingsWithAssetDetails(array $conditions, DatabaseManager $db, boo
 
 function getLoansWithInstallments(array $conditions, DatabaseManager $db, bool $jalali_dates = false): bool|array
 {
+    // TODO: Calculate remining days to next installment
     $loans = $db->read(
         table: 'loans l',
         conditions: $conditions,
@@ -2237,7 +2238,7 @@ function createHoldingDetailText(
  *  -- Installments must be sorted ascending by their due date.
  *  -- Installments must have 'is_due' bool value.
  */
-function createLoansView(array $loans, ?string $loans_mssg_id = null, ?string $initial_mssg_id = null): string
+function createLoansView(array $loans, ?string $loans_mssg_id = null, ?string $initial_mssg_id = null, bool $summerized = false): string
 {
     $text = 'وام‌های ثبت شده‌ی شما: ' . "\n";
     foreach ($loans as $loan) {
@@ -2248,6 +2249,7 @@ function createLoansView(array $loans, ?string $loans_mssg_id = null, ?string $i
         if ($installments) {
 
             $insts_per_year = [];
+            $summerized_insts_text = '‏';
             foreach ($installments as $installment) {
 
                 $due_year = $installment['due_date']->jy;
@@ -2257,8 +2259,12 @@ function createLoansView(array $loans, ?string $loans_mssg_id = null, ?string $i
                     $next_payment = $installment['due_date'];
 
                 // Create paid status icon for the installment
-                if ($installment['is_paid'] == 1) $insts_per_year[$due_year][] = "🟢";
-                else $insts_per_year[$due_year][] = $installment['is_due'] ? "🔴" : "⚪";
+                if ($installment['is_paid'])
+                    if (!$summerized) $insts_per_year[$due_year][] = "🟢";
+                    else $summerized_insts_text .= "🟢";
+                else
+                    if (!$summerized) $insts_per_year[$due_year][] = $installment['is_due'] ? "🔴" : "⚪";
+                    else $summerized_insts_text .= $installment['is_due'] ? "🔴" : "⚪";
             }
 
             $last_year = array_key_last($insts_per_year);
@@ -2275,18 +2281,24 @@ function createLoansView(array $loans, ?string $loans_mssg_id = null, ?string $i
         $daysRemaining = $next_payment?->diffInDays(JalaliDate::fromGregorian());
 
         $deep_link = "https://ble.ir/" . BOT_ID . "?start=showLoan_loanId{$loan['id']}" . ($loans_mssg_id ? "_loansMssgId" . $loans_mssg_id : '') . ($initial_mssg_id ? "_initMssgId" . $initial_mssg_id : '');
-        $loan_name = "\n‏\-* [" . markdownScape(beautifulNumber($loan['name'], null)) . "]($deep_link)*";
+        $loan_name = "\n‏" . "\-* [" . beautifulNumber($loan['name'], null) . "]($deep_link)*";
 
-        $detail =
-            "\n‏      │  \n‏      ┤─ مبلغ وام\: " . markdownScape(beautifulNumber($loan['total_amount'])) .
-            "\n‏      ┤─ تاریخ دریافت\: " . markdownScape(beautifulNumber($loan['received_date']->format(), null));
-        if ($daysRemaining)
-            $detail .= "\n‏      ┤─ قسط بعدی\: " . beautifulNumber($daysRemaining) . ' روز دیگر ' .
-                'در ' . beautifulNumber($next_payment->format(), null);
+        $next_payment_text = $daysRemaining ?
+            beautifulNumber($daysRemaining . ' روز دیگر در ' . $next_payment->format(), null) :
+            'پایان یافته';
 
-        $detail .= $installments_detail;
+        if (!$summerized) {
+            $detail =
+                "\n‏      │  " .
+                "\n‏      ┤─ " . 'مبلغ وام: ' . beautifulNumber($loan['total_amount']) .
+                "\n‏      ┤─ " . 'تاریخ دریافت: ' . beautifulNumber($loan['received_date']->format(), null) .
+                "\n‏      ┤─ " . 'قسط بعدی: ' . $next_payment_text;
 
-        $text .= $loan_name . $detail . "\n";
+            $detail .= $installments_detail . "\n";
+        } else
+            $detail = ': ' . $next_payment_text . "\n" . $summerized_insts_text . "\n";
+
+        $text .= $loan_name . markdownScape($detail);
     }
     return $text;
 }
