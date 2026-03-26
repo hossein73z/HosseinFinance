@@ -155,7 +155,7 @@ function handleCallbackQuery(array $callback_query, DatabaseManager $db): void
         }
 
         $query_data = json_decode($callback_query['data'], true);
-        $query_key = array_key_first($query_data);
+        $query_key = $query_data ? array_key_first($query_data) : $query_data;
 
         switch ($query_key) {
 
@@ -169,7 +169,6 @@ function handleCallbackQuery(array $callback_query, DatabaseManager $db): void
             case 'conf_del_fav':
             case 'set_live':
             case 'show_favorites':
-                // TODO: Move alert related callbacks to separate function from the level
                 level_5($user, $db, null, $message, $callback_query);
 
             case 'fav_alert':
@@ -2282,8 +2281,8 @@ function createLoansView(array $loans, ?string $loans_mssg_id = null, ?string $i
             "\n‏      │  \n‏      ┤─ مبلغ وام\: " . markdownScape(beautifulNumber($loan['total_amount'])) .
             "\n‏      ┤─ تاریخ دریافت\: " . markdownScape(beautifulNumber($loan['received_date']->format(), null));
         if ($daysRemaining)
-            $detail .= "\n‏      ┤─ قسط بعدی\: " . beautifulNumber($daysRemaining) . ' روز دیگر' .
-                ' (' . beautifulNumber($next_payment->format(), null) . ')';
+            $detail .= "\n‏      ┤─ قسط بعدی\: " . beautifulNumber($daysRemaining) . ' روز دیگر ' .
+                'در ' . beautifulNumber($next_payment->format(), null);
 
         $detail .= $installments_detail;
 
