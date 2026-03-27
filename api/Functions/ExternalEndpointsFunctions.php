@@ -17,7 +17,7 @@ function sendToTelegram(
 {
     // Allow token to be passed, or fallback to constant/env
     if (empty($token))
-        $token = defined('MAIN_BOT_TOKEN') ? MAIN_BOT_TOKEN : getenv('MAIN_BOT_TOKEN');
+        $token = defined('BOT_TOKEN') ? BOT_TOKEN : getenv('BOT_TOKEN');
     if (empty($bot_endpoint))
         $bot_endpoint = defined('BOT_ENDPOINT') ? BOT_ENDPOINT : getenv('BOT_ENDPOINT');
 

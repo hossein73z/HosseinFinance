@@ -7,8 +7,7 @@ date_default_timezone_set('Asia/Tehran');
 // --- VERCEL CONFIGURATION ---
 define('SHARED_SECRET', getenv('SHARED_SECRET'));
 define('BOT_ID', getenv('BOT_ID'));
-define('MAIN_BOT_TOKEN', getenv('MAIN_BOT_TOKEN'));
-define('MAJID_API_TOKEN', getenv('MAJID_API_TOKEN'));
+define('BOT_TOKEN', getenv('BOT_TOKEN'));
 
 // Database Constants (Required for DatabaseManager)
 define('DB_HOST', getenv('DB_HOST'));
@@ -824,18 +823,22 @@ function level_2(
 #[NoReturn]
 function handleLoansCallback(User $user, array $callback_query, array $data, array $message, $db): void
 {
-    sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
-
     $query_data = $callback_query['data'];
 
     $query_key = array_key_first($query_data);
     $data['message_id'] = $message['message_id'];
 
+    sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
+
     switch ($query_key) {
         case 'loan_list':
             sendToTelegram('deleteMessage', ['chat_id' => $user->getid(), 'message_id' => $message['message_id']]);
             $response = sendToTelegram('sendMessage', $data);
-            sendAllLoans($user, $db, $response['result']['message_id']);
+            if ($response) sendAllLoans($user, $db, $response['result']['message_id']);
+            break;
+
+        case 'detailed_loans':
+            sendAllLoans($user, $db, null, $message['message_id'], !$query_data[$query_key]);
             break;
 
         default:
@@ -1025,9 +1028,10 @@ function handleLoansTextMessage(User $user, array $data, array $message, Databas
             /** else: Send default Irrelevance message */
 
             // Delete redundant messages
-            sendToTelegram('deleteMessage', ['chat_id' => $user->getid(), 'message_id' => $matches[5]]); ////////// // Initial
-            sendToTelegram('deleteMessage', ['chat_id' => $user->getid(), 'message_id' => $matches[3]]); ////////// // Loans
-            sendToTelegram('deleteMessage', ['chat_id' => $user->getid(), 'message_id' => $message['message_id']]); // Deep-Link
+            if (isset($matches[5]))
+                sendToTelegram('deleteMessage', ['chat_id' => $user->getid(), 'message_id' => $matches[5]]); ######## Initial
+            sendToTelegram('deleteMessage', ['chat_id' => $user->getid(), 'message_id' => $matches[3]]); ############ Loans
+            sendToTelegram('deleteMessage', ['chat_id' => $user->getid(), 'message_id' => $message['message_id']]); # Deep-Link
 
             sendLoanDetail($loans[0], $data);
 
@@ -1103,21 +1107,28 @@ function handleLoansTextMessage(User $user, array $data, array $message, Databas
 
 }
 
-function sendAllLoans(User $user, DatabaseManager $db, ?string $initial_mssg_id = null, bool $summerized = true): void
+function sendAllLoans(User $user, DatabaseManager $db, ?string $initial_mssg_id = null, ?string $mssg_id_to_edit = null, bool $summerized = true): void
 {
     $loans = getLoansWithInstallments(['l.user_id' => $user->getId()], $db, true);
 
     if ($loans) {
+        if (!$mssg_id_to_edit) {
+            $temp_mssg = sendLoadingMessage($user->getid(), 'در حال دریافت اطلاعات وام‌ها ...');
+            if ($temp_mssg) $mssg_id_to_edit = $temp_mssg['result']['message_id'];
+        }
 
-        $temp_mssg = sendLoadingMessage($user->getid(), 'در حال دریافت اطلاعات وام‌ها ...');
-        if ($temp_mssg) {
+        if ($mssg_id_to_edit)
             sendToTelegram('editMessageText', [
                 'chat_id' => $user->getid(),
-                'message_id' => $temp_mssg['result']['message_id'],
-                'text' => createLoansView($loans, $temp_mssg['result']['message_id'], $initial_mssg_id, $summerized),
-                'parse_mode' => 'MarkdownV2'
+                'message_id' => $mssg_id_to_edit,
+                'text' => createLoansView($loans, $mssg_id_to_edit, $initial_mssg_id, $summerized),
+                'parse_mode' => 'MarkdownV2',
+                'reply_markup' => ['inline_keyboard' => [[
+                    [
+                        'text' => $summerized ? 'نمایش جزئیات وام‌ها' : 'پنهان کردن جزئیات',
+                        'callback_data' => json_encode(['detailed_loans' => $summerized])
+                    ]]]]
             ]);
-        }
     } else {
         sendToTelegram('sendMessage', ['chat_id' => $user->getid(), 'text' => 'هیچ وام یا قسطی برای شما ثبت نشده است!']);
     }
@@ -2100,6 +2111,7 @@ function getLoansWithInstallments(array $conditions, DatabaseManager $db, bool $
     return $loans;
 }
 
+// TODO: Om main server, change this so it won't use api directly
 function createWebAppBtn(string $text, string $path, array $params = []): array
 {
     $url = BASE_URL . $path;
