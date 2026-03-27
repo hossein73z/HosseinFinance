@@ -1,10 +1,21 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <script src="https://tapi.bale.ai/miniapp.js?3"></script>
+    <script src="https://tapi.bale.ai/miniapp.js?3"></script> <!-- HACK: Needs to be changed when using for telegram -->
     <meta charset="UTF-8"/>
     <title>Test Holding Form</title>
     <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <style>
+        button.danger-btn {
+            background-color: #dc3545;
+            color: white;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+    </style>
 </head>
 <body>
 <form id="holdingForm">
@@ -30,6 +41,9 @@
     <p>
         <button type="submit">Send to Bot</button>
     </p>
+    <p>
+        <button type="button" id="deleteButton" class="danger-btn hidden">Delete Holding</button>
+    </p>
 </form>
 <script>
     // Parse URL for editing
@@ -45,6 +59,10 @@
             document.getElementById('date').value = data.date || '';
             document.getElementById('time').value = data.time || '';
             document.getElementById('note').value = data.note || '';
+
+            const deleteButton = document.getElementById('deleteButton');
+            deleteButton.classList.remove('hidden');
+
         } catch (e) {
             console.error("Failed to parse data:", e);
         }
@@ -64,6 +82,8 @@
                 note: document.getElementById('note').value
             }
         };
+
+        // HACK: Needs to be changed when using for telegram
         // Send to Bale bot
         if (window.Bale && window.Bale.WebApp) {
             window.Bale.WebApp.sendData(JSON.stringify(payload));
@@ -72,6 +92,26 @@
             alert("Telegram WebApp not available. This is for testing only.");
         }
     });
+    // Delete button
+    document.getElementById('deleteButton').addEventListener('click', function (e) {
+        e.preventDefault();
+        const payload = {
+            action: 'delete',
+            holding: {
+                id: document.getElementById('holding_id').value
+            }
+        };
+
+        // HACK: Needs to be changed when using for telegram
+        // Send to Bale bot
+        if (window.Bale && window.Bale.WebApp) {
+            window.Bale.WebApp.sendData(JSON.stringify(payload));
+            window.Bale.WebApp.close();
+        } else {
+            alert("Telegram WebApp not available. This is for testing only.");
+        }
+    });
+
 </script>
 </body>
 </html>

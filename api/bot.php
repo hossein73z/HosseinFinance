@@ -611,7 +611,7 @@ function handleHoldingsWebAppData(User $user, array $data, array $message, Datab
         try {
             $db->delete(
                 table: 'holdings',
-                conditions: ['id' => $web_app_data['id']],
+                conditions: ['id' => $web_app_data['holding']['id']],
                 resetAutoIncrement: true
             );
             $data['text'] = '✅ دارایی با موفقیت حذف شد.';
@@ -2113,12 +2113,9 @@ function getLoansWithInstallments(array $conditions, DatabaseManager $db, bool $
     return $loans;
 }
 
-// TODO: Om main server, change this so it won't use api directly
 function createWebAppBtn(string $text, string $path, array $params = []): array
 {
     $url = BASE_URL . $path;
-    $params['api_url'] = BASE_URL . '/api/ExternalConnections/api.php';
-    $params['api_key'] = DB_API_SECRET;
 
     return [
         'text' => $text,
