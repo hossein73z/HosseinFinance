@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script src="https://tapi.bale.ai/miniapp.js?3"></script>
+    <meta charset="UTF-8"/>
+    <title>Test Holding Form</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+</head>
+<body>
+<form id="holdingForm">
+    <input type="hidden" id="holding_id" name="id"/>
+    <p>
+        <label>Asset ID: <input type="text" id="asset_id" name="asset_id" required/></label>
+    </p>
+    <p>
+        <label>Amount: <input type="text" id="amount" name="amount" required/></label>
+    </p>
+    <p>
+        <label>Avg Price: <input type="text" id="avg_price" name="avg_price" required/></label>
+    </p>
+    <p>
+        <label>Date: <input type="text" id="date" name="date" placeholder="YYYY/MM/DD" required/></label>
+    </p>
+    <p>
+        <label>Time: <input type="text" id="time" name="time" placeholder="HH:MM" required/></label>
+    </p>
+    <p>
+        <label>Note: <textarea id="note" name="note" rows="2"></textarea></label>
+    </p>
+    <p>
+        <button type="submit">Send to Bot</button>
+    </p>
+</form>
+<script>
+    // Parse URL for editing
+    const urlParams = new URLSearchParams(window.location.search);
+    const dataEncoded = urlParams.get('data');
+    if (dataEncoded) {
+        try {
+            const data = JSON.parse(atob(dataEncoded));
+            document.getElementById('holding_id').value = data.id || '';
+            document.getElementById('asset_id').value = data.asset_id || '';
+            document.getElementById('amount').value = data.amount || '';
+            document.getElementById('avg_price').value = data.avg_price || '';
+            document.getElementById('date').value = data.date || '';
+            document.getElementById('time').value = data.time || '';
+            document.getElementById('note').value = data.note || '';
+        } catch (e) {
+            console.error("Failed to parse data:", e);
+        }
+    }
+    // Submit form
+    document.getElementById('holdingForm').addEventListener('submit', function (e) {
+        e.preventDefault();
+        const payload = {
+            action: document.getElementById('holding_id').value ? 'edit' : 'add',
+            holding: {
+                id: document.getElementById('holding_id').value,
+                asset_id: document.getElementById('asset_id').value,
+                amount: document.getElementById('amount').value,
+                avg_price: document.getElementById('avg_price').value,
+                date: document.getElementById('date').value,
+                time: document.getElementById('time').value,
+                note: document.getElementById('note').value
+            }
+        };
+        // Send to Bale bot
+        if (window.Bale && window.Bale.WebApp) {
+            window.Bale.WebApp.sendData(JSON.stringify(payload));
+            window.Bale.WebApp.close();
+        } else {
+            alert("Telegram WebApp not available. This is for testing only.");
+        }
+    });
+</script>
+</body>
+</html>
