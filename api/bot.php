@@ -18,7 +18,7 @@ define('DB_PASS', getenv('DB_PASS'));
 define('DB_API_SECRET', getenv('DB_API_SECRET'));
 
 // Base URL for Web Apps
-define('BASE_URL', 'https://' . getenv('VERCEL_PROJECT_PRODUCTION_URL'));
+define('BASE_URL', getenv('BASE_URL'));
 // ----------------------------
 
 // Load necessary files
@@ -463,7 +463,7 @@ function level_1(
     $keyboard = createKeyboardsArray(parent_btn_id: $level_button->getId(), admin: $user->isAdmin(), db: $db);
 
     // Add '➕ افزودن دارایی جدید' button to the keyboard
-    array_unshift($keyboard, [createWebAppBtn('➕ افزودن دارایی جدید', '/assets/add_holding.html')]);
+    array_unshift($keyboard, [createWebAppBtn('➕ افزودن دارایی جدید', '/assets/holding_add.html')]);
 
     $data = [
         'chat_id' => $user->getid(),
@@ -530,9 +530,10 @@ function handleHoldingsCallback(User $user, array $callback_query, array $data, 
 function handleHoldingsWebAppData(User $user, array $data, array $message, DatabaseManager $db): void
 {
     $web_app_data = json_decode($message['web_app_data']['data'], true);
+
     $action = $web_app_data['action'] ?? null;
 
-    $correct_data = false;
+    $expected_data = false;
 
     if ($action === 'add') {
 
@@ -545,7 +546,7 @@ function handleHoldingsWebAppData(User $user, array $data, array $message, Datab
                     "asset_id" => $new_holding["asset_id"],
                     "amount" => $new_holding["amount"],
                     "avg_price" => $new_holding["avg_price"],
-                    "date" => $new_holding["date"],
+                    "date" => JalaliDate::fromString($new_holding["date"])->toGregorian()->format('Y-m-d'),
                     "time" => $new_holding["time"],
                     "note" => $new_holding["note"],
                 ]
@@ -555,16 +556,16 @@ function handleHoldingsWebAppData(User $user, array $data, array $message, Datab
         } catch (PDOException $e) {
 
             if ($e->errorInfo[1] == 1062) {
-                /*
+                /**
                  * Duplicate Entry.
                  *
-                 * Sends the informative message, redirects user
-                 * to the existing holding and breaks the process.
+                 * Informs user of existing holding, redirects
+                 * them to the holding and breaks the process.
                  */
 
-                $data['text'] = ' ' .
-                    'شما از قبل این دارایی را در سیستم ثبت کرده اید.' . "\n" .
+                $data['text'] = 'شما از قبل این دارایی را در سیستم ثبت کرده اید.' . "\n" .
                     'درصورت تمایل برای ثبت تغییرات، دارایی ثبت شده را ویرایش کنید.';
+
                 sendToTelegram('sendMessage', $data);
 
                 $holding = getHoldingsWithAssetDetails(['h.asset_id' => $new_holding["asset_id"], 'h.user_id' => $user->getId()], $db, true);
@@ -584,17 +585,18 @@ function handleHoldingsWebAppData(User $user, array $data, array $message, Datab
             );
             $data['text'] = '❌ خطای پایگاه داده در ثبت دارایی جدید: ' . $e->errorInfo[2];
         }
-        $correct_data = true;
+        $expected_data = true;
     }
     if ($action === 'edit') {
 
         try {
+            $modified_holding = $web_app_data['holding'];
             $db->update(
                 table: 'holdings',
-                data: $web_app_data['updates'],
-                conditions: ['id' => $web_app_data['id']]
+                data: $modified_holding,
+                conditions: ['id' => $modified_holding['id']]
             );
-            $data['text'] = '✅ دارایی با موفقیت ویرایش ثبت شد.';
+            $data['text'] = '✅ دارایی با موفقیت ویرایش شد.';
 
         } catch (PDOException $e) {
             error_log('Updates: ' . json_encode($web_app_data['updates']) . "\n" .
@@ -602,7 +604,7 @@ function handleHoldingsWebAppData(User $user, array $data, array $message, Datab
             );
             $data['text'] = '❌ خطای پایگاه داده در ثبت دارایی جدید: ' . $e->errorInfo[2];
         }
-        $correct_data = true;
+        $expected_data = true;
     }
     if ($action === 'delete') {
 
@@ -620,10 +622,10 @@ function handleHoldingsWebAppData(User $user, array $data, array $message, Datab
             );
             $data['text'] = '❌ خطای پایگاه داده درحذف دارایی: ' . $e->errorInfo[2];
         }
-        $correct_data = true;
+        $expected_data = true;
     }
 
-    if ($correct_data) {
+    if ($expected_data) {
         // Send success/failure message
         sendToTelegram('sendMessage', $data);
 
@@ -729,7 +731,7 @@ function sendHoldingDetail(array $holding, array $data, string $user_base_curren
     $data['text'] = "/holding_$holding[id]\n";
     $data['text'] .= 'جزئیات دارایی «' . $holding['asset_name'] . '»';
     array_unshift($data['reply_markup']['keyboard'], [
-        createWebAppBtn('✏ ویرایش ' . beautifulNumber($holding['asset_name'], null), '/assets/add_holding.html', ['data' => base64_encode(json_encode($holding))])
+        createWebAppBtn('✏ ویرایش ' . beautifulNumber($holding['asset_name'], null), '/assets/holding_add.html', ['data' => base64_encode(json_encode($holding))])
     ]);
 
     sendToTelegram('sendMessage', $data);
@@ -756,7 +758,7 @@ function checkAndAddEditHoldingButton(array $data, User $user, DatabaseManager $
             array_unshift($data['reply_markup']['keyboard'], [
                 createWebAppBtn(
                     text: '✏ ویرایش ' . $holding['asset_name'],
-                    path: '/assets/add_holding.html',
+                    path: '/assets/holding_add.html',
                     params: ['data' => base64_encode(json_encode($holding))])
             ]);
         }
@@ -2119,8 +2121,8 @@ function createWebAppBtn(string $text, string $path, array $params = []): array
     $params['api_key'] = DB_API_SECRET;
 
     return [
-        'text' => 'WebApp: ' . $text,
-//        'web_app' => ['url' => $url . '?' . http_build_query($params)]
+        'text' => $text,
+        'web_app' => ['url' => $url . '?' . http_build_query($params)]
     ];
 }
 
@@ -2250,7 +2252,7 @@ function createHoldingDetailText(
  *  -- Installments must be sorted ascending by their due date.
  *  -- Installments must have 'is_due' bool value.
  */
-function createLoansView(array $loans, ?string $loans_mssg_id = null, ?string $initial_mssg_id = null, bool $summerized = false): string
+function createLoansView(array $loans, ?string $loans_mssg_id = null, ?string $initial_mssg_id = null, bool $summerized = true): string
 {
     $text = 'وام‌های ثبت شده‌ی شما: ' . "\n";
     foreach ($loans as $loan) {
