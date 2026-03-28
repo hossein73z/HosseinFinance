@@ -865,10 +865,10 @@ function handleLoansWebAppData(User $user, array $data, array $message, Database
 
     $web_app_data = json_decode($message['web_app_data']['data'], true);
     // Add new loan and installments
-    if (isset($web_app_data['loans']) &&
+    if (isset($web_app_data['loan']) &&
         isset($web_app_data['installments'])) {
 
-        $new_loan = $web_app_data['loans'];
+        $new_loan = $web_app_data['loan'];
         try {
 
             $loan_id = $db->create(
@@ -884,13 +884,18 @@ function handleLoansWebAppData(User $user, array $data, array $message, Database
             $count = 0;
             foreach ($web_app_data['installments'] as $inst) {
                 try {
+
+                    $inst['due_date'] = JalaliDate::fromString($inst['due_date'])->toGregorian();
+                    $due_date = clone $inst['due_date'];
+                    $alert_date = $due_date->modify("-$new_loan[alert_offset] days")->format('Y-m-d');
+
                     $db->create(
                         table: 'installments',
                         data: [
                             'loan_id' => $loan_id,
                             'amount' => $inst['amount'],
-                            'due_date' => JalaliDate::fromString($inst['due_date'])->toGregorian()->format('Y-m-d'),
-                            # 'alert_date' => TODO: Complete this
+                            'due_date' => $due_date->format('Y-m-d'),
+                            'alert_date' => $alert_date,
                             'is_paid' => 0
                         ]);
                     $count++;
@@ -1005,6 +1010,8 @@ function handleLoansWebAppData(User $user, array $data, array $message, Database
         sendAllLoans($user, $db);
         exit();
     }
+
+    error_log('Unprocessable WebApp Data Received: ' . "\n" . json_encode($web_app_data));
 
     $data['text'] = 'داده‌های ارسالی قابل پردازش نیستند!';
     sendToTelegram('sendMessage', $data);

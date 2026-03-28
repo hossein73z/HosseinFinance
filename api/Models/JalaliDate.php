@@ -48,7 +48,7 @@ class JalaliDate
      * Static constructor from string.
      * Supported format: year/month/day
      */
-    public static function fromString(string $date_string, ?string $delimiter = '/'): self
+    public static function fromString(string $date_string, ?string $delimiter = null): self
     {
         if ($delimiter) $date_array = explode("$delimiter", $date_string);
         else {
@@ -56,6 +56,7 @@ class JalaliDate
             $date_array[0] = $matches[1][0]; // Year
             $date_array[1] = $matches[2][0]; // Month
             $date_array[2] = $matches[3][0]; // Day
+            // 1404-03-06
         }
 
         $date_array[1] = str_replace(
