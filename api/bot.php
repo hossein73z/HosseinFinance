@@ -861,9 +861,6 @@ function handleLoansWebAppData(User $user, array $data, array $message, Database
      * TODO: Add Triggers to automatically calculate `alert_date` column:
      *  `after insert` trigger for installments and
      *  `after update` trigger for loans table
-     *
-     * TODO: When using telegram, handle showing,
-     *  editing and inserting dates in Gregorian
      */
 
     $web_app_data = json_decode($message['web_app_data']['data'], true);
