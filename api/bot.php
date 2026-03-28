@@ -2277,12 +2277,13 @@ function createLoansView(array $loans, ?string $loans_mssg_id = null, ?string $i
                 $due_year = JalaliDate::fromString($installment['due_date'])->jy;
 
                 // Create payment status icon for the installment
-                if ($installment['is_paid'])
-                    if (!$summerized) $insts_per_year[$due_year][] = "🟢";
-                    else $summerized_insts_text .= "🟢";
-                else
-                    if (!$summerized) $insts_per_year[$due_year][] = $installment['is_due'] ? "🔴" : "⚪";
+                if ($summerized) {
+                    if ($installment['is_paid']) $summerized_insts_text .= "🟢";
                     else $summerized_insts_text .= $installment['is_due'] ? "🔴" : "⚪";
+                } else {
+                    if ($installment['is_paid']) $insts_per_year[$due_year][] = "🟢";
+                    else $insts_per_year[$due_year][] = $installment['is_due'] ? "🔴" : "⚪";
+                }
             }
 
             $last_year = array_key_last($insts_per_year);
