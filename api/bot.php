@@ -880,7 +880,7 @@ function handleLoansWebAppData(User $user, array $data, array $message, Database
                     'user_id' => $user->getId(),
                     'name' => $new_loan['name'],
                     'total_amount' => $new_loan['total_amount'],
-                    'received_date' => $new_loan['received_date'],
+                    'received_date' => JalaliDate::fromString($new_loan['received_date'], '-')->toGregorian()->format('Y-m-d'),
                     'alert_offset' => $new_loan['alert_offset'],
                 ]);
 
@@ -892,8 +892,9 @@ function handleLoansWebAppData(User $user, array $data, array $message, Database
                         data: [
                             'loan_id' => $loan_id,
                             'amount' => $inst['amount'],
-                            'due_date' => $inst['due_date'],
-                            'is_paid' => $inst['is_paid'] ? 1 : 0
+                            'due_date' => JalaliDate::fromString($inst['due_date'])->toGregorian()->format('Y-m-d'),
+                            # 'alert_date' => TODO: Complete this
+                            'is_paid' => 0
                         ]);
                     $count++;
                 } catch (Exception $e) {
@@ -1092,7 +1093,7 @@ function handleLoansTextMessage(User $user, array $data, array $message, Databas
      */
     $progress = $user->getProgress();
     if ($progress && key($progress) === 'view_loan') {
-        $loan = getLoansWithInstallments(['l.id' => $progress['view_loan']['loan_id'], 'l.user_id' => $user->getId()], $db)[0];
+        $loan = getLoansWithInstallments(['l.id' => $progress['view_loan']['loan_id'], 'l.user_id' => $user->getId()], $db, true)[0];
         if ($loan) {
             array_unshift($data['reply_markup']['keyboard'], [
                 createWebAppBtn(
@@ -1114,7 +1115,7 @@ function sendAllLoans(User $user, DatabaseManager $db, ?string $initial_mssg_id 
     $loans = getLoansWithInstallments(['l.user_id' => $user->getId()], $db, true);
 
     if ($loans) {
-        if (!$mssg_id_to_edit) {
+        if (!$mssg_id_to_edit) { // TODO: I'm not satisfied with this
             $temp_mssg = sendLoadingMessage($user->getid(), 'در حال دریافت اطلاعات وام‌ها ...');
             if ($temp_mssg) $mssg_id_to_edit = $temp_mssg['result']['message_id'];
         }
@@ -1143,6 +1144,7 @@ function sendLoanDetail(array $loan, array $data): void
 
     $data['text'] = "/loan_$loan[id]\n";
     $data['text'] .= 'جزئیات وام «' . $loan['name'] . '»';
+
     array_unshift($data['reply_markup']['keyboard'], [createWebAppBtn('✏ ویرایش وام «' . $loan['name'] . '»', '/assets/add_loan.html', ['data' => base64_encode(json_encode($loan))])]);
 
     sendToTelegram('sendMessage', $data);
@@ -2011,13 +2013,8 @@ function empty_level(
 // ==========================================
 
 /**
- * Return a list of holdings (Or just one, if `Single -- true`) containing `asset_name`,
+ * Return a list of holdings (Or just one, if `Single == true`) containing `asset_name`,
  * `current_price`, `base_currency` and `exchange_rate` (Based on user's base currency).
- *
- * @param array $conditions
- * @param DatabaseManager $db
- * @param bool $single
- * @return bool|array
  */
 function getHoldingsWithAssetDetails(array $conditions, DatabaseManager $db, bool $single = false): bool|array
 {
@@ -2045,9 +2042,17 @@ function getHoldingsWithAssetDetails(array $conditions, DatabaseManager $db, boo
     );
 }
 
-function getLoansWithInstallments(array $conditions, DatabaseManager $db, bool $jalali_dates = false): bool|array
+/**
+ * - Returns a list of all user's loans with related installments under `installments` key.
+ * - All loans and installments dates are returned as string (Gregorian or Jalali).
+ * - Each returned installment has an `is_due` boolean key.
+ * - Each loan has a `next_payment` key, storing due date of the next installment in
+ *      DateTime object or null if all the installments are due.
+ * - Each loan as an `insts_summary` key storing the count and summation of
+ *      paid, overdue and remaining installments for that loan.
+ */
+function getLoansWithInstallments(array $conditions, DatabaseManager $db, bool $jalali = false): bool|array
 {
-    // TODO: Calculate remining days to next installment
     $loans = $db->read(
         table: 'loans l',
         conditions: $conditions,
@@ -2075,39 +2080,47 @@ function getLoansWithInstallments(array $conditions, DatabaseManager $db, bool $
             $loan['installments'] = json_decode($loan['installments'], true);
             if ($loan['installments'][0]['id'] == null) $loan['installments'] = null;
 
-            // Objectify received date column
-            $loan['received_date'] = DateTime::createFromFormat('Y-m-d', $loan['received_date']);
-            if ($jalali_dates) $loan['received_date'] = JalaliDate::fromGregorianObject($loan['received_date']);
+            // Convert received date to Jalali
+            if ($jalali) $loan['received_date'] = JalaliDate::fromGregorianString($loan['received_date'])->format();
 
-            $loan['installments_summary']['paid_count'] = 0;
-            $loan['installments_summary']['overdue_count'] = 0;
-            $loan['installments_summary']['remaining_count'] = 0;
-            $loan['installments_summary']['paid_sum'] = 0;
-            $loan['installments_summary']['overdue_sum'] = 0;
-            $loan['installments_summary']['remaining_sum'] = 0;
+            $loan['next_payment'] = null;
+            $loan['insts_summary']['paid_count'] = 0;
+            $loan['insts_summary']['overdue_count'] = 0;
+            $loan['insts_summary']['remaining_count'] = 0;
+            $loan['insts_summary']['paid_sum'] = 0;
+            $loan['insts_summary']['overdue_sum'] = 0;
+            $loan['insts_summary']['remaining_sum'] = 0;
             foreach ($loan['installments'] as &$installment) {
 
-                $installment['is_paid'] = boolval($installment['is_paid']);
+                // Create `due_date` object just for calculations
+                $due_date = DateTime::createFromFormat('Y-m-d', $installment['due_date']);
 
-                // Objectify date columns
-                $installment['due_date'] = DateTime::createFromFormat('Y-m-d', $installment['due_date']);
-                $installment['alert_date'] = DateTime::createFromFormat('Y-m-d', $installment['alert_date']);
+                // Create `is_due` and `is_paid` boolean values
+                $is_due = boolval((new DateTime())->diff($due_date)->invert);
+                $is_paid = boolval($installment['is_paid']);
 
-                // Calculate and add `is_due` key
-                $due_date = clone $installment['due_date'];
-                $installment['is_due'] = boolval((new DateTime())->diff($due_date)->invert);
+                // Calculate and add remaining days to next payment
+                if ($loan['next_payment'] === null && !$is_due && !$is_paid)
+                    $loan['next_payment'] = $due_date;
 
                 // Initialize installments' summary
-                if ($installment['is_paid']) $summary_key_word = 'paid';
-                elseif ($installment['is_due']) $summary_key_word = 'overdue';
+                if ($is_paid) $summary_key_word = 'paid';
+                elseif ($is_due) $summary_key_word = 'overdue';
                 else $summary_key_word = 'remaining';
 
-                $loan['installments_summary'][$summary_key_word . '_count'] += 1;
-                $loan['installments_summary'][$summary_key_word . '_sum'] += $installment['amount'];
+                // Add installments' summary to loan object
+                $loan['insts_summary'][$summary_key_word . '_count'] += 1;
+                $loan['insts_summary'][$summary_key_word . '_sum'] += $installment['amount'];
 
-                // Change dates to Jalali
-                if ($jalali_dates) $installment['due_date'] = JalaliDate::fromGregorianObject($installment['due_date']);
-                if ($jalali_dates) $installment['alert_date'] = JalaliDate::fromGregorianObject($installment['alert_date']);
+                // Add `is_due` and `is_paid` to the installment
+                $installment['is_due'] = $is_due;
+                $installment['is_paid'] = $is_paid;
+
+                // Change dates to Jalali string
+                if ($jalali) {
+                    $installment['due_date'] = JalaliDate::fromGregorianString($installment['due_date'])->format();
+                    $installment['alert_date'] = JalaliDate::fromGregorianString($installment['alert_date'])->format();
+                }
             }
         }
     return $loans;
@@ -2254,8 +2267,6 @@ function createLoansView(array $loans, ?string $loans_mssg_id = null, ?string $i
     $text = 'وام‌های ثبت شده‌ی شما: ' . "\n";
     foreach ($loans as $loan) {
 
-        $next_payment = null;
-
         $installments = &$loan['installments'];
         if ($installments) {
 
@@ -2263,13 +2274,9 @@ function createLoansView(array $loans, ?string $loans_mssg_id = null, ?string $i
             $summerized_insts_text = '‏';
             foreach ($installments as $installment) {
 
-                $due_year = $installment['due_date']->jy;
+                $due_year = JalaliDate::fromString($installment['due_date'])->jy;
 
-                // Check if the installment is next unpaid one
-                if ($next_payment === null && !$installment['is_due'] && !$installment['is_paid'])
-                    $next_payment = $installment['due_date'];
-
-                // Create paid status icon for the installment
+                // Create payment status icon for the installment
                 if ($installment['is_paid'])
                     if (!$summerized) $insts_per_year[$due_year][] = "🟢";
                     else $summerized_insts_text .= "🟢";
@@ -2289,20 +2296,20 @@ function createLoansView(array $loans, ?string $loans_mssg_id = null, ?string $i
 
         } else $installments_detail = '';
 
-        $daysRemaining = $next_payment?->diffInDays(JalaliDate::fromGregorian());
-
         $deep_link = "https://ble.ir/" . BOT_ID . "?start=showLoan_loanId{$loan['id']}" . ($loans_mssg_id ? "_loansMssgId" . $loans_mssg_id : '') . ($initial_mssg_id ? "_initMssgId" . $initial_mssg_id : '');
         $loan_name = "\n‏" . "\-* [" . beautifulNumber($loan['name'], null) . "]($deep_link)*";
 
-        $next_payment_text = $daysRemaining ?
-            beautifulNumber($daysRemaining . ' روز دیگر در ' . $next_payment->format(), null) :
-            'پایان یافته';
+        if ($loan['next_payment']) {
+            $remaining_days = $loan['next_payment']->diff(new DateTime())->days;
+            $next_payment_text = beautifulNumber($remaining_days . ' روز دیگر در ' . JalaliDate::fromGregorianObject($loan['next_payment'])->format(), null);
+
+        } else $next_payment_text = 'پایان یافته';
 
         if (!$summerized) {
             $detail =
                 "\n‏      │  " .
                 "\n‏      ┤─ " . 'مبلغ وام: ' . beautifulNumber($loan['total_amount']) .
-                "\n‏      ┤─ " . 'تاریخ دریافت: ' . beautifulNumber($loan['received_date']->format(), null) .
+                "\n‏      ┤─ " . 'تاریخ دریافت: ' . beautifulNumber($loan['received_date'], null) .
                 "\n‏      ┤─ " . 'قسط بعدی: ' . $next_payment_text;
 
             $detail .= $installments_detail . "\n";
@@ -2319,7 +2326,7 @@ function createLoansView(array $loans, ?string $loans_mssg_id = null, ?string $i
  *  -- It must have all related installments
  *     under `installments` key.
  *  -- All dates (loan's received date and installments' due
- *     and alert date) must be in Jalali object.
+ *     and alert date) must be in Jalali string.
  *  -- Installments must be sorted ascending by their due date.
  *  -- Installments must have 'is_due' bool value.
  */
@@ -2342,7 +2349,7 @@ function createLoanDetailText(array $loan, string $mssg_id): string
 
             // Create installment text
             $inst_num = beautifulNumber(intval($i) + 1, null);
-            $date = beautifulNumber($installment['due_date']->format(), null);
+            $date = beautifulNumber($installment['due_date'], null);
             $amount = beautifulNumber($installment['amount']);
             $link = "https://ble.ir/" . BOT_ID . "?start=toggleInstPayment_instId{$installment['id']}_mssgId$mssg_id";
 
@@ -2352,11 +2359,11 @@ function createLoanDetailText(array $loan, string $mssg_id): string
 
         $text = "‏*" . markdownScape($loan['name']) . "*:\n" .
             "\n مبلغ وام\: " . markdownScape(beautifulNumber($loan['total_amount'])) .
-            "\n تاریخ دریافت\: " . markdownScape(beautifulNumber($loan['received_date']->format(), null)) .
+            "\n تاریخ دریافت\: " . markdownScape(beautifulNumber($loan['received_date'], null)) .
             "\n کل بازپرداخت\: " . markdownScape(beautifulNumber(array_sum(array_column($installments, 'amount')))) .
-            "\n " . markdownScape(beautifulNumber($loan['installments_summary']['paid_count']) . " قسط پرداخت‌شده، معادل " . beautifulNumber($loan['installments_summary']['paid_sum'])) .
-            "\n " . markdownScape(beautifulNumber($loan['installments_summary']['remaining_count']) . " قسط باقی مانده، معادل " . beautifulNumber($loan['installments_summary']['remaining_sum'])) .
-            "\n " . markdownScape(beautifulNumber($loan['installments_summary']['overdue_count']) . " قسط معوقه، معادل " . beautifulNumber($loan['installments_summary']['overdue_sum'])) .
+            "\n " . markdownScape(beautifulNumber($loan['insts_summary']['paid_count']) . " قسط پرداخت‌شده، معادل " . beautifulNumber($loan['insts_summary']['paid_sum'])) .
+            "\n " . markdownScape(beautifulNumber($loan['insts_summary']['remaining_count']) . " قسط باقی مانده، معادل " . beautifulNumber($loan['insts_summary']['remaining_sum'])) .
+            "\n " . markdownScape(beautifulNumber($loan['insts_summary']['overdue_count']) . " قسط معوقه، معادل " . beautifulNumber($loan['insts_summary']['overdue_sum'])) .
             "\n جزئیات اقساط\: ";
 
         $text .= $installments_text;
