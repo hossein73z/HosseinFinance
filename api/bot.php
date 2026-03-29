@@ -591,6 +591,7 @@ function handleHoldingsWebAppData(User $user, array $data, array $message, Datab
 
         try {
             $updates = $web_app_data['updates'];
+            echo "\n" . json_encode($updates) . "\n";
             if (isset($updates['date'])) $updates['date'] = JalaliDate::fromString($updates['date'])->toGregorian()->format('Y-m-d');
             $db->update(
                 table: 'holdings',
@@ -693,7 +694,7 @@ function sendAllHoldings(User $user, DatabaseManager $db, int|string $initial_ms
                     holding: $holding,
                     markdown: 'MarkdownV2',
                     user_base_currency: $user->getBaseCurrency(),
-                    attributes: ['space', 'org_amount', 'org_total_price', 'space', 'profit'],
+                    attributes: ['org_amount', 'org_total_price', 'profit'],
                     holding_mssg_id: $temp_mssg['result']['message_id'],
                     initial_mssg_id: $initial_mssg_id
                 );
@@ -733,15 +734,11 @@ function sendHoldingDetail(array $holding, array $data, string $user_base_curren
     $data['text'] = "/holding_$holding[id]\n";
     $data['text'] .= 'جزئیات دارایی «' . $holding['asset_name'] . '»';
 
-    // HACK: Lazy fix
-    $url_holding = $holding;
-    $url_holding['date'] = JalaliDate::fromGregorianString($url_holding['date'])->format();
-
     array_unshift($data['reply_markup']['keyboard'], [
         createWebAppBtn(
             text: '✏ ویرایش ' . beautifulNumber($holding['asset_name'], null),
             path: '/assets/holding_add.html',
-            params: ['holding' => base64_encode(json_encode($url_holding))])
+            params: ['holding' => base64_encode(json_encode($holding))])
     ]);
 
     sendToTelegram('sendMessage', $data);
@@ -765,16 +762,12 @@ function checkAndAddEditHoldingButton(array $data, User $user, DatabaseManager $
     if ($progress && key($progress) === 'view_holding') {
         $holding = getHoldingsWithAssetDetails(['h.id' => $progress['view_holding']['holding_id'], 'h.user_id' => $user->getId()], $db, true);
 
-        // HACK: Lazy fix
-        $url_holding = $holding;
-        $url_holding['date'] = JalaliDate::fromGregorianString($url_holding['date'])->format();
-
         if ($holding) {
             array_unshift($data['reply_markup']['keyboard'], [
                 createWebAppBtn(
                     text: '✏ ویرایش ' . $holding['asset_name'],
                     path: '/assets/holding_add.html',
-                    params: ['holding' => base64_encode(json_encode($url_holding))])
+                    params: ['holding' => base64_encode(json_encode($holding))])
             ]);
         }
     }
@@ -2034,6 +2027,7 @@ function empty_level(
 /**
  * Return a list of holdings (Or just one, if `Single == true`) containing `asset_name`,
  * `current_price`, `base_currency` and `exchange_rate` (Based on user's base currency).
+ * 'date' column is also converted to Jalali string in 'yyyy/mm/dd' format.
  */
 function getHoldingsWithAssetDetails(array $conditions, DatabaseManager $db, bool $single = false): bool|array
 {
@@ -2045,7 +2039,7 @@ function getHoldingsWithAssetDetails(array $conditions, DatabaseManager $db, boo
     $user_base = "ifnull(json_unquote(json_extract(u.settings, '$.base_currency')), 'ریال')";
     $user_base_price = "$select_price = $user_base";
 
-    return $db->read(
+    $holdings = $db->read(
         table: 'holdings h',
         conditions: $conditions,
         single: $single,
@@ -2059,6 +2053,13 @@ function getHoldingsWithAssetDetails(array $conditions, DatabaseManager $db, boo
             LEFT JOIN assets a ON h.asset_id = a.id
             LEFT JOIN users u ON h.user_id = u.id'
     );
+
+    if ($single) $holdings['date'] = JalaliDate::fromGregorianString($holdings['date'])->format();
+    else foreach ($holdings as $holding) {
+        $holding['date'] = JalaliDate::fromGregorianString($holding['date'])->format();
+    }
+
+    return $holdings;
 }
 
 /**
@@ -2210,7 +2211,7 @@ function createHoldingDetailText(
         }
 
         if ($attribute == 'date' && isset($holding['date'])) {
-            $date = JalaliDate::fromGregorianString($holding['date'])->toPersianMonths();
+            $date = JalaliDate::fromString($holding['date'])->toPersianMonths();
             $tree .=
                 "\n   ┤── تاریخ خرید: " .
                 beautifulNumber("$date[day] $date[month] $date[year]", null);

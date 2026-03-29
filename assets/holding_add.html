@@ -1094,7 +1094,7 @@
         assetSelect.innerHTML = '<option value="" disabled selected>انتخاب کنید...</option>';
 
         if (selectedType) {
-            const filtered = availableAssets.filter(a => a.asset_type === selectedType);
+            const filtered = availableAssets.filter(a => a.asset_type == selectedType);
             filtered.forEach(a => {
                 const opt = document.createElement('option');
                 opt.value = a.id;
@@ -1230,7 +1230,7 @@
         } else {
             // Edit Mode - Only send updates
             const updates = {};
-            if (originalHolding.asset_id !== assetId) updates.asset_id = parseInt(assetId);
+            if (originalHolding.asset_id != assetId) updates.asset_id = parseInt(assetId);
             if (parseFloat(originalHolding.amount) !== parseFloat(amountVal)) updates.amount = parseFloat(amountVal);
             if (parseFloat(originalHolding.avg_price) !== parseFloat(priceVal)) updates.avg_price = parseFloat(priceVal);
             if (originalHolding.date !== dateVal) updates.date = dateVal;
