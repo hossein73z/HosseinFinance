@@ -590,11 +590,12 @@ function handleHoldingsWebAppData(User $user, array $data, array $message, Datab
     if ($action === 'edit') {
 
         try {
-            $modified_holding = $web_app_data['holding'];
+            $updates = $web_app_data['updates'];
+            if (isset($updates['date'])) $updates['date'] = JalaliDate::fromString($updates['date'])->toGregorian()->format('Y-m-d');
             $db->update(
                 table: 'holdings',
-                data: $modified_holding,
-                conditions: ['id' => $modified_holding['id']]
+                data: $updates,
+                conditions: ['id' => $web_app_data['id']]
             );
             $data['text'] = '✅ دارایی با موفقیت ویرایش شد.';
 
@@ -611,7 +612,7 @@ function handleHoldingsWebAppData(User $user, array $data, array $message, Datab
         try {
             $db->delete(
                 table: 'holdings',
-                conditions: ['id' => $web_app_data['holding']['id']],
+                conditions: ['id' => $web_app_data['id']],
                 resetAutoIncrement: true
             );
             $data['text'] = '✅ دارایی با موفقیت حذف شد.';
@@ -654,9 +655,10 @@ function handleHoldingsTextMessage(User $user, array $data, array $message, Data
         if ($holding) {
 
             // Delete redundant messages
-            sendToTelegram('deleteMessage', ['chat_id' => $user->getid(), 'message_id' => $matches[5]]); ////////// // Initial
-            sendToTelegram('deleteMessage', ['chat_id' => $user->getid(), 'message_id' => $matches[3]]); ////////// // Holdings
-            sendToTelegram('deleteMessage', ['chat_id' => $user->getid(), 'message_id' => $message['message_id']]); // Deep-Link
+            if (isset($matches[5]))
+                sendToTelegram('deleteMessage', ['chat_id' => $user->getid(), 'message_id' => $matches[5]]); ######## Initial
+            sendToTelegram('deleteMessage', ['chat_id' => $user->getid(), 'message_id' => $matches[3]]); ############ Holdings
+            sendToTelegram('deleteMessage', ['chat_id' => $user->getid(), 'message_id' => $message['message_id']]); # Deep-Link
 
             sendHoldingDetail($holding, $data, $user->getBaseCurrency());
             $db->update(
@@ -730,8 +732,16 @@ function sendHoldingDetail(array $holding, array $data, string $user_base_curren
 {
     $data['text'] = "/holding_$holding[id]\n";
     $data['text'] .= 'جزئیات دارایی «' . $holding['asset_name'] . '»';
+
+    // HACK: Lazy fix
+    $url_holding = $holding;
+    $url_holding['date'] = JalaliDate::fromGregorianString($url_holding['date'])->format();
+
     array_unshift($data['reply_markup']['keyboard'], [
-        createWebAppBtn('✏ ویرایش ' . beautifulNumber($holding['asset_name'], null), '/assets/holding_add.html', ['data' => base64_encode(json_encode($holding))])
+        createWebAppBtn(
+            text: '✏ ویرایش ' . beautifulNumber($holding['asset_name'], null),
+            path: '/assets/holding_add.html',
+            params: ['holding' => base64_encode(json_encode($url_holding))])
     ]);
 
     sendToTelegram('sendMessage', $data);
@@ -754,12 +764,17 @@ function checkAndAddEditHoldingButton(array $data, User $user, DatabaseManager $
     $progress = $user->getProgress();
     if ($progress && key($progress) === 'view_holding') {
         $holding = getHoldingsWithAssetDetails(['h.id' => $progress['view_holding']['holding_id'], 'h.user_id' => $user->getId()], $db, true);
+
+        // HACK: Lazy fix
+        $url_holding = $holding;
+        $url_holding['date'] = JalaliDate::fromGregorianString($url_holding['date'])->format();
+
         if ($holding) {
             array_unshift($data['reply_markup']['keyboard'], [
                 createWebAppBtn(
                     text: '✏ ویرایش ' . $holding['asset_name'],
                     path: '/assets/holding_add.html',
-                    params: ['data' => base64_encode(json_encode($holding))])
+                    params: ['holding' => base64_encode(json_encode($url_holding))])
             ]);
         }
     }
@@ -2133,6 +2148,8 @@ function getLoansWithInstallments(array $conditions, DatabaseManager $db, bool $
 function createWebAppBtn(string $text, string $path, array $params = []): array
 {
     $url = BASE_URL . $path;
+    $params['api_url'] = BASE_URL . '/api/ExternalConnections/api.php';
+    $params['api_key'] = DB_API_SECRET;
 
     return [
         'text' => $text,
@@ -2193,7 +2210,7 @@ function createHoldingDetailText(
         }
 
         if ($attribute == 'date' && isset($holding['date'])) {
-            $date = JalaliDate::fromString($holding['date'])->toPersianMonths();
+            $date = JalaliDate::fromGregorianString($holding['date'])->toPersianMonths();
             $tree .=
                 "\n   ┤── تاریخ خرید: " .
                 beautifulNumber("$date[day] $date[month] $date[year]", null);

@@ -16,7 +16,7 @@ if (!defined('DB_USER')) define('DB_USER', getenv('DB_USER'));
 if (!defined('DB_PASS')) define('DB_PASS', getenv('DB_PASS'));
 
 $apiSecret = getenv('DB_API_SECRET');
-$allowedTablesEnv = getenv('DB_ALLOWED_TABLES');
+$allowedTablesEnv = getenv('API_ALLOWED_TABLES');
 $allowedTables = $allowedTablesEnv ? array_map('trim', explode(',', $allowedTablesEnv)) : [];
 
 // -------------------------------------------------------------------------
