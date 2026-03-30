@@ -358,20 +358,29 @@ function backButton(User $user, DatabaseManager $db, int|string|null $parent_btn
     );
     $current_btn = Button::fromDbRow($current_level);
 
-    if ($progress) {
-        $user->setProgress(null);
-        normalButtonHandler(user: $user, pressed_button: $current_btn, db: $db);
+    if ($progress && sizeof($progress[array_key_last($progress)]) > 1) {
+        // If user is at levels higher than 1 in a progress, remove the
+        // last progress level and return user back to current level.
+        array_pop($progress[array_key_last($progress)]);
+        choosePath(user: $user->setProgress($progress), db: $db);
     } else {
-        $last_level = $db->read(
+        // If user is at level 1 of a progress or has no
+        // progress at all Redirect them to the parent level.
+        $parent_level = $db->read(
             table: 'buttons',
             conditions: ['id' => $current_btn->getBelongTo()],
             single: true
         );
 
-        $last_btn = Button::fromDbRow($last_level);
-        $user->setProgress(null);
-        normalButtonHandler(user: $user, pressed_button: $last_btn, db: $db);
+        $last_btn = Button::fromDbRow($parent_level);
+        normalButtonHandler(user: $user->setProgress(null), pressed_button: $last_btn, db: $db);
     }
+}
+
+#[NoReturn]
+function cancelButton(User $user, DatabaseManager $db, int|string|null $parent_btn_id = null): void
+{
+    backButton($user->setProgress(null), $db, $parent_btn_id);
 }
 
 
@@ -463,7 +472,7 @@ function level_1(
     $keyboard = createKeyboardsArray(parent_btn_id: $level_button->getId(), admin: $user->isAdmin(), db: $db);
 
     // Add '➕ افزودن دارایی جدید' button to the keyboard
-    array_unshift($keyboard, [createWebAppBtn('➕ افزودن دارایی جدید', '/assets/holding.html',add_api: true)]);
+    array_unshift($keyboard, [createWebAppBtn('➕ افزودن دارایی جدید', '/assets/holding.html', add_api: true)]);
 
     $data = [
         'chat_id' => $user->getid(),
