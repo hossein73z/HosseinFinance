@@ -904,7 +904,7 @@ function handleLoansWebAppData(User $user, array $data, array $message, Database
                             'amount' => $inst['amount'],
                             'due_date' => $due_date->format('Y-m-d'),
                             'alert_date' => $alert_date->format('Y-m-d'),
-                            'is_paid' => 0
+                            'is_paid' => $inst['is_paid']
                         ]);
                     $count++;
                 } catch (Exception $e) {

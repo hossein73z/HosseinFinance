@@ -410,6 +410,59 @@
             opacity: 1;
         }
 
+        .checkbox-label {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 25px;
+            height: 25px;
+            margin-left: 5px;
+            cursor: pointer;
+            position: relative;
+            flex-shrink: 0;
+        }
+
+        .checkbox-label input[type="checkbox"] {
+            position: absolute;
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .checkmark {
+            position: absolute;
+            top: 0;
+            left: 0;
+            height: 25px;
+            width: 25px;
+            background-color: #fff;
+            border: 2px solid #ccc;
+            border-radius: 6px;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .checkbox-label input[type="checkbox"]:checked + .checkmark {
+            background-color: var(--button-color);
+            border-color: var(--button-color);
+        }
+
+        .checkbox-label input[type="checkbox"]:checked + .checkmark::after {
+            content: "✓";
+            color: white;
+            font-size: 14px;
+            font-weight: bold;
+            font-family: sans-serif;
+            transform: scale(0.9);
+        }
+
+        .checkbox-label:hover .checkmark {
+            border-color: var(--button-color);
+        }
+
+
     </style>
 </head>
 <body>
@@ -1218,6 +1271,10 @@
             const row = document.createElement('div');
             row.className = 'installment-row';
             row.innerHTML = `
+                <label class="checkbox-label">
+                    <input type="checkbox" class="installment-checkbox" ${item.is_paid ? 'checked' : ''}>
+                    <span class="checkmark"></span>
+                </label>
                 <span>${displayIndex}</span>
                 <input type="hidden" class="installment-id" value="${idVal}">
                 <div class="input-with-icon">
@@ -1285,6 +1342,7 @@
             let date = toEnglishDigits(row.querySelector('.row-date').value);
             let amt = removeCommas(toEnglishDigits(row.querySelector('.row-amount').value));
             let id = row.querySelector('.installment-id').value;
+            const isPaid = row.querySelector('.installment-checkbox').checked;
 
             if (!isValidJalaliDateString(date) || !amt) isValid = false;
 
@@ -1292,7 +1350,7 @@
                 id: id ? parseInt(id) : null,
                 due_date: date,
                 amount: parseFloat(amt),
-                is_paid: false // default or preserved? Ideally preserved but UI doesn't allow editing paid status here.
+                is_paid: isPaid
             });
         });
 
@@ -1300,18 +1358,6 @@
             // bale.showAlert('لطفا تاریخ‌ها و مبالغ را اصلاح کنید');
             showToast('لطفا تاریخ‌ها و مبالغ را اصلاح کنید');
             return;
-        }
-
-        // Preserve is_paid status if ID matches original
-        if (appMode === 'edit' && originalLoanData) {
-            tempInstallments.forEach(newInst => {
-                if (newInst.id) {
-                    const original = originalLoanData.installments.find(o => o.id == newInst.id);
-                    if (original) {
-                        newInst.is_paid = original.is_paid;
-                    }
-                }
-            });
         }
 
         finalInstallments = tempInstallments;
@@ -1367,8 +1413,8 @@
             // Check fields
             if (toEnglishDigits(orig.due_date).replace(/-/g, '/') !== curr.due_date.replace(/-/g, '/')) return true;
             if (parseFloat(orig.amount) !== parseFloat(curr.amount)) return true;
-            // We ignore is_paid here because this form doesn't edit it,
-            // but if the user *could* edit it, check it too.
+            if (orig.is_paid !== curr.is_paid) return true;
+
         }
         return false;
     }
@@ -1406,12 +1452,11 @@
             let clean = {
                 due_date: inst.due_date,
                 amount: inst.amount,
-                alert_date: alertDate
+                alert_date: alertDate,
+                is_paid: inst.is_paid,
             };
             // Only send ID if it exists (for edits)
             if (inst.id) clean.id = inst.id;
-            // Only send is_paid if it is TRUE (assuming backend defaults to false)
-            if (inst.is_paid) clean.is_paid = true;
 
             return clean;
         });

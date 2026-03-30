@@ -138,7 +138,7 @@ CREATE TABLE IF NOT EXISTS `installments`
     is_paid    BOOLEAN        NOT NULL DEFAULT 0,
 
     UNIQUE INDEX idx_unique_installment (loan_id, due_date),
-    FOREIGN KEY (loan_id) REFERENCES loans (id) ON DELETE CASCADE
+    FOREIGN KEY (loan_id) REFERENCES loans (id) ON DELETE CASCADE ON UPDATE CASCADE
 ) DEFAULT CHARSET = utf8mb4;
 
 CREATE TABLE IF NOT EXISTS `special_messages`
