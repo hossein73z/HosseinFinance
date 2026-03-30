@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS `buttons`
     keyboards TEXT             DEFAULT NULL
 ) DEFAULT CHARSET = utf8mb4;
 INSERT INTO `buttons` (`id`, `attrs`, `admin_key`, `messages`, `belong_to`, `keyboards`)
-VALUES ('0', '{\"text\": \"🏠 صفحه اصلی\"}', 0, NULL, NULL, '[[\"1\", \"2\"], [\"3\"], [\"4\", \"7\"]]'),
+VALUES ('0', '{\"text\": \"🏠 صفحه اصلی\"}', 0, NULL, NULL, '[[\"1\", \"2\"], [\"9\"], [\"3\"], [\"4\", \"7\"]]'),
        ('1', '{\"text\": \"💼 دارایی‌ها\"}', 0, NULL, '0', '[[\"s0\"]]'),
        ('2', '{\"text\": \"🏦 وام و اقساط\"}', 0, NULL, '0', '[[\"s0\"]]'),
        ('3', '{\"text\": \"🛠 ابزارها\"}', 0, NULL, '0', '[[\"5\", \"8\"], [\"6\"], [\"s0\"]]'),
@@ -31,11 +31,13 @@ VALUES ('0', '{\"text\": \"🏠 صفحه اصلی\"}', 0, NULL, NULL, '[[\"1\", 
        ('6', '{\"text\": \"🤖 هوش مصنوعی\"}', 0, NULL, '3', '[[\"s0\"]]'),
        ('7', '{\"text\": \"⚙ تنظیمات\"}', 0, NULL, '0', '[[\"s4\"], [\"s0\"]]'),
        ('8', '{\"text\": \"🔔 هشدارها\"}', 0, NULL, '3', '[[\"s0\"]]'),
+       ('9', '{\"text\": \"🧾 حساب‌ها\"}', 0, NULL, '0', '[[\"9\"], [\"s0\"]]'),
+       ('10', '{\"text\": \"➕ افزودن حساب جدید\"}', 0, NULL, '9', '[[\"s0\", \"s1\"]]'),
        ('s0', '{\"text\": \"🔙 برگشت 🔙\"}', 0, NULL, NULL, NULL),
        ('s1', '{\"text\": \"❌ لغو ❌\"}', 0, NULL, NULL, NULL),
        ('s2', '{\"text\": \"❤ علاقه‌مندی‌ها ❤\"}', 0, NULL, NULL, NULL),
        ('s3', '{\"text\": \"Empty Button\"}', 0, NULL, NULL, NULL),
-       ('s4', '{\"text\": \"💲 ارز پایه\"}', 0, NULL, '7', '[[\"s0\"]]');
+       ('s4', '{\"text\": \"💲 ارز پایه\"}', 0, NULL, '7', null);
 
 CREATE TABLE IF NOT EXISTS `assets`
 (
@@ -98,6 +100,18 @@ CREATE TABLE IF NOT EXISTS `alerts`
     FOREIGN KEY (asset_name) REFERENCES assets (name) ON DELETE RESTRICT
 ) DEFAULT CHARSET = utf8mb4;
 
+CREATE TABLE IF NOT EXISTS `accounts`
+(
+    id              BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id         INT            NOT NULL,
+    type            VARCHAR(100)   NOT NULL,
+    name            VARCHAR(255)   NOT NULL,
+    starting_amount NUMERIC(18, 8) NOT NULL,
+    note            TEXT,
+
+    FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE ON UPDATE CASCADE
+) DEFAULT CHARSET = utf8mb4;
+
 CREATE TABLE IF NOT EXISTS `transactions`
 (
     id       BIGINT AUTO_INCREMENT PRIMARY KEY,
@@ -121,7 +135,7 @@ CREATE TABLE IF NOT EXISTS `loans`
     user_id       INT                   NOT NULL,
     name          VARCHAR(191)          NOT NULL,
     total_amount  NUMERIC(18, 8)        NOT NULL,
-    received_date VARCHAR(10) DEFAULT NULL, # TODO: Change to date to store Gregorian
+    received_date VARCHAR(10) DEFAULT NULL,
     alert_offset  INT         DEFAULT 0 NOT NULL,
     created_at    TIMESTAMP   DEFAULT CURRENT_TIMESTAMP,
 
@@ -133,8 +147,8 @@ CREATE TABLE IF NOT EXISTS `installments`
     id         INT AUTO_INCREMENT PRIMARY KEY,
     loan_id    INT            NOT NULL,
     amount     NUMERIC(18, 8) NOT NULL,
-    due_date   VARCHAR(10)    NOT NULL,              # TODO: Change to date to store Gregorian
-    alert_date VARCHAR(10)             DEFAULT NULL, # TODO: Change to date to store Gregorian
+    due_date   VARCHAR(10)    NOT NULL,
+    alert_date VARCHAR(10)             DEFAULT NULL,
     is_paid    BOOLEAN        NOT NULL DEFAULT 0,
 
     UNIQUE INDEX idx_unique_installment (loan_id, due_date),
