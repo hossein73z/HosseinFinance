@@ -348,10 +348,6 @@ function choosePath(
     nonButtonHandler(user: $user, message: $message, db: $db);
 }
 
-/**
- * Logic for 'Back' button.
- * TODO: Needs modifications in case of multistep progress
- */
 #[NoReturn]
 function backButton(User $user, DatabaseManager $db, int|string|null $parent_btn_id = null): void
 {
@@ -367,6 +363,7 @@ function backButton(User $user, DatabaseManager $db, int|string|null $parent_btn
         // If user is at levels higher than 1 in a progress, remove the
         // last progress level and return user back to current level.
         array_pop($progress[array_key_first($progress)]);
+        $progress[array_key_first($progress)][array_key_last($progress[array_key_first($progress)])] = null;
         normalButtonHandler($user->setProgress($progress), $current_btn, $db);
     } else {
         // If user is at level 1 of a progress or has no
@@ -2076,44 +2073,46 @@ function addAccountProgress(User $user, array $data, ?array $message, DatabaseMa
      *     starting_amount
      * ]
      */
+
     $progress = $user->getProgress();
-    if ($progress) {
-
-        $current_level = array_key_last($progress['add_account']);
-        switch ($current_level) {
-            case 'type':
-                if (!$message) askForAccountType($user, $data, $db);
-                $progress['add_account'][$current_level] = $message['text'];
-                $db->update('users', ['progress' => json_encode($progress)], ['id' => $user->getId()]);
-                askForAccountName($user->setProgress($progress), $data, $db);
-
-            case 'name':
-                if (!$message) askForAccountName($user, $data, $db);
-                $progress['add_account'][$current_level] = $message['text'];
-                $db->update('users', ['progress' => json_encode($progress)], ['id' => $user->getId()]);
-                askForAccountStartingAmount($user->setProgress($progress), $data, $db);
-
-            case 'starting_amount':
-                if (!$message) askForAccountStartingAmount($user, $data, $db);
-
-                $amount = cleanAndValidateNumber($message['text']);
-                if ($amount === null)
-                    askForAccountStartingAmount($user, $data, $db, 'پیام نامفهوم بود. لطفاً موجودی را تنها با استفاده از ارقام وارد کنید!');
-                else
-                    addAccount($user, [
-                        'user_id' => $user->getId(),
-                        'type' => $progress['add_account']['type'],
-                        'name' => $progress['add_account']['name'],
-                        'starting_amount' => $amount
-                    ], $data, $db);
-        }
-
-    } else {
+    if (!$progress ||
+        (isset($progress['add_account']) && sizeof($progress['add_account']) < 1)) {
         $progress = ['add_account' => ['type' => null]];
         $db->update('users', ['last_btn' => 10, 'progress' => json_encode($progress)], ['id' => $user->getId()]);
         askForAccountType($user->setProgress($progress), $data, $db);
-    }
 
+    } else
+        foreach ($progress['add_account'] as $level => $value) {
+
+            if ($value !== null) continue;
+
+            switch ($level) {
+                case 'type':
+                    if (!$message) askForAccountType($user, $data, $db);
+                    $progress['add_account'][$level] = $message['text'];
+                    if (!isset($progress['add_account']['name'])) $progress['add_account']['name'] = null;
+                    level_10($user->setProgress($progress), $db);
+                case 'name':
+                    if (!$message) askForAccountName($user, $data, $db);
+                    $progress['add_account'][$level] = $message['text'];
+                    if (!isset($progress['add_account']['starting_amount'])) $progress['add_account']['starting_amount'] = null;
+                    level_10($user->setProgress($progress), $db);
+                case 'starting_amount':
+                    if (!$message) askForAccountStartingAmount($user, $data, $db);
+                    $amount = cleanAndValidateNumber($message['text']);
+                    if ($amount === null)
+                        askForAccountStartingAmount($user, $data, $db, 'پیام نامفهوم بود. لطفاً موجودی را تنها با استفاده از ارقام وارد کنید!');
+                    $progress['add_account'][$level] = $amount;
+                    if (!isset($progress['add_account']['type'])) $progress['add_account']['type'] = null;
+                    level_10($user->setProgress($progress), $db);
+            }
+        }
+    addAccount($user, [
+        'user_id' => $user->getId(),
+        'type' => $progress['add_account']['type'],
+        'name' => $progress['add_account']['name'],
+        'starting_amount' => $progress['add_account']['starting_amount']
+    ], $data, $db);
 }
 
 #[NoReturn]
