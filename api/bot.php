@@ -463,7 +463,7 @@ function level_1(
     $keyboard = createKeyboardsArray(parent_btn_id: $level_button->getId(), admin: $user->isAdmin(), db: $db);
 
     // Add '➕ افزودن دارایی جدید' button to the keyboard
-    array_unshift($keyboard, [createWebAppBtn('➕ افزودن دارایی جدید', '/assets/holding_add.html')]);
+    array_unshift($keyboard, [createWebAppBtn('➕ افزودن دارایی جدید', '/assets/holding.html',add_api: true)]);
 
     $data = [
         'chat_id' => $user->getid(),
@@ -535,7 +535,7 @@ function handleHoldingsWebAppData(User $user, array $data, array $message, Datab
 
     $expected_data = false;
 
-    if ($action === 'add') {
+    if ($action == 'add') {
 
         $new_holding = $web_app_data['holding'];
         try {
@@ -587,11 +587,10 @@ function handleHoldingsWebAppData(User $user, array $data, array $message, Datab
         }
         $expected_data = true;
     }
-    if ($action === 'edit') {
+    if ($action == 'edit') {
 
         try {
             $updates = $web_app_data['updates'];
-            echo "\n" . json_encode($updates) . "\n";
             if (isset($updates['date'])) $updates['date'] = JalaliDate::fromString($updates['date'])->toGregorian()->format('Y-m-d');
             $db->update(
                 table: 'holdings',
@@ -608,7 +607,7 @@ function handleHoldingsWebAppData(User $user, array $data, array $message, Datab
         }
         $expected_data = true;
     }
-    if ($action === 'delete') {
+    if ($action == 'delete') {
 
         try {
             $db->delete(
@@ -737,8 +736,9 @@ function sendHoldingDetail(array $holding, array $data, string $user_base_curren
     array_unshift($data['reply_markup']['keyboard'], [
         createWebAppBtn(
             text: '✏ ویرایش ' . beautifulNumber($holding['asset_name'], null),
-            path: '/assets/holding_add.html',
-            params: ['holding' => base64_encode(json_encode($holding))])
+            path: '/assets/holding.html',
+            params: ['holding' => base64_encode(json_encode($holding))],
+            add_api: true)
     ]);
 
     sendToTelegram('sendMessage', $data);
@@ -766,8 +766,9 @@ function checkAndAddEditHoldingButton(array $data, User $user, DatabaseManager $
             array_unshift($data['reply_markup']['keyboard'], [
                 createWebAppBtn(
                     text: '✏ ویرایش ' . $holding['asset_name'],
-                    path: '/assets/holding_add.html',
-                    params: ['holding' => base64_encode(json_encode($holding))])
+                    path: '/assets/holding.html',
+                    params: ['holding' => base64_encode(json_encode($holding))],
+                    add_api: true)
             ]);
         }
     }
@@ -796,7 +797,7 @@ function level_2(
     $keyboard = createKeyboardsArray(parent_btn_id: $level_button->getId(), admin: $user->isAdmin(), db: $db);
 
     // Add '➕ افزودن وام جدید' button to the keyboard
-    array_unshift($keyboard, [createWebAppBtn('➕ افزودن وام جدید', '/assets/add_loan.html')]);
+    array_unshift($keyboard, [createWebAppBtn('➕ افزودن وام جدید', '/assets/loan.html')]);
 
     $data = [
         'chat_id' => $user->getid(),
@@ -879,13 +880,14 @@ function handleLoansWebAppData(User $user, array $data, array $message, Database
         $new_loan = $web_app_data['loan'];
         try {
 
+            $received_date = JalaliDate::fromString($new_loan['received_date'], '-')->toGregorian();
             $loan_id = $db->create(
                 table: 'loans',
                 data: [
                     'user_id' => $user->getId(),
                     'name' => $new_loan['name'],
                     'total_amount' => $new_loan['total_amount'],
-                    'received_date' => JalaliDate::fromString($new_loan['received_date'], '-')->toGregorian()->format('Y-m-d'),
+                    'received_date' => $received_date->format('Y-m-d'),
                     'alert_offset' => $new_loan['alert_offset'],
                 ]);
 
@@ -893,17 +895,15 @@ function handleLoansWebAppData(User $user, array $data, array $message, Database
             foreach ($web_app_data['installments'] as $inst) {
                 try {
 
-                    $inst['due_date'] = JalaliDate::fromString($inst['due_date'])->toGregorian();
-                    $due_date = clone $inst['due_date'];
-                    $alert_date = $due_date->modify("-$new_loan[alert_offset] days")->format('Y-m-d');
-
+                    $due_date = JalaliDate::fromString($inst['due_date'])->toGregorian();
+                    $alert_date = JalaliDate::fromString($inst['alert_date'])->toGregorian();
                     $db->create(
                         table: 'installments',
                         data: [
                             'loan_id' => $loan_id,
                             'amount' => $inst['amount'],
                             'due_date' => $due_date->format('Y-m-d'),
-                            'alert_date' => $alert_date,
+                            'alert_date' => $alert_date->format('Y-m-d'),
                             'is_paid' => 0
                         ]);
                     $count++;
@@ -936,31 +936,35 @@ function handleLoansWebAppData(User $user, array $data, array $message, Database
 
         $new_insts = $web_app_data['updates']['installments'] ?? null;
         unset($web_app_data['updates']['installments']);
+
+        $loan_modified = false;
         $data['text'] = "نتیجه ویرایش وام: ";
+        if ($web_app_data['updates']) {
+            try {
+                $db->update(
+                    table: 'loans',
+                    data: $web_app_data['updates'],
+                    conditions: ['id' => $web_app_data['id'], 'user_id' => $user->getId()]);
+                $loan_modified = true;
 
-        try {
-            // Update the loan
-            $db->update(
-                table: 'loans',
-                data: $web_app_data['updates'],
-                conditions: ['id' => $web_app_data['id'], 'user_id' => $user->getId()]);
-            $data['text'] .= "\nویرایش اطلاعات وام: ✅";
-
-        } catch (Exception $e) {
-            $data['text'] .= "\nویرایش اطلاعات وام: ❌";
-            error_log(
-                'Loan Updates: ' . json_encode($web_app_data['updates']) . "\n" .
-                'Error: ' . $e->getMessage()
-            );
+            } catch (Exception $e) {
+                error_log(
+                    'Loan Updates: ' . json_encode($web_app_data['updates']) . "\n" .
+                    'Error: ' . $e->getMessage()
+                );
+            }
         }
+        $data['text'] .= $loan_modified ? "\nویرایش اطلاعات وام: ✅" : "\nویرایش اطلاعات وام: ❌";
 
         if ($new_insts) {
 
-            // Add 'loan_id' to installments
-            foreach ($new_insts as &$new_inst)
+            foreach ($new_insts as &$new_inst) {
                 $new_inst['loan_id'] = $web_app_data['id'];
+                $new_inst['due_date'] = JalaliDate::fromString($new_inst['due_date'])->toGregorian()->format('Y-m-d');
+                $new_inst['alert_date'] = JalaliDate::fromString($new_inst['alert_date'])->toGregorian()->format('Y-m-d');
+            }
 
-            // Update the Existing installments, based on their dates
+            // Update the Existing installments, based on their IDs or dates
             try {
                 $db->upsertBatch(
                     table: 'installments',
@@ -1110,7 +1114,7 @@ function handleLoansTextMessage(User $user, array $data, array $message, Databas
             array_unshift($data['reply_markup']['keyboard'], [
                 createWebAppBtn(
                     text: '✏ ویرایش وام «' . $loan['name'] . '»',
-                    path: '/assets/add_loan.html',
+                    path: '/assets/loan.html',
                     params: ['data' => base64_encode(json_encode($loan))])
             ]);
         }
@@ -1157,7 +1161,7 @@ function sendLoanDetail(array $loan, array $data): void
     $data['text'] = "/loan_$loan[id]\n";
     $data['text'] .= 'جزئیات وام «' . $loan['name'] . '»';
 
-    array_unshift($data['reply_markup']['keyboard'], [createWebAppBtn('✏ ویرایش وام «' . $loan['name'] . '»', '/assets/add_loan.html', ['data' => base64_encode(json_encode($loan))])]);
+    array_unshift($data['reply_markup']['keyboard'], [createWebAppBtn('✏ ویرایش وام «' . $loan['name'] . '»', '/assets/loan.html', ['data' => base64_encode(json_encode($loan))])]);
 
     sendToTelegram('sendMessage', $data);
 
@@ -1855,7 +1859,6 @@ function managePriceAlerts(User $user, array $callback_query, array $message, Da
         // Ask user to confirm deleting alert
         case 'del_alert':
             $alert_id = $query_data[$query_key];
-            echo $alert_id;
 
             $data['text'] = 'آیا از حذف اطمینان دارید؟';
             $data['reply_markup']['inline_keyboard'] = [[
@@ -1964,7 +1967,6 @@ function empty_level(
             // Check if Received text is cancel button
             $pressed_button = $db->read('buttons', ['id' => 's1', 'attrs->>"$.text"' => $message['text']]);
             if ($pressed_button) backButton($user, $db, $parent_level);
-            echo json_encode($pressed_button, JSON_PRETTY_PRINT);
 
             // Check if received text is a valid button
             $target_price = cleanAndValidateNumber($message['text']);
@@ -2103,54 +2105,58 @@ function getLoansWithInstallments(array $conditions, DatabaseManager $db, bool $
             // Convert received date to Jalali
             if ($jalali) $loan['received_date'] = JalaliDate::fromGregorianString($loan['received_date'])->format();
 
-            $loan['next_payment'] = null;
-            $loan['insts_summary']['paid_count'] = 0;
-            $loan['insts_summary']['overdue_count'] = 0;
-            $loan['insts_summary']['remaining_count'] = 0;
-            $loan['insts_summary']['paid_sum'] = 0;
-            $loan['insts_summary']['overdue_sum'] = 0;
-            $loan['insts_summary']['remaining_sum'] = 0;
-            foreach ($loan['installments'] as &$installment) {
+            if ($loan['installments']) {
+                $loan['next_payment'] = null;
+                $loan['insts_summary']['paid_count'] = 0;
+                $loan['insts_summary']['overdue_count'] = 0;
+                $loan['insts_summary']['remaining_count'] = 0;
+                $loan['insts_summary']['paid_sum'] = 0;
+                $loan['insts_summary']['overdue_sum'] = 0;
+                $loan['insts_summary']['remaining_sum'] = 0;
+                foreach ($loan['installments'] as &$installment) {
 
-                // Create `due_date` object just for calculations
-                $due_date = DateTime::createFromFormat('Y-m-d', $installment['due_date']);
+                    // Create `due_date` object just for calculations
+                    $due_date = DateTime::createFromFormat('Y-m-d', $installment['due_date']);
 
-                // Create `is_due` and `is_paid` boolean values
-                $is_due = boolval((new DateTime())->diff($due_date)->invert);
-                $is_paid = boolval($installment['is_paid']);
+                    // Create `is_due` and `is_paid` boolean values
+                    $is_due = boolval((new DateTime())->diff($due_date)->invert);
+                    $is_paid = boolval($installment['is_paid']);
 
-                // Calculate and add remaining days to next payment
-                if ($loan['next_payment'] === null && !$is_due && !$is_paid)
-                    $loan['next_payment'] = $due_date;
+                    // Calculate and add remaining days to next payment
+                    if ($loan['next_payment'] === null && !$is_due && !$is_paid)
+                        $loan['next_payment'] = $due_date;
 
-                // Initialize installments' summary
-                if ($is_paid) $summary_key_word = 'paid';
-                elseif ($is_due) $summary_key_word = 'overdue';
-                else $summary_key_word = 'remaining';
+                    // Initialize installments' summary
+                    if ($is_paid) $summary_key_word = 'paid';
+                    elseif ($is_due) $summary_key_word = 'overdue';
+                    else $summary_key_word = 'remaining';
 
-                // Add installments' summary to loan object
-                $loan['insts_summary'][$summary_key_word . '_count'] += 1;
-                $loan['insts_summary'][$summary_key_word . '_sum'] += $installment['amount'];
+                    // Add installments' summary to loan object
+                    $loan['insts_summary'][$summary_key_word . '_count'] += 1;
+                    $loan['insts_summary'][$summary_key_word . '_sum'] += $installment['amount'];
 
-                // Add `is_due` and `is_paid` to the installment
-                $installment['is_due'] = $is_due;
-                $installment['is_paid'] = $is_paid;
+                    // Add `is_due` and `is_paid` to the installment
+                    $installment['is_due'] = $is_due;
+                    $installment['is_paid'] = $is_paid;
 
-                // Change dates to Jalali string
-                if ($jalali) {
-                    $installment['due_date'] = JalaliDate::fromGregorianString($installment['due_date'])->format();
-                    $installment['alert_date'] = JalaliDate::fromGregorianString($installment['alert_date'])->format();
+                    // Change dates to Jalali string
+                    if ($jalali) {
+                        $installment['due_date'] = JalaliDate::fromGregorianString($installment['due_date'])->format();
+                        $installment['alert_date'] = JalaliDate::fromGregorianString($installment['alert_date'])->format();
+                    }
                 }
             }
         }
     return $loans;
 }
 
-function createWebAppBtn(string $text, string $path, array $params = []): array
+function createWebAppBtn(string $text, string $path, array $params = [], bool $add_api = false): array
 {
     $url = BASE_URL . $path;
-    $params['api_url'] = BASE_URL . '/api/ExternalConnections/api.php';
-    $params['api_key'] = DB_API_SECRET;
+    if ($add_api) {
+        $params['api_url'] = BASE_URL . '/api/ExternalConnections/api.php';
+        $params['api_key'] = DB_API_SECRET;
+    }
 
     return [
         'text' => $text,
@@ -2317,12 +2323,15 @@ function createLoansView(array $loans, ?string $loans_mssg_id = null, ?string $i
                 $installments_detail .= $prefix . beautifulNumber($year, null) . '\: ' . implode('', $year_installments);
             }
 
-        } else $installments_detail = '';
+        } else {
+            $installments_detail = '';
+            $summerized_insts_text = '';
+        }
 
         $deep_link = "https://ble.ir/" . BOT_ID . "?start=showLoan_loanId{$loan['id']}" . ($loans_mssg_id ? "_loansMssgId" . $loans_mssg_id : '') . ($initial_mssg_id ? "_initMssgId" . $initial_mssg_id : '');
         $loan_name = "\n‏" . "\-* [" . beautifulNumber($loan['name'], null) . "]($deep_link)*";
 
-        if ($loan['next_payment']) {
+        if (isset($loan['next_payment'])) {
             $remaining_days = $loan['next_payment']->diff(new DateTime())->days;
             $next_payment_text = beautifulNumber($remaining_days . ' روز دیگر در ' . JalaliDate::fromGregorianObject($loan['next_payment'])->format(), null);
 
