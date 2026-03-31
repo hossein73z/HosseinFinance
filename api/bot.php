@@ -2044,10 +2044,6 @@ function level_10(
     if ($callback_query) handleAddAccountsCallback($user, $message);
 
     addAccountProgress($user, $data, $message, $db);
-    // Send default message of this level
-    $data['text'] = 'پیام نامفهوم است!';
-    sendToTelegram('sendMessage', $data);
-    exit();
 }
 
 #[NoReturn]
@@ -2062,6 +2058,7 @@ function handleAddAccountsCallback(User $user, array $message): void
     exit();
 }
 
+#[NoReturn]
 function addAccountProgress(User $user, array $data, ?array $message, DatabaseManager $db): void
 {
     /**
@@ -2081,32 +2078,26 @@ function addAccountProgress(User $user, array $data, ?array $message, DatabaseMa
         $db->update('users', ['last_btn' => 10, 'progress' => json_encode($progress)], ['id' => $user->getId()]);
         askForAccountType($user->setProgress($progress), $data, $db);
 
-    } else
-        foreach ($progress['add_account'] as $level => $value) {
-
-            if ($value !== null) continue;
-
-            switch ($level) {
-                case 'type':
-                    if (!$message) askForAccountType($user, $data, $db);
-                    $progress['add_account'][$level] = $message['text'];
-                    if (!isset($progress['add_account']['name'])) $progress['add_account']['name'] = null;
-                    level_10($user->setProgress($progress), $db);
-                case 'name':
-                    if (!$message) askForAccountName($user, $data, $db);
-                    $progress['add_account'][$level] = $message['text'];
-                    if (!isset($progress['add_account']['starting_amount'])) $progress['add_account']['starting_amount'] = null;
-                    level_10($user->setProgress($progress), $db);
-                case 'starting_amount':
-                    if (!$message) askForAccountStartingAmount($user, $data, $db);
-                    $amount = cleanAndValidateNumber($message['text']);
-                    if ($amount === null)
-                        askForAccountStartingAmount($user, $data, $db, 'پیام نامفهوم بود. لطفاً موجودی را تنها با استفاده از ارقام وارد کنید!');
-                    $progress['add_account'][$level] = $amount;
-                    if (!isset($progress['add_account']['type'])) $progress['add_account']['type'] = null;
-                    level_10($user->setProgress($progress), $db);
-            }
+    } else {
+        if (!isset($progress['add_account']['type'])) {
+            if (!$message) askForAccountType($user, $data, $db);
+            $progress['add_account']['type'] = $message['text'];
+            level_10($user->setProgress($progress), $db);
         }
+        if (!isset($progress['add_account']['name'])) {
+            if (!$message) askForAccountName($user, $data, $db);
+            $progress['add_account']['name'] = $message['text'];
+            level_10($user->setProgress($progress), $db);
+        }
+        if (!isset($progress['add_account']['starting_amount'])) {
+            if (!$message) askForAccountStartingAmount($user, $data, $db);
+            $amount = cleanAndValidateNumber($message['text']);
+            if ($amount === null)
+                askForAccountStartingAmount($user, $data, $db, 'پیام نامفهوم بود. لطفاً موجودی را تنها با استفاده از ارقام وارد کنید!');
+            $progress['add_account']['starting_amount'] = $amount;
+            level_10($user->setProgress($progress), $db);
+        }
+    }
     addAccount($user, [
         'user_id' => $user->getId(),
         'type' => $progress['add_account']['type'],
