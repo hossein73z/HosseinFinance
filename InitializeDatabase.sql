@@ -102,12 +102,13 @@ CREATE TABLE IF NOT EXISTS `alerts`
 
 CREATE TABLE IF NOT EXISTS `accounts`
 (
-    id              BIGINT AUTO_INCREMENT PRIMARY KEY,
-    user_id         INT            NOT NULL,
-    type            VARCHAR(100)   NOT NULL,
-    name            VARCHAR(255)   NOT NULL,
-    starting_amount NUMERIC(18, 8) NOT NULL,
-    note            TEXT,
+    id               BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id          INT            NOT NULL,
+    type             VARCHAR(100)   NOT NULL,
+    name             VARCHAR(255)   NOT NULL,
+    starting_balance NUMERIC(18, 8) NOT NULL DEFAULT 0,
+    current_balance  NUMERIC(18, 8) NOT NULL DEFAULT 0,
+    note             TEXT,
 
     FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE ON UPDATE CASCADE
 ) DEFAULT CHARSET = utf8mb4;

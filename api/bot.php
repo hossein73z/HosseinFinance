@@ -2002,8 +2002,8 @@ function sendAccounts(User $user, DatabaseManager $db, int|string|null $message_
 
     if ($accounts) {
         $text = 'حساب‌های شما:' . "\n";
-//        foreach ($alerts as $alert) {
-//            $text .= "\n  - " . beautifulNumber($alert['asset_name'], null) . ': ' . beautifulNumber($alert['target_price']);
+//        foreach ($accounts as $account) {
+//            $text .= "\n  - " . "‏" . beautifulNumber($alert['asset_name'], null) . ': ' . beautifulNumber($alert['target_price']);
 //        }
     } else $text = 'شما حسابی ثبت نکرده‌اید!';
 
@@ -2061,16 +2061,6 @@ function handleAddAccountsCallback(User $user, array $message): void
 #[NoReturn]
 function addAccountProgress(User $user, array $data, ?array $message, DatabaseManager $db): void
 {
-    /**
-     * --- PROGRESS SCHEMA ---
-     *
-     * add_account = [
-     *     type,
-     *     name,
-     *     starting_amount
-     * ]
-     */
-
     $progress = $user->getProgress();
     if (!$progress ||
         (isset($progress['add_account']) && sizeof($progress['add_account']) < 1)) {
@@ -2089,12 +2079,12 @@ function addAccountProgress(User $user, array $data, ?array $message, DatabaseMa
             $progress['add_account']['name'] = $message['text'];
             level_10($user->setProgress($progress), $db);
         }
-        if (!isset($progress['add_account']['starting_amount'])) {
-            if (!$message) askForAccountStartingAmount($user, $data, $db);
+        if (!isset($progress['add_account']['starting_balance'])) {
+            if (!$message) askForAccountStartingBalance($user, $data, $db);
             $amount = cleanAndValidateNumber($message['text']);
             if ($amount === null)
-                askForAccountStartingAmount($user, $data, $db, 'پیام نامفهوم بود. لطفاً موجودی را تنها با استفاده از ارقام وارد کنید!');
-            $progress['add_account']['starting_amount'] = $amount;
+                askForAccountStartingBalance($user, $data, $db, 'پیام نامفهوم بود. لطفاً موجودی را تنها با استفاده از ارقام وارد کنید!');
+            $progress['add_account']['starting_balance'] = $amount;
             level_10($user->setProgress($progress), $db);
         }
     }
@@ -2102,7 +2092,8 @@ function addAccountProgress(User $user, array $data, ?array $message, DatabaseMa
         'user_id' => $user->getId(),
         'type' => $progress['add_account']['type'],
         'name' => $progress['add_account']['name'],
-        'starting_amount' => $progress['add_account']['starting_amount']
+        'starting_balance' => $progress['add_account']['starting_balance'],
+        'current_balance' => $progress['add_account']['starting_balance']
     ], $data, $db);
 }
 
@@ -2138,13 +2129,13 @@ function askForAccountName(User $user, array $data, DatabaseManager $db): void
 }
 
 #[NoReturn]
-function askForAccountStartingAmount(User $user, array $data, DatabaseManager $db, ?string $text = null): void
+function askForAccountStartingBalance(User $user, array $data, DatabaseManager $db, ?string $text = null): void
 {
     $data['text'] = $text ?? 'موجودی کنونی حساب را وارد کنید';
     $response = sendToTelegram('sendMessage', $data);
     if ($response) {
         $progress = $user->getProgress();
-        $progress['add_account']['starting_amount'] = null;
+        $progress['add_account']['starting_balance'] = null;
         $db->update(
             'users',
             ['progress' => json_encode($progress)],
