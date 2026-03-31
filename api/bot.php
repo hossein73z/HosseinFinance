@@ -1995,16 +1995,16 @@ function sendAccounts(User $user, DatabaseManager $db, int|string|null $message_
         'text' => &$text,
         'chat_id' => $user->getid(),
         'message_id' => $message_id,
-        'reply_markup' => ['inline_keyboard' => [
-            [['text' => 'مدیریت حساب‌ها', 'callback_data' => json_encode(['mng_accounts' => null])]]
-        ]]
+//        'reply_markup' => ['inline_keyboard' => [
+//            [['text' => 'مدیریت حساب‌ها', 'callback_data' => json_encode(['mng_accounts' => null])]]
+//        ]]
     ];
 
     if ($accounts) {
         $text = 'حساب‌های شما:' . "\n";
-//        foreach ($accounts as $account) {
-//            $text .= "\n  - " . "‏" . beautifulNumber($alert['asset_name'], null) . ': ' . beautifulNumber($alert['target_price']);
-//        }
+        foreach ($accounts as $account) {
+            $text .= "\n  - " . "‏" . beautifulNumber($account['name'], null) . "‏" . " (" . beautifulNumber($account['type'], null) . "): " . beautifulNumber($account['current_balance']);
+        }
     } else $text = 'شما حسابی ثبت نکرده‌اید!';
 
     sendToTelegram('editMessageText', $data);
