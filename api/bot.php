@@ -360,14 +360,15 @@ function backButton(User $user, DatabaseManager $db, int|string|null $parent_btn
     $current_btn = Button::fromDbRow($current_level);
 
     if ($progress && sizeof($progress[array_key_first($progress)]) > 1) {
-        // If user is at levels higher than 1 in a progress, remove the
-        // last progress level and return user back to current level.
-        array_pop($progress[array_key_first($progress)]);
-        $progress[array_key_first($progress)][array_key_last($progress[array_key_first($progress)])] = null;
+        $current_progress = &$progress[array_key_first($progress)];
+        // Delete the last level
+        array_pop($current_progress);
+        // Clear the current last level
+        $current_progress[array_key_last($current_progress)] = null;
         normalButtonHandler($user->setProgress($progress), $current_btn, $db);
     } else {
         // If user is at level 1 of a progress or has no
-        // progress at all Redirect them to the parent level.
+        // progress at all Redirect them back to the parent level.
         $parent_level = $db->read(
             table: 'buttons',
             conditions: ['id' => $current_btn->getBelongTo()],
@@ -2061,23 +2062,35 @@ function handleAddAccountsCallback(User $user, array $message): void
 #[NoReturn]
 function addAccountProgress(User $user, array $data, ?array $message, DatabaseManager $db): void
 {
+    /**
+     * Required fields for new account: user_id, type and name.
+     *
+     * If any of the three values are not presented, asks for it,
+     * Otherwise adds the account to the database.
+     */
+
     $progress = $user->getProgress();
-    if (!$progress ||
-        (isset($progress['add_account']) && sizeof($progress['add_account']) < 1)) {
+    if (!$progress || !isset($progress['add_account'])) {
+        // Starting adding account process
         $progress = ['add_account' => ['type' => null]];
         $db->update('users', ['last_btn' => 10, 'progress' => json_encode($progress)], ['id' => $user->getId()]);
         askForAccountType($user->setProgress($progress), $data, $db);
 
     } else {
+        /*
+         * Each `if works with this principle:
+         *  $message == null -> asks for certain information.
+         *  $message != null -> saves the received information
+         */
         if (!isset($progress['add_account']['type'])) {
             if (!$message) askForAccountType($user, $data, $db);
             $progress['add_account']['type'] = $message['text'];
-            level_10($user->setProgress($progress), $db);
+            addAccountProgress($user->setProgress($progress), $data, null, $db);
         }
         if (!isset($progress['add_account']['name'])) {
             if (!$message) askForAccountName($user, $data, $db);
             $progress['add_account']['name'] = $message['text'];
-            level_10($user->setProgress($progress), $db);
+            addAccountProgress($user->setProgress($progress), $data, null, $db);
         }
         if (!isset($progress['add_account']['starting_balance'])) {
             if (!$message) askForAccountStartingBalance($user, $data, $db);
@@ -2085,9 +2098,11 @@ function addAccountProgress(User $user, array $data, ?array $message, DatabaseMa
             if ($amount === null)
                 askForAccountStartingBalance($user, $data, $db, 'پیام نامفهوم بود. لطفاً موجودی را تنها با استفاده از ارقام وارد کنید!');
             $progress['add_account']['starting_balance'] = $amount;
-            level_10($user->setProgress($progress), $db);
+            addAccountProgress($user->setProgress($progress), $data, null, $db);
         }
     }
+
+    // Add the account if all the required values are presented
     addAccount($user, [
         'user_id' => $user->getId(),
         'type' => $progress['add_account']['type'],
