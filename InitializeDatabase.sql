@@ -22,7 +22,8 @@ CREATE TABLE IF NOT EXISTS `buttons`
     keyboards TEXT             DEFAULT NULL
 ) DEFAULT CHARSET = utf8mb4;
 INSERT INTO `buttons` (`id`, `attrs`, `admin_key`, `messages`, `belong_to`, `keyboards`)
-VALUES ('0', '{\"text\": \"🏠 صفحه اصلی\"}', 0, NULL, NULL, '[[\"1\", \"2\"], [\"9\", \"11\"], [\"3\"], [\"4\", \"7\"]]'),
+VALUES ('0', '{\"text\": \"🏠 صفحه اصلی\"}', 0, NULL, NULL,
+        '[[\"1\", \"2\"], [\"9\", \"11\"], [\"3\"], [\"4\", \"7\"]]'),
        ('1', '{\"text\": \"💼 دارایی‌ها\"}', 0, NULL, '0', '[[\"s0\"]]'),
        ('2', '{\"text\": \"🏦 وام و اقساط\"}', 0, NULL, '0', '[[\"s0\"]]'),
        ('3', '{\"text\": \"🛠 ابزارها\"}', 0, NULL, '0', '[[\"5\", \"8\"], [\"6\"], [\"s0\"]]'),
@@ -118,11 +119,12 @@ CREATE TABLE IF NOT EXISTS `accounts`
 CREATE TABLE IF NOT EXISTS `transactions`
 (
     id       BIGINT AUTO_INCREMENT PRIMARY KEY,
-    user_id  INT            NOT NULL,
-    category VARCHAR(50)    NOT NULL DEFAULT 'دسته‌بندی نشده',
-    date     VARCHAR(10)    DEFAULT NULL,
-    time     VARCHAR(8)     DEFAULT NULL,
-    amount   NUMERIC(18, 8) NOT NULL,
+    user_id  INT                                    NOT NULL,
+    category VARCHAR(50)                            NOT NULL DEFAULT 'دسته‌بندی نشده',
+    type     ENUM ('outward', 'inward', 'transfer') NOT NULL DEFAULT 'outward',
+    date     VARCHAR(10)                                     DEFAULT NULL,
+    time     VARCHAR(8)                                      DEFAULT NULL,
+    amount   NUMERIC(18, 8)                         NOT NULL,
     note     TEXT,
 
     FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE ON UPDATE CASCADE

@@ -2251,11 +2251,12 @@ function handleTransactionsTextMessage(User $user, array $data, array $message, 
         $text = 'در متن ارسالی یک تراکنش پیدا شد. در صورت تمایل می‌توانید با دکمه زیر این تراکنش را ذخیره کنید.';
         $text .= "\n\n";
 
-        if ($transaction['bank']) $text .= 'بانک: ' . $transaction['bank'] . "\n";
-        if ($transaction['amount']) $text .= 'مبلغ: ' . $transaction['amount'] . "\n";
-        if ($transaction['balance']) $text .= 'موجودی فعلی: ' . $transaction['balance'] . "\n";
-        if ($transaction['date']) $text .= 'تاریخ: ' . $transaction['date'] . "\n";
-        if ($transaction['time']) $text .= 'ساعت: ' . $transaction['time'] . "\n";
+        $text .= "\n" . 'بانک: ' . beautifulNumber($transaction['bank'], null);
+        $text .= "\n" . 'مبلغ: ' . beautifulNumber($transaction['amount']);
+        $text .= "\n" . 'نوع: ' . beautifulNumber($transaction['type'] == 'inward' ? 'واریز' : 'برداشت', null);
+        $text .= "\n" . 'موجودی فعلی: ' . beautifulNumber($transaction['balance']);
+        $text .= "\n" . 'تاریخ: ' . beautifulNumber($transaction['date']->format(), null);
+        $text .= "\n" . 'ساعت: ' . beautifulNumber($transaction['time'], null);
 
     } else $text = 'پیام نامفهوم است!';
 
@@ -2266,29 +2267,37 @@ function handleTransactionsTextMessage(User $user, array $data, array $message, 
 
 function extractTransactionFromText(string $text): ?array
 {
-    // Bank Name
-    preg_match('/^بلو/u', $text, $bank); // Blu
+    // --- Bank Name ---
+    preg_match('/بلو/u', $text, $bank); // Blu
     if ($bank) $bank = $bank[0];
 
     $transaction = [];
     if ($bank == 'بلو') {
         $transaction['bank'] = $bank;
 
-        // Amount
-        preg_match('/ (.+?) ریال به حساب شما نشست./um', $text, $amount);
+        // --- Amount ---
+        preg_match('/ (.+?) ریال به حساب شما نشست\./um', $text, $amount);
         if ($amount) {
             $amount = cleanAndValidateNumber(preg_replace('/\D+/', '', $amount[1]));
             $transaction['amount'] = $amount;
+            $transaction['type'] = 'inward';
+        } else {
+            preg_match('/ (.+?) ریال از حساب شما پرید\./um', $text, $amount);
+            if ($amount) {
+                $amount = cleanAndValidateNumber(preg_replace('/\D+/', '', $amount[1]));
+                $transaction['amount'] = $amount;
+                $transaction['type'] = 'outward';
+            } else return null;
         }
 
-        // Balance
+        // --- Balance ---
         preg_match('/موجودی: (.+?) ریال/um', $text, $balance);
         if ($balance) {
             $balance = cleanAndValidateNumber(preg_replace('/\D+/', '', $balance[1]));
             $transaction['balance'] = $balance;
-        }
+        } else return null;
 
-        // Date
+        // --- Date ---
         preg_match('/^(....)\.(..)\.(..)$/um', $text, $date);
 
         if ($date) {
@@ -2297,16 +2306,16 @@ function extractTransactionFromText(string $text): ?array
             $day = cleanAndValidateNumber($date[3]);
 
             $date = $year . '/' . $month . '/' . $day;
-            $date = JalaliDate::fromString($date)->toGregorian()->format('Y-m-d');
+            $date = JalaliDate::fromString($date);
             $transaction['date'] = $date;
-        }
+        } else $transaction['date'] = JalaliDate::fromGregorian();
 
-        // Time
+        // --- Time ---
         preg_match('/^(..):(..)$/um', $text, $time);
         if ($time) {
             $time = cleanAndValidateNumber($time[1]) . ':' . cleanAndValidateNumber($time[2]);
             $transaction['time'] = $time;
-        }
+        } else $transaction['time'] = (new DateTime())->format('H:i');
     }
     return $transaction;
 }
