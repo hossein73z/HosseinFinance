@@ -4,6 +4,13 @@ const persian = ['۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹'];
 const arabic = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
 const english = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 
+function toEnglishDigits(string $text): string
+{
+    $cleanedText = str_replace(persian, english, $text);
+    $cleanedText = str_replace(arabic, english, $cleanedText);
+    return $cleanedText;
+}
+
 /**
  * Cleans and validates a message text, converting it into a normalized numeric string format (e.g., "123.45").
  * Handles various numeral systems and common delimiters.

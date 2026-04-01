@@ -180,6 +180,9 @@ function handleCallbackQuery(array $callback_query, DatabaseManager $db): void
             case 'show_alerts':
                 managePriceAlerts($user, $callback_query, $message, $db);
 
+            case 'add_mssg_transaction':
+                addTransaction($user, $callback_query, $message, $db);
+
             default:
                 choosePath(message: $message, user: $user, callback_query: $callback_query, db: $db);
         }
@@ -2248,8 +2251,8 @@ function handleTransactionsTextMessage(User $user, array $data, array $message, 
     $transaction = extractTransactionFromText($message['text']);
 
     if ($transaction) {
-        $text = 'در متن ارسالی یک تراکنش پیدا شد. در صورت تمایل می‌توانید با دکمه زیر این تراکنش را ذخیره کنید.';
-        $text .= "\n\n";
+
+        $text = "در متن ارسالی یک تراکنش پیدا شد. در صورت تمایل می‌توانید با دکمه زیر این تراکنش را ذخیره کنید.\n";
 
         $text .= "\n" . 'بانک: ' . beautifulNumber($transaction['bank'], null);
         $text .= "\n" . 'مبلغ: ' . beautifulNumber($transaction['amount']);
@@ -2257,6 +2260,10 @@ function handleTransactionsTextMessage(User $user, array $data, array $message, 
         $text .= "\n" . 'موجودی فعلی: ' . beautifulNumber($transaction['balance']);
         $text .= "\n" . 'تاریخ: ' . beautifulNumber($transaction['date']->format(), null);
         $text .= "\n" . 'ساعت: ' . beautifulNumber($transaction['time'], null);
+
+        $data['reply_markup'] = ['inline_keyboard' => [[
+            ['text' => 'ثبت تراکنش', 'callback_data' => json_encode(['add_mssg_transaction' => null])]
+        ]]];
 
     } else $text = 'پیام نامفهوم است!';
 
@@ -2318,6 +2325,41 @@ function extractTransactionFromText(string $text): ?array
         } else $transaction['time'] = (new DateTime())->format('H:i');
     }
     return $transaction;
+}
+
+#[NoReturn]
+function addTransaction(User $user, array $callback_query, array $message, DatabaseManager $db): void
+{
+    if ($message) {
+        preg_match('/^بانک: (.+?)$/um', $message['text'], $bank);
+        preg_match('/^مبلغ: (.+?)$/um', $message['text'], $amount);
+        preg_match('/^نوع: (.+?)$/um', $message['text'], $type);
+        preg_match('/^موجودی فعلی: (.+?)$/um', $message['text'], $balance);
+        preg_match('/^تاریخ: (.+?)$/um', $message['text'], $date);
+        preg_match('/^ساعت: (.+?)$/um', $message['text'], $time);
+
+        $transaction = [
+            'bank' => $bank[1],
+            'amount' => cleanAndValidateNumber(str_replace(',', '', $amount[1])),
+            'type' => $type[1] == 'واریز' ? 'inward' : 'outward',
+            'balance' => cleanAndValidateNumber(str_replace(',', '', $balance[1])),
+            'date' => JalaliDate::fromString(toEnglishDigits($date[1]))->toGregorian()->format('Y-m-d'),
+            'time' => toEnglishDigits($time[1]),
+        ];
+
+        $result = $db->create('transactions', [
+            'user_id' => $user->getId(),
+            'type' => $transaction['type'],
+            'date' => $transaction['date'],
+            'time' => $transaction['time'],
+            'amount' => $transaction['amount'],
+        ]);
+
+        sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
+        $text = $result ? '✅ تراکنش جدید با موفقیت ثبت شد!' : '❌ خطای پایگاه داده در ثبت تراکنش جدید!';
+        sendToTelegram('editMessageText', ['chat_id' => $user->getId(), 'message_id' => $message['message_id'], 'text' => $text]);
+    }
+    exit();
 }
 
 // ==========================================
