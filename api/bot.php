@@ -2473,7 +2473,8 @@ function getHoldingsWithAssetDetails(array $conditions, DatabaseManager $db, boo
 }
 
 /**
- * - Returns a list of all user's loans with related installments under `installments` key.
+ * - Returns a list of all user's loans with related installments under `installments` key,
+ *      sorted by remaining days to the next payment.
  * - All loans and installments dates are returned as string (Gregorian or Jalali).
  * - Each returned installment has an `is_due` boolean key.
  * - Each loan has a `next_payment` key, storing due date of the next installment in
@@ -2555,6 +2556,13 @@ function getLoansWithInstallments(array $conditions, DatabaseManager $db, bool $
                 }
             }
         }
+
+    usort($loans, function ($a, $b) {
+        if ($a['next_payment'] == null) return 1;
+        elseif ($b['next_payment'] == null) return -1;
+        else return $a['next_payment']->diff(new DateTime())->days <=> $b['next_payment']->diff(new DateTime())->days;
+    });
+
     return $loans;
 }
 
