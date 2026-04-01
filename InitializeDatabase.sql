@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS `buttons`
     keyboards TEXT             DEFAULT NULL
 ) DEFAULT CHARSET = utf8mb4;
 INSERT INTO `buttons` (`id`, `attrs`, `admin_key`, `messages`, `belong_to`, `keyboards`)
-VALUES ('0', '{\"text\": \"🏠 صفحه اصلی\"}', 0, NULL, NULL, '[[\"1\", \"2\"], [\"9\"], [\"3\"], [\"4\", \"7\"]]'),
+VALUES ('0', '{\"text\": \"🏠 صفحه اصلی\"}', 0, NULL, NULL, '[[\"1\", \"2\"], [\"9\", \"11\"], [\"3\"], [\"4\", \"7\"]]'),
        ('1', '{\"text\": \"💼 دارایی‌ها\"}', 0, NULL, '0', '[[\"s0\"]]'),
        ('2', '{\"text\": \"🏦 وام و اقساط\"}', 0, NULL, '0', '[[\"s0\"]]'),
        ('3', '{\"text\": \"🛠 ابزارها\"}', 0, NULL, '0', '[[\"5\", \"8\"], [\"6\"], [\"s0\"]]'),
@@ -31,8 +31,10 @@ VALUES ('0', '{\"text\": \"🏠 صفحه اصلی\"}', 0, NULL, NULL, '[[\"1\", 
        ('6', '{\"text\": \"🤖 هوش مصنوعی\"}', 0, NULL, '3', '[[\"s0\"]]'),
        ('7', '{\"text\": \"⚙ تنظیمات\"}', 0, NULL, '0', '[[\"s4\"], [\"s0\"]]'),
        ('8', '{\"text\": \"🔔 هشدارها\"}', 0, NULL, '3', '[[\"s0\"]]'),
-       ('9', '{\"text\": \"🧾 حساب‌ها\"}', 0, NULL, '0', '[[\"9\"], [\"s0\"]]'),
+       ('9', '{\"text\": \"🧾 حساب‌ها\"}', 0, NULL, '0', '[[\"10\"], [\"s0\"]]'),
        ('10', '{\"text\": \"➕ افزودن حساب جدید\"}', 0, NULL, '9', '[[\"s0\", \"s1\"]]'),
+       ('11', '{\"text\": \"🔃 تراکنش‌ها\"}', 0, NULL, '0', '[[\"12\"], [\"s0\"]]'),
+       ('12', '{\"text\": \"➕ افزودن تراکنش جدید\"}', 0, NULL, '11', '[[\"s0\", \"s1\"]]'),
        ('s0', '{\"text\": \"🔙 برگشت 🔙\"}', 0, NULL, NULL, NULL),
        ('s1', '{\"text\": \"❌ لغو ❌\"}', 0, NULL, NULL, NULL),
        ('s2', '{\"text\": \"❤ علاقه‌مندی‌ها ❤\"}', 0, NULL, NULL, NULL),
@@ -117,16 +119,12 @@ CREATE TABLE IF NOT EXISTS `transactions`
 (
     id       BIGINT AUTO_INCREMENT PRIMARY KEY,
     user_id  INT            NOT NULL,
-    asset_id INT            NOT NULL,
-    category VARCHAR(50)    NOT NULL,
+    category VARCHAR(50)    NOT NULL DEFAULT 'دسته‌بندی نشده',
     date     VARCHAR(10)    DEFAULT NULL,
     time     VARCHAR(8)     DEFAULT NULL,
-    price    NUMERIC(18, 8) NOT NULL,
     amount   NUMERIC(18, 8) NOT NULL,
-    fee      NUMERIC(18, 8) DEFAULT 0.0,
     note     TEXT,
 
-    FOREIGN KEY (asset_id) REFERENCES assets (id) ON DELETE RESTRICT,
     FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE ON UPDATE CASCADE
 ) DEFAULT CHARSET = utf8mb4;
 

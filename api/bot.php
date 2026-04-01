@@ -239,12 +239,13 @@ function callbackHandler(User $user, array $callback_query, DatabaseManager $db)
 {
     $message = $callback_query['message'];
 
-    if ($user->getLastBtn() == 0) level_0(user: $user, db: $db, message: $message, callback_query: $callback_query);
-    if ($user->getLastBtn() == 1) level_1(user: $user, db: $db, message: $message, callback_query: $callback_query);
-    if ($user->getLastBtn() == 2) level_2(user: $user, db: $db, message: $message, callback_query: $callback_query);
-    if ($user->getLastBtn() == 5) level_5(user: $user, db: $db, message: $message, callback_query: $callback_query);
-    if ($user->getLastBtn() == 6) level_6(user: $user, db: $db, message: $message, callback_query: $callback_query);
-    if ($user->getLastBtn() == 8) level_8(user: $user, db: $db, message: $message, callback_query: $callback_query);
+    if ($user->getLastBtn() == 0) /***/ level_0(user: $user, db: $db, message: $message, callback_query: $callback_query);
+    if ($user->getLastBtn() == 1) /***/ level_1(user: $user, db: $db, message: $message, callback_query: $callback_query);
+    if ($user->getLastBtn() == 2) /***/ level_2(user: $user, db: $db, message: $message, callback_query: $callback_query);
+    if ($user->getLastBtn() == 5) /***/ level_5(user: $user, db: $db, message: $message, callback_query: $callback_query);
+    if ($user->getLastBtn() == 6) /***/ level_6(user: $user, db: $db, message: $message, callback_query: $callback_query);
+    if ($user->getLastBtn() == 8) /***/ level_8(user: $user, db: $db, message: $message, callback_query: $callback_query);
+    if ($user->getLastBtn() == 11) /**/ level_11(user: $user, db: $db, message: $message, callback_query: $callback_query);
 
     // Fallback if not handled
     sendToTelegram('editMessageText', [
@@ -279,6 +280,7 @@ function normalButtonHandler(User $user, Button $pressed_button, DatabaseManager
     if ($pressed_button->getId() == 8) level_8(user: $user, db: $db, level_button: $pressed_button);
     if ($pressed_button->getId() == 9) level_9(user: $user, db: $db, level_button: $pressed_button);
     if ($pressed_button->getId() == 10) level_10(user: $user, db: $db, level_button: $pressed_button);
+    if ($pressed_button->getId() == 11) level_11(user: $user, db: $db, level_button: $pressed_button);
 
     // Default Actions for normal button
     $response = sendToTelegram('sendMessage', [
@@ -310,7 +312,8 @@ function nonButtonHandler(User $user, array $message, DatabaseManager $db): void
     if ($user->getLastBtn() == '5') /***/ level_5(user: $user, db: $db, message: $message);
     if ($user->getLastBtn() == '6') /***/ level_6(user: $user, db: $db, message: $message);
     if ($user->getLastBtn() == '8') /***/ level_8(user: $user, db: $db, message: $message);
-    if ($user->getLastBtn() == '10') /***/ level_10(user: $user, db: $db, message: $message);
+    if ($user->getLastBtn() == '10') /**/ level_10(user: $user, db: $db, message: $message);
+    if ($user->getLastBtn() == '11') /**/ level_11(user: $user, db: $db, message: $message);
 
     if ($user->getLastBtn() == 's3') /**/ empty_level(user: $user, db: $db, message: $message);
 
@@ -2176,6 +2179,136 @@ function addAccount(User $user, array $account, array $data, DatabaseManager $db
 
     // Redirect user to view all accounts
     level_9($user, $db);
+}
+
+// ==========================================
+//          LEVEL 11: Transactions
+// ==========================================
+
+#[NoReturn]
+function level_11(
+    User            $user,
+    DatabaseManager $db,
+    ?Button         $level_button = null,
+    ?array          $message = null,
+    ?array          $callback_query = null
+): void
+{
+    // Initialize button object if null is given
+    $level_button = $level_button ?? Button::fromDbRow($db->read('buttons', ['id' => 9], true));
+
+    // Create keyboards
+    $keyboard = createKeyboardsArray(parent_btn_id: $level_button->getId(), admin: $user->isAdmin(), db: $db);
+
+    $data = [
+        'chat_id' => $user->getid(),
+        'text' => $level_button->getText(),
+        'reply_markup' => [
+            'keyboard' => $keyboard,
+            'resize_keyboard' => true,
+            'is_persistent' => true,
+            'input_field_placeholder' => $level_button->getText()
+        ]
+    ];
+
+    if ($callback_query) handleTransactionsCallback($user, $message);
+    if ($message) handleTransactionsTextMessage($user, $data, $message, $db);
+
+    // Send initial message
+    $response = sendToTelegram('sendMessage', $data);
+
+    // Update user's level and progress
+    if ($response) {
+        $db->update('users', ['last_btn' => $level_button->getId(), 'progress' => null], ['id' => $user->getId()]);
+
+        // Send Informative message
+//        sendAccounts($user, $db);
+    }
+
+    exit();
+}
+
+#[NoReturn]
+function handleTransactionsCallback(User $user, array $message): void
+{
+    $data = [
+        'chat_id' => $user->getid(),
+        'message_id' => $message['message_id'],
+        'text' => 'این پیام منقضی شده است.'];
+
+    sendToTelegram('editMessageText', $data);
+    exit();
+}
+
+#[NoReturn]
+function handleTransactionsTextMessage(User $user, array $data, array $message, DatabaseManager $db): void
+{
+    $text = &$data['text'];
+
+    $transaction = extractTransactionFromText($message['text']);
+
+    if ($transaction) {
+        $text = 'در متن ارسالی یک تراکنش پیدا شد. در صورت تمایل می‌توانید با دکمه زیر این تراکنش را ذخیره کنید.';
+        $text .= "\n\n";
+
+        if ($transaction['bank']) $text .= 'بانک: ' . $transaction['bank'] . "\n";
+        if ($transaction['amount']) $text .= 'مبلغ: ' . $transaction['amount'] . "\n";
+        if ($transaction['balance']) $text .= 'موجودی فعلی: ' . $transaction['balance'] . "\n";
+        if ($transaction['date']) $text .= 'تاریخ: ' . $transaction['date'] . "\n";
+        if ($transaction['time']) $text .= 'ساعت: ' . $transaction['time'] . "\n";
+
+    } else $text = 'پیام نامفهوم است!';
+
+    // Send default message of this level
+    sendToTelegram('sendMessage', $data);
+    exit();
+}
+
+function extractTransactionFromText(string $text): ?array
+{
+    // Bank Name
+    preg_match('/^بلو/u', $text, $bank); // Blu
+    if ($bank) $bank = $bank[0];
+
+    $transaction = [];
+    if ($bank == 'بلو') {
+        $transaction['bank'] = $bank;
+
+        // Amount
+        preg_match('/ (.+?) ریال به حساب شما نشست./um', $text, $amount);
+        if ($amount) {
+            $amount = cleanAndValidateNumber(preg_replace('/\D+/', '', $amount[1]));
+            $transaction['amount'] = $amount;
+        }
+
+        // Balance
+        preg_match('/موجودی: (.+?) ریال/um', $text, $balance);
+        if ($balance) {
+            $balance = cleanAndValidateNumber(preg_replace('/\D+/', '', $balance[1]));
+            $transaction['balance'] = $balance;
+        }
+
+        // Date
+        preg_match('/^(....)\.(..)\.(..)$/um', $text, $date);
+
+        if ($date) {
+            $year = cleanAndValidateNumber($date[1]);
+            $month = cleanAndValidateNumber($date[2]);
+            $day = cleanAndValidateNumber($date[3]);
+
+            $date = $year . '/' . $month . '/' . $day;
+            $date = JalaliDate::fromString($date)->toGregorian()->format('Y-m-d');
+            $transaction['date'] = $date;
+        }
+
+        // Time
+        preg_match('/^(..):(..)$/um', $text, $time);
+        if ($time) {
+            $time = cleanAndValidateNumber($time[1]) . ':' . cleanAndValidateNumber($time[2]);
+            $transaction['time'] = $time;
+        }
+    }
+    return $transaction;
 }
 
 // ==========================================
