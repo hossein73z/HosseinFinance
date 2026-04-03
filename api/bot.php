@@ -49,13 +49,13 @@ http_response_code(200);
 
 if (empty($input)) {
     error_log("[WARN] No input data received via Webhook.");
-    exit();
+    exit;
 }
 
 $update = json_decode($input, true);
 if (json_last_error() !== JSON_ERROR_NONE) {
     error_log("[ERROR] Invalid JSON received: " . json_last_error_msg());
-    exit();
+    exit;
 }
 
 // Initialize Database connection.
@@ -70,7 +70,7 @@ try {
     $db->query("SET SESSION group_concat_max_len = 10000000;");
 } catch (Exception $e) {
     error_log($e->getMessage());
-    exit();
+    exit;
 }
 
 // --- MAIN UPDATE ROUTER ---
@@ -80,7 +80,7 @@ elseif (isset($update['callback_query'])) handleCallbackQuery($update['callback_
 else error_log("[INFO] Unhandled update type received.");
 
 DatabaseManager::closeConnection();
-exit();
+exit;
 
 
 // ==========================================
@@ -151,7 +151,7 @@ function handleCallbackQuery(array $callback_query, DatabaseManager $db): void
         $query_data = &$callback_query['data'];
         if ($query_data === null) {
             sendToTelegram('deleteMessage', ['chat_id' => $user->getid(), 'message_id' => $message['message_id']]);
-            exit();
+            exit;
         }
 
         $query_data = json_decode($callback_query['data'], true);
@@ -231,7 +231,7 @@ function getOrCreateUser(array $from, DatabaseManager $db): User
             );
         } else {
             error_log("[ERROR] Failed to create new user: " . $from['id']);
-            exit();
+            exit;
         }
     }
     return User::fromDbRow($user);
@@ -257,7 +257,7 @@ function callbackHandler(User $user, array $callback_query, DatabaseManager $db)
         'chat_id' => $user->getid(),
     ]);
 
-    exit();
+    exit;
 }
 
 #[NoReturn]
@@ -268,7 +268,7 @@ function specialButtonHandler(User $user, Button $pressed_button, DatabaseManage
     if ($pressed_button->getId() === "s2") sendFavorites($user, $db);
     if ($pressed_button->getId() === "s4") sendSelectBaseCurrencyMessage($user, $db);
 
-    exit();
+    exit;
 }
 
 #[NoReturn]
@@ -303,7 +303,7 @@ function normalButtonHandler(User $user, Button $pressed_button, DatabaseManager
         conditions: ['id' => $user->getId()]
     );
 
-    exit();
+    exit;
 }
 
 #[NoReturn]
@@ -331,7 +331,7 @@ function nonButtonHandler(User $user, array $message, DatabaseManager $db): void
         ]
     ]);
 
-    exit();
+    exit;
 }
 
 /**
@@ -434,7 +434,7 @@ function level_0(
         $db->update('users', ['last_btn' => $level_button->getId(), 'progress' => null], ['id' => $user->getId()]);
     }
 
-    exit();
+    exit;
 }
 
 #[NoReturn]
@@ -448,7 +448,7 @@ function handleMainMenuCallBack(User $user, array $callback_query, array $messag
         'message_id' => $message['message_id'],
         'text' => 'این پیام منقضی شده است.'
     ]);
-    exit();
+    exit;
 }
 
 #[NoReturn]
@@ -456,7 +456,7 @@ function handleMainMenuTextMessage(array $data): void
 {
     $data['text'] = 'پیام نامفهوم است!';
     sendToTelegram('sendMessage', $data);
-    exit();
+    exit;
 
 }
 
@@ -513,7 +513,7 @@ function level_1(
         } else sendAllHoldings($user, $db, $response['result']['message_id']);
     }
 
-    exit();
+    exit;
 }
 
 #[NoReturn]
@@ -541,7 +541,7 @@ function handleHoldingsCallback(User $user, array $callback_query, array $data, 
             ]);
             break;
     }
-    exit();
+    exit;
 }
 
 #[NoReturn]
@@ -595,7 +595,7 @@ function handleHoldingsWebAppData(User $user, array $data, array $message, Datab
                     );
                     sendHoldingDetail($holding, $data, $user->getBaseCurrency());
                 }
-                exit();
+                exit;
             }
 
             error_log('Holding: ' . json_encode($new_holding) . "\n" .
@@ -656,7 +656,7 @@ function handleHoldingsWebAppData(User $user, array $data, array $message, Datab
         $data = checkAndAddEditHoldingButton($data, $user, $db);
         sendToTelegram('sendMessage', $data);
     }
-    exit();
+    exit;
 }
 
 #[NoReturn]
@@ -684,7 +684,7 @@ function handleHoldingsTextMessage(User $user, array $data, array $message, Data
                 data: ['progress' => json_encode(['view_holding' => ['holding_id' => $holding['id']]])],
                 conditions: ['id' => $user->getId()]
             );
-            exit();
+            exit;
 
         } else $data['text'] = 'دارایی با این مشخصه یافت نشد!';
     } else $data['text'] = 'پیام نامفهوم است!';
@@ -692,7 +692,7 @@ function handleHoldingsTextMessage(User $user, array $data, array $message, Data
     // Only irreverent texts and deep-links with wrong holding id reach here.
     $data = checkAndAddEditHoldingButton($data, $user, $db);
     sendToTelegram('sendMessage', $data);
-    exit();
+    exit;
 }
 
 function sendAllHoldings(User $user, DatabaseManager $db, int|string $initial_mssg_id = null): void
@@ -846,7 +846,7 @@ function level_2(
         } else sendAllLoans($user, $db, $response['result']['message_id']);
     }
 
-    exit();
+    exit;
 }
 
 #[NoReturn]
@@ -878,7 +878,7 @@ function handleLoansCallback(User $user, array $callback_query, array $data, arr
             ]);
             break;
     }
-    exit();
+    exit;
 }
 
 #[NoReturn]
@@ -944,7 +944,7 @@ function handleLoansWebAppData(User $user, array $data, array $message, Database
                 'Error: ' . $e->getMessage());
         }
         sendAllLoans($user, $db);
-        exit();
+        exit;
 
     }
 
@@ -1015,7 +1015,7 @@ function handleLoansWebAppData(User $user, array $data, array $message, Database
 
         sendToTelegram('sendMessage', $data);
         sendAllLoans($user, $db);
-        exit();
+        exit;
 
     }
 
@@ -1038,7 +1038,7 @@ function handleLoansWebAppData(User $user, array $data, array $message, Database
 
         sendToTelegram('sendMessage', $data);
         sendAllLoans($user, $db);
-        exit();
+        exit;
     }
 
     error_log('Unprocessable WebApp Data Received: ' . "\n" . json_encode($web_app_data));
@@ -1047,7 +1047,7 @@ function handleLoansWebAppData(User $user, array $data, array $message, Database
     sendToTelegram('sendMessage', $data);
 
     sendAllLoans($user, $db);
-    exit();
+    exit;
 
 }
 
@@ -1077,7 +1077,7 @@ function handleLoansTextMessage(User $user, array $data, array $message, Databas
                 data: ['progress' => json_encode(['view_loan' => ['loan_id' => $loans[0]['id']]])],
                 conditions: ['id' => $user->getId()]
             );
-            exit();
+            exit;
         }
     }
 
@@ -1116,7 +1116,7 @@ function handleLoansTextMessage(User $user, array $data, array $message, Databas
                     'reply_markup' => ['inline_keyboard' => [[['text' => 'برگشت به لیست وام‌ها', 'callback_data' => json_encode(['loan_list' => null])]]]]
                 ]);
             }
-            exit();
+            exit;
 
         }
     }
@@ -1140,7 +1140,7 @@ function handleLoansTextMessage(User $user, array $data, array $message, Databas
 
     $data['text'] = 'پیام نامفهوم است!';
     sendToTelegram('sendMessage', $data);
-    exit();
+    exit;
 
 }
 
@@ -1252,7 +1252,7 @@ function level_5(
         sendFavorites($user, $db);
     }
 
-    exit();
+    exit;
 }
 
 #[NoReturn]
@@ -1329,13 +1329,13 @@ function handlePricesCallback(User $user, array $callback_query, array $message,
                     }
                 } else {
                     sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id'], 'text' => 'لیست علاقه‌مندی‌های شما خالی‌ست!']);
-                    exit();
+                    exit;
                 }
             }
 
             sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
             sendToTelegram('editMessageText', $data);
-            exit();
+            exit;
 
         // Show list of assets in a specific type for user to add to their favorites
         case 'new_fav_type':
@@ -1367,7 +1367,7 @@ function handlePricesCallback(User $user, array $callback_query, array $message,
 
             sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
             sendToTelegram('editMessageText', $data);
-            exit();
+            exit;
 
         // Add new favorite to the table and send the favorites message to the user
         case 'new_fav_name':
@@ -1404,7 +1404,7 @@ function handlePricesCallback(User $user, array $callback_query, array $message,
 
             sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
             sendToTelegram('editMessageText', $data);
-            exit();
+            exit;
 
         // Delete favorite from the database and send the favorites message to the user
         case 'conf_del_fav':
@@ -1445,7 +1445,7 @@ function handlePricesCallback(User $user, array $callback_query, array $message,
                 'message_id' => $message['message_id'],
                 'text' => 'این پیام منقضی شده است.'
             ]);
-            exit();
+            exit;
     }
 }
 
@@ -1467,13 +1467,13 @@ function handlePricesTextMessage(array $data, array $message, array $asset_types
 
         $data['reply_to_message_id'] = $message['message_id'];
         sendToTelegram('sendMessage', $data);
-        exit();
+        exit;
     }
 
     // Send default message of this level
     $data['text'] = 'پیام نامفهوم است!' . "\n" . 'یکی از دسته‌بندی‌های زیر را انتخاب کنید:';
     sendToTelegram('sendMessage', $data);
-    exit();
+    exit;
 
 }
 
@@ -1557,7 +1557,7 @@ function level_6(
             conditions: ['id' => $user->getId()]
         );
     }
-    exit();
+    exit;
 }
 
 // ==========================================
@@ -1590,7 +1590,7 @@ function sendSelectBaseCurrencyMessage(User $user, DatabaseManager $db): void
 
         sendToTelegram('sendMessage', $data);
     }
-    exit();
+    exit;
 }
 
 #[NoReturn]
@@ -1621,11 +1621,11 @@ function setBaseCurrency(User $user, array $callback_query, array $message, Data
 
         sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
         sendToTelegram('editMessageText', $data);
-        exit();
+        exit;
     }
 
     sendToTelegram('editMessageText', $data);
-    exit();
+    exit;
 }
 
 
@@ -1673,7 +1673,7 @@ function level_8(
         sendAlerts($user, $db);
     }
 
-    exit();
+    exit;
 }
 
 #[NoReturn]
@@ -1685,7 +1685,7 @@ function handleAlertsCallback(User $user, array $message): void
         'text' => 'این پیام منقضی شده است.'];
 
     sendToTelegram('editMessageText', $data);
-    exit();
+    exit;
 }
 
 #[NoReturn]
@@ -1694,7 +1694,7 @@ function handleAlertsTextMessage(array $data): void
     // Send default message of this level
     $data['text'] = 'پیام نامفهوم است!';
     sendToTelegram('sendMessage', $data);
-    exit();
+    exit;
 
 }
 
@@ -1784,7 +1784,7 @@ function managePriceAlerts(User $user, array $callback_query, array $message, Da
                     );
                 } else {
                     sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id'], 'text' => 'دسته‌بندی‌ای در سیستم یافت نشد!']);
-                    exit();
+                    exit;
                 }
             }
 
@@ -1819,13 +1819,13 @@ function managePriceAlerts(User $user, array $callback_query, array $message, Da
 
                 } else {
                     sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id'], 'text' => 'شما هشداری ثبت نکرده‌اید!']);
-                    exit();
+                    exit;
                 }
             }
 
             sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
             sendToTelegram('editMessageText', $data);
-            exit();
+            exit;
 
         // Show list of asset to select for new alert
         case 'fav_alert': // A request from favorites message
@@ -1864,7 +1864,7 @@ function managePriceAlerts(User $user, array $callback_query, array $message, Da
 
             sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
             sendToTelegram('editMessageText', $data);
-            exit();
+            exit;
 
         case 'new_alert_name':
 
@@ -1886,7 +1886,7 @@ function managePriceAlerts(User $user, array $callback_query, array $message, Da
 
             sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
             sendToTelegram('editMessageText', $data);
-            exit();
+            exit;
 
         // Delete alert and send alerts' message to the user
         case 'conf_del_alert':
@@ -1907,17 +1907,17 @@ function managePriceAlerts(User $user, array $callback_query, array $message, Da
             sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
             sendToTelegram('editMessageText', $data);
             sendAlerts($user, $db);
-            exit();
+            exit;
 
         // Show main list of alerts
         case 'show_alerts':
             sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
             sendAlerts($user, $db, $message['message_id']);
-            exit();
+            exit;
     }
 
     sendToTelegram('editMessageText', $data);
-    exit();
+    exit;
 
 }
 
@@ -1965,7 +1965,7 @@ function level_9(
         sendAccounts($user, $db);
     }
 
-    exit();
+    exit;
 }
 
 #[NoReturn]
@@ -1977,7 +1977,7 @@ function handleAccountsCallback(User $user, array $message): void
         'text' => 'این پیام منقضی شده است.'];
 
     sendToTelegram('editMessageText', $data);
-    exit();
+    exit;
 }
 
 #[NoReturn]
@@ -1986,7 +1986,7 @@ function handleAccountsTextMessage(array $data): void
     // Send default message of this level
     $data['text'] = 'پیام نامفهوم است!';
     sendToTelegram('sendMessage', $data);
-    exit();
+    exit;
 
 }
 
@@ -2062,7 +2062,7 @@ function handleAddAccountsCallback(User $user, array $message): void
         'text' => 'این پیام منقضی شده است.'];
 
     sendToTelegram('editMessageText', $data);
-    exit();
+    exit;
 }
 
 #[NoReturn]
@@ -2130,7 +2130,7 @@ function askForAccountType(User $user, array $data, DatabaseManager $db): void
             ['progress' => json_encode($progress)],
             ['id' => $user->getId()]);
     }
-    exit();
+    exit;
 }
 
 #[NoReturn]
@@ -2146,7 +2146,7 @@ function askForAccountName(User $user, array $data, DatabaseManager $db): void
             ['progress' => json_encode($progress)],
             ['id' => $user->getId()]);
     }
-    exit();
+    exit;
 }
 
 #[NoReturn]
@@ -2162,7 +2162,7 @@ function askForAccountStartingBalance(User $user, array $data, DatabaseManager $
             ['progress' => json_encode($progress)],
             ['id' => $user->getId()]);
     }
-    exit();
+    exit;
 }
 
 #[NoReturn]
@@ -2228,7 +2228,7 @@ function level_11(
 //        sendAccounts($user, $db);
     }
 
-    exit();
+    exit;
 }
 
 #[NoReturn]
@@ -2240,7 +2240,7 @@ function handleTransactionsCallback(User $user, array $message): void
         'text' => 'این پیام منقضی شده است.'];
 
     sendToTelegram('editMessageText', $data);
-    exit();
+    exit;
 }
 
 #[NoReturn]
@@ -2269,7 +2269,7 @@ function handleTransactionsTextMessage(User $user, array $data, array $message, 
 
     // Send default message of this level
     sendToTelegram('sendMessage', $data);
-    exit();
+    exit;
 }
 
 function extractTransactionFromText(string $text): ?array
@@ -2475,9 +2475,9 @@ function empty_level(
         // Send default progress related text and bottom keyboard
         // Note: Entering level or Wrong number format reach here
         sendToTelegram('sendMessage', $data);
-        exit();
+        exit;
     }
-    exit();
+    exit;
 }
 
 
@@ -2579,7 +2579,7 @@ function getLoansWithInstallments(array $conditions, DatabaseManager $db, bool $
                     $due_date = DateTime::createFromFormat('Y-m-d', $installment['due_date']);
 
                     // Create `is_due` and `is_paid` boolean values
-                    $is_due = boolval((new DateTime())->diff($due_date)->invert);
+                    $is_due = boolval((new DateTime())->modify('-1 seconds')->diff($due_date)->invert);
                     $is_paid = boolval($installment['is_paid']);
 
                     // Calculate and add remaining days to next payment
