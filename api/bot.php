@@ -162,6 +162,9 @@ function handleCallbackQuery(array $callback_query, DatabaseManager $db): void
             case 'set_base_currency':
                 setBaseCurrency($user, $callback_query, $message, $db);
 
+            case 'cron_inst_paid':
+                payInstallmentFromCronJob($user, $callback_query, $message, $db);
+
             case 'edit_fav':
             case 'new_fav_type':
             case 'new_fav_name':
@@ -1193,6 +1196,30 @@ function sendLoanDetail(array $loan, array $data): void
 
         sendToTelegram('editMessageText', $data);
     }
+}
+
+#[NoReturn]
+function payInstallmentFromCronJob(User $user, array $callback_query, array $message, DatabaseManager $db): void
+{
+    $installment_id = $callback_query['data']['cron_inst_paid'];
+    $user_id = $user->getId();
+    try {
+        $db->query("
+        UPDATE installments i
+        JOIN loans l ON i.loan_id = l.id
+        SET i.is_paid = true
+        WHERE i.id = $installment_id
+        AND l.user_id = $user_id;
+    ");
+        $text = $message['text'] . "\n\n" . "✅ پرداخت قسط ثبت شد.";
+    } catch (Exception $e) {
+        error_log('Error adding new favorite: ' . $e->getMessage());
+        $text = $message['text'] . "\n\n" . "❌ خطای پایگاه داده!";
+    }
+
+    sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
+    sendToTelegram('editMessageText', ['chat_id' => $user->getId(), 'text' => $text, 'message_id' => $message['message_id']]);
+    exit();
 }
 
 // ==========================================
@@ -2796,7 +2823,7 @@ function createLoansView(array $loans, ?string $loans_mssg_id = null, ?string $i
         $loan_name = "\n‏" . "\-* [" . beautifulNumber($loan['name'], null) . "]($deep_link)*";
 
         if (isset($loan['next_payment'])) {
-            $remaining_days = $loan['next_payment']->diff((new DateTime())->modify('-1 seconds'))->days;
+            $remaining_days = $loan['next_payment']->diff((new DateTime())->modify('-2 seconds'))->days;
             $next_payment_text = beautifulNumber($remaining_days . ' روز دیگر در ' . JalaliDate::fromGregorianObject($loan['next_payment'])->format(), null);
 
         } else $next_payment_text = 'پایان یافته';

@@ -3,9 +3,12 @@
 require_once __DIR__ . '/../Libraries/DatabaseManager.php';
 require_once __DIR__ . '/../Functions/ExternalEndpointsFunctions.php';
 require_once __DIR__ . '/../Functions/StringHelper.php';
+require_once __DIR__ . '/../Models/JalaliDate.php';
 
 $cronSecret = getenv('CRON_SECRET');
-if ($cronSecret && $_SERVER['HTTP_AUTHORIZATION'] !== ("Bearer " . $cronSecret)) {
+$headers = getallheaders();
+$auth = $headers['Authorization'] ?? $_SERVER['HTTP_AUTHORIZATION'] ?? null;
+if ($cronSecret && $auth !== "Bearer $cronSecret") {
     http_response_code(401);
     echo json_encode(['error' => 'Unauthorized']);
     exit;
@@ -14,62 +17,48 @@ if ($cronSecret && $_SERVER['HTTP_AUTHORIZATION'] !== ("Bearer " . $cronSecret))
 header('Content-Type: application/json');
 
 try {
-    $db = DatabaseManager::getInstance();
-
-    $installments = $db->read(
-        table: 'installments i',
-        conditions: [
-            'i.is_paid' => false
-        ],
-        selectColumns: 'i.*, p.chat_id, l.name as loan_name, l.alert_offset',
-        join: [
-            [
-                'type' => 'INNER',
-                'table' => 'loans l',
-                'on' => 'i.loan_id = l.id'
-            ],
-            [
-                'type' => 'INNER',
-                'table' => 'users p',
-                'on' => 'l.user_id = p.id'
-            ]
-        ],
-        orderBy: ['due_date' => 'ASC']
+    $db = DatabaseManager::getInstance(
+        host: getenv('DB_HOST'),
+        db: getenv('DB_NAME'),
+        user: getenv('DB_USER'),
+        pass: getenv('DB_PASS'),
+        port: getenv('DB_PORT') ?: '3306'
     );
 
-    if (!$installments) {
-        echo json_encode(['status' => 'success', 'message' => 'No installments due for today.']);
-        exit;
+    // Send triggered notification to admins
+    $admins = $db->read('users', ['is_admin' => true]);
+    foreach ($admins as $admin)
+        sendToTelegram('sendMessage', ['chat_id' => $admin['id'], 'text' => 'Crown Triggered!']);
+
+    $installments = $db->query("
+        select
+            i.*,
+            l.name as loan_name,
+            u.id as chat_id
+        from installments i
+        join loans l on i.loan_id=l.id
+        join users u on l.user_id=u.id
+        where
+            i.is_paid is false and
+            curdate() between i.alert_date and i.due_date;
+    ")->fetchAll();
+    if ($installments) foreach ($installments as $installment) {
+
+        echo "\n$installment[loan_name]\n";
+
+        $due_date = JalaliDate::fromGregorianString($installment['due_date']);
+        $remaining_days = $due_date->diffInDays(JalaliDate::fromGregorian());
+
+        $text = 'یادآور پرداخت قسط وام «' . $installment['loan_name'] . '»' . "\n";
+        $text .= "\n" . 'سررسید: ' . beautifulNumber($due_date->format() . ' (' . $remaining_days . ' روز دیگر' . ')', null);
+        $text .= "\n" . 'مبلغ: ' . beautifulNumber($installment['amount']);
+
+        $reply_markup = ['inline_keyboard' => [[
+            ['text' => 'پرداخت شد', 'callback_data' => json_encode(['cron_inst_paid' => $installment['id']])]
+        ]]];
+
+        sendToTelegram('sendMessage', ['chat_id' => $installment['chat_id'], 'text' => $text, 'reply_markup' => $reply_markup]);
     }
-
-    $count = 0;
-
-    foreach ($installments as $installment) {
-
-        $parts = explode('/', $installment['due_date']);
-        if (count($parts) == 3) {
-            $gregorianDueDate = new DateTime(jalaliToGregorian($parts[0], $parts[1], $parts[2]) . ' 00:00:00');
-            $today = new DateTime('now');
-            $today->setTime(0, 0); // Normalize today to midnight for accurate day calc
-
-            $interval = $today->diff($gregorianDueDate);
-            $daysRemaining = (int)$interval->format('%r%a'); // %r gives sign (-/+), %a gives total days
-
-            if ($daysRemaining > $installment['alert_offset'] || $daysRemaining < 0) continue;
-
-            $message = "📢 یادآوری قسط!\n\n";
-            $message .= "وام: " . $installment['loan_name'];
-            $message .= "\nمبلغ: " . beautifulNumber($installment['amount']);
-            $message .= "\nتاریخ سررسید: " . beautifulNumber($installment['due_date'], null) . " (" . beautifulNumber($daysRemaining) . " روز دیگر)";
-
-            // Send request to Telegram
-            $response = sendToTelegram(method: 'sendMessage', data: ['chat_id' => $installment['chat_id'], 'text' => $message]);
-            if ($response) $count++;
-            else echo "\n\n" . json_encode($response, JSON_PRETTY_PRINT) . "\n\n";
-        }
-    }
-
-    echo json_encode(['status' => 'success', 'sent_count' => $count]);
 
 } catch (Exception $e) {
     error_log("Cron Error: " . $e->getMessage());
