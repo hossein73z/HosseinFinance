@@ -2765,20 +2765,17 @@ function createLoansView(array $loans, ?string $loans_mssg_id = null, ?string $i
         $installments = &$loan['installments'];
         if ($installments) {
 
+            // Create payment status icon for the installment
             $insts_per_year = [];
             $summerized_insts_text = '‏';
             foreach ($installments as $installment) {
 
-                $due_year = JalaliDate::fromString($installment['due_date'])->jy;
+                if ($summerized && $installment['is_paid']) $summerized_insts_text .= "🟢";
+                if ($summerized && !$installment['is_paid']) $summerized_insts_text .= $installment['is_due'] ? "🔴" : "⚪";
 
-                // Create payment status icon for the installment
-                if ($summerized) {
-                    if ($installment['is_paid']) $summerized_insts_text .= "🟢";
-                    else $summerized_insts_text .= $installment['is_due'] ? "🔴" : "⚪";
-                } else {
-                    if ($installment['is_paid']) $insts_per_year[$due_year][] = "🟢";
-                    else $insts_per_year[$due_year][] = $installment['is_due'] ? "🔴" : "⚪";
-                }
+                $due_year = JalaliDate::fromString($installment['due_date'])->jy;
+                if (!$summerized && $installment['is_paid']) $insts_per_year[$due_year][] = "🟢";
+                if (!$summerized && !$installment['is_paid']) $insts_per_year[$due_year][] = $installment['is_due'] ? "🔴" : "⚪";
             }
 
             $last_year = array_key_last($insts_per_year);
@@ -2799,7 +2796,7 @@ function createLoansView(array $loans, ?string $loans_mssg_id = null, ?string $i
         $loan_name = "\n‏" . "\-* [" . beautifulNumber($loan['name'], null) . "]($deep_link)*";
 
         if (isset($loan['next_payment'])) {
-            $remaining_days = $loan['next_payment']->diff(new DateTime())->days;
+            $remaining_days = $loan['next_payment']->diff((new DateTime())->modify('-1 seconds'))->days;
             $next_payment_text = beautifulNumber($remaining_days . ' روز دیگر در ' . JalaliDate::fromGregorianObject($loan['next_payment'])->format(), null);
 
         } else $next_payment_text = 'پایان یافته';
