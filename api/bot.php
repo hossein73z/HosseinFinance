@@ -867,9 +867,16 @@ function handleLoansCallback(User $user, array $callback_query, array $data, arr
 
     switch ($query_key) {
         case 'loans_list':
-            sendToTelegram('deleteMessage', ['chat_id' => $user->getid(), 'message_id' => $message['message_id']]);
+
+            // HACK: If the bottom keyboard won't stick in telegram, uncomment the line bellow
+            // sendToTelegram('deleteMessage', ['chat_id' => $user->getid(), 'message_id' => $message['message_id']]);
             $response = sendToTelegram('sendMessage', $data);
-            if ($response) sendAllLoans($user, $db, $response['result']['message_id']);
+            if ($response) {
+                sendToTelegram('deleteMessage', ['chat_id' => $user->getId(), 'message_id' => $response['result']['message_id']]);
+                sendAllLoans($user, $db, null, $message['message_id']);
+                // HACK: And replace the line above, with the one bellow
+                // sendAllLoans($user, $db, $response['result']['message_id']);
+            }
             break;
 
         case 'detailed_loans':
@@ -2994,7 +3001,7 @@ function createLoanDetailKeyboard(array $loan): array
 {
     $keyboard = [];
     $keyboard_row = [];
-    $btn_in_row = 2;
+    $btn_in_row = 3;
     foreach ($loan['installments'] as $installment) {
         $due_date = JalaliDate::fromString($installment['due_date'])->format();
         if ($installment['is_paid']) $payment_icon = '🟢';
