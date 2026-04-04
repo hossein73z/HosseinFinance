@@ -1080,10 +1080,10 @@ function handleLoansTextMessage(User $user, array $data, array $message, Databas
             // Delete redundant messages
             if (isset($matches[5]))
                 sendToTelegram('deleteMessage', ['chat_id' => $user->getid(), 'message_id' => $matches[5]]); ######## Initial
-            sendToTelegram('deleteMessage', ['chat_id' => $user->getid(), 'message_id' => $matches[3]]); ############ Loans
+            // sendToTelegram('deleteMessage', ['chat_id' => $user->getid(), 'message_id' => $matches[3]]); ############ Loans HACK: Uncomment this if edit button won't stick
             sendToTelegram('deleteMessage', ['chat_id' => $user->getid(), 'message_id' => $message['message_id']]); # Deep-Link
 
-            sendLoanDetail($loan, $data);
+            sendLoanDetail($loan, $data, $matches[3]);
 
             $db->update(
                 table: 'users',
@@ -1186,7 +1186,7 @@ function sendAllLoans(User $user, DatabaseManager $db, ?string $initial_mssg_id 
     $db->update('users', ['progress' => null], ['id' => $user->getId()]);
 }
 
-function sendLoanDetail(array $loan, array $data): void
+function sendLoanDetail(array $loan, array $data, string|int|null $mssg_id_to_edit = null): void
 {
 
     $data['text'] = "/loan_$loan[id]\n";
@@ -1194,13 +1194,17 @@ function sendLoanDetail(array $loan, array $data): void
 
     array_unshift($data['reply_markup']['keyboard'], [createWebAppBtn('✏ ویرایش وام «' . $loan['name'] . '»', '/assets/loan.html', ['data' => base64_encode(json_encode($loan))])]);
 
-    sendToTelegram('sendMessage', $data);
+    $response = sendToTelegram('sendMessage', $data);
+    if ($response) sendToTelegram('deleteMessage', ['chat_id' => $data['chat_id'], 'message_id' => $response['result']['message_id']]);
 
-    $temp_mssg = sendLoadingMessage($data['chat_id'], 'در حال دریافت اطلاعات اقساط ...');
-    if ($temp_mssg) {
+    if (!$mssg_id_to_edit) { // TODO: I'm not satisfied with this approach
+        $temp_mssg = sendLoadingMessage($data['chat_id'], 'در حال دریافت اطلاعات اقساط ...');
+        if ($temp_mssg) $mssg_id_to_edit = $temp_mssg['result']['message_id'];
+    }
+    if ($mssg_id_to_edit) {
 
-        $data['message_id'] = $temp_mssg['result']['message_id'];
-        $data['text'] = createLoanDetailText($loan, 'MarkdownV2', $temp_mssg['result']['message_id']);
+        $data['message_id'] = $mssg_id_to_edit;
+        $data['text'] = createLoanDetailText($loan, 'MarkdownV2', $mssg_id_to_edit);
         $data['parse_mode'] = 'MarkdownV2';
         $data['reply_markup'] = ['inline_keyboard' => createLoanDetailKeyboard($loan)];
 
