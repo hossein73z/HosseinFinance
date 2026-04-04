@@ -2392,7 +2392,7 @@ function extractTransactionFromText(string $text): ?array
 function addTransaction(User $user, array $callback_query, array $message, DatabaseManager $db): void
 {
     if ($message) {
-        preg_match('/^بانک: (.+?)$/um', $message['text'], $bank);
+//        preg_match('/^بانک: (.+?)$/um', $message['text'], $bank);
         preg_match('/^مبلغ: (.+?)$/um', $message['text'], $amount);
         preg_match('/^نوع: (.+?)$/um', $message['text'], $type);
         preg_match('/^موجودی فعلی: (.+?)$/um', $message['text'], $balance);
@@ -2400,7 +2400,7 @@ function addTransaction(User $user, array $callback_query, array $message, Datab
         preg_match('/^ساعت: (.+?)$/um', $message['text'], $time);
 
         $transaction = [
-            'bank' => $bank[1],
+//            'bank' => $bank[1],
             'amount' => cleanAndValidateNumber(str_replace(',', '', $amount[1])),
             'type' => $type[1] == 'واریز' ? 'inward' : 'outward',
             'balance' => cleanAndValidateNumber(str_replace(',', '', $balance[1])),
@@ -2944,7 +2944,7 @@ function createLoanDetailText(array $loan, ?string $markdown = null, ?string $ms
     if ($installments) {
 
         $installments_text = '';
-        foreach ($installments as $i => &$installment) {
+        foreach ($installments as $i => $installment) {
 
             // Create payment status emoji
             if ($installment['is_paid']) $payment_emoji = "🟢";
