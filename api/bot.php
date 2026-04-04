@@ -2432,12 +2432,23 @@ function addTransaction(User $user, array $callback_query, array $message, Datab
 #[NoReturn]
 function sendTransactions(User $user, DatabaseManager $db): void
 {
-    $transactions = $db->read('transactions', ['user_id' => $user->getId()], orderBy: ['category' => 'ASC']);
+    $transactions = $db->read(
+        table: 'transactions t',
+        conditions: ['t.user_id' => $user->getId()],
+        selectColumns: 't.*, a.name as account_name, a.type as account_type',
+        join: 'join accounts a on a.id = t.account_id',
+        orderBy: ['t.date' => 'ASC', 't.time' => 'ASC'],
+        limit: 10,
+    );
     if ($transactions) {
         $data['text'] = 'لیست تراکنش‌های شما:';
+        $data['chat_id'] = $user->getId();
 
         foreach ($transactions as $transaction) {
-            $data['text'] .= '';
+            $data['text'] .= "\n" . ($transaction['type'] == 'outward' ? '📤 برداشت از: ' : '📥 واریز به: ') .
+                beautifulNumber($transaction['account_name'], null) . ' (' . beautifulNumber($transaction['account_type'], null) . ')';
+            $data['text'] .= "\n" . 'مبلغ: ' . beautifulNumber($transaction['amount']);
+            $data['text'] .= "\n" . 'زمان: ' . beautifulNumber(JalaliDate::fromGregorianString($transaction['date'])->format(), null) . ' ' . beautifulNumber($transaction['time'], null);
         }
 
     } else {
