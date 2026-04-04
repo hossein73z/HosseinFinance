@@ -105,12 +105,12 @@ CREATE TABLE IF NOT EXISTS `alerts`
 
 CREATE TABLE IF NOT EXISTS `accounts`
 (
-    id               BIGINT AUTO_INCREMENT PRIMARY KEY,
-    user_id          INT            NOT NULL,
-    type             VARCHAR(100)   NOT NULL,
-    name             VARCHAR(255)   NOT NULL,
-    starting_balance NUMERIC(18, 8) NOT NULL DEFAULT 0,
-    current_balance  NUMERIC(18, 8) NOT NULL DEFAULT 0,
+    id               INT AUTO_INCREMENT NOT NULL PRIMARY KEY,
+    user_id          INT                NOT NULL,
+    type             VARCHAR(100)       NOT NULL,
+    name             VARCHAR(255)       NOT NULL,
+    starting_balance NUMERIC(18, 8)     NOT NULL DEFAULT 0,
+    current_balance  NUMERIC(18, 8)     NOT NULL DEFAULT 0,
     note             TEXT,
 
     FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE ON UPDATE CASCADE
@@ -118,16 +118,18 @@ CREATE TABLE IF NOT EXISTS `accounts`
 
 CREATE TABLE IF NOT EXISTS `transactions`
 (
-    id       BIGINT AUTO_INCREMENT PRIMARY KEY,
-    user_id  INT                                    NOT NULL,
-    category VARCHAR(50)                            NOT NULL DEFAULT 'دسته‌بندی نشده',
-    type     ENUM ('outward', 'inward', 'transfer') NOT NULL DEFAULT 'outward',
-    date     VARCHAR(10)                                     DEFAULT NULL,
-    time     VARCHAR(8)                                      DEFAULT NULL,
-    amount   NUMERIC(18, 8)                         NOT NULL,
-    note     TEXT,
+    id         BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id    INT                                    NOT NULL,
+    account_id INT                                    NOT NULL,
+    category   VARCHAR(50)                            NOT NULL DEFAULT 'دسته‌بندی نشده',
+    type       ENUM ('outward', 'inward', 'transfer') NOT NULL DEFAULT 'outward',
+    date       VARCHAR(10)                                     DEFAULT NULL,
+    time       VARCHAR(8)                                      DEFAULT NULL,
+    amount     NUMERIC(18, 8)                         NOT NULL,
+    note       TEXT,
 
-    FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE ON UPDATE CASCADE
+    FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE ON UPDATE CASCADE,
+    FOREIGN KEY (account_id) REFERENCES accounts (id) ON DELETE RESTRICT
 ) DEFAULT CHARSET = utf8mb4;
 
 CREATE TABLE IF NOT EXISTS `loans`

@@ -167,6 +167,7 @@ function handleCallbackQuery(array $callback_query, DatabaseManager $db): void
 
             case'inplace_inst_pay_toggle':
                 inplaceInstallmentPaymentToggle($user, $callback_query, $message, $db);
+
             case 'edit_fav':
             case 'new_fav_type':
             case 'new_fav_name':
@@ -865,7 +866,7 @@ function handleLoansCallback(User $user, array $callback_query, array $data, arr
     sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
 
     switch ($query_key) {
-        case 'loan_list':
+        case 'loans_list':
             sendToTelegram('deleteMessage', ['chat_id' => $user->getid(), 'message_id' => $message['message_id']]);
             $response = sendToTelegram('sendMessage', $data);
             if ($response) sendAllLoans($user, $db, $response['result']['message_id']);
@@ -2278,7 +2279,7 @@ function level_11(
         $db->update('users', ['last_btn' => $level_button->getId(), 'progress' => null], ['id' => $user->getId()]);
 
         // Send Informative message
-//        sendAccounts($user, $db);
+        sendTransactions($user, $db);
     }
 
     exit;
@@ -2299,26 +2300,33 @@ function handleTransactionsCallback(User $user, array $message): void
 #[NoReturn]
 function handleTransactionsTextMessage(User $user, array $data, array $message, DatabaseManager $db): void
 {
-    $text = &$data['text'];
 
     $transaction = extractTransactionFromText($message['text']);
-
     if ($transaction) {
 
-        $text = "در متن ارسالی یک تراکنش پیدا شد. در صورت تمایل می‌توانید با دکمه زیر این تراکنش را ذخیره کنید.\n";
+        $accounts = $db->read('accounts', ['user_id' => $user->getId()]);
+        if ($accounts) {
+            $data['text'] = "در متن ارسالی یک تراکنش پیدا شد. در صورت تمایل می‌توانید با انتخاب حساب مبدا/مقصد از دکمه‌های زیر، این تراکنش را برای حساب منتخب ذخیره کنید.\n";
 
-        $text .= "\n" . 'بانک: ' . beautifulNumber($transaction['bank'], null);
-        $text .= "\n" . 'مبلغ: ' . beautifulNumber($transaction['amount']);
-        $text .= "\n" . 'نوع: ' . beautifulNumber($transaction['type'] == 'inward' ? 'واریز' : 'برداشت', null);
-        $text .= "\n" . 'موجودی فعلی: ' . beautifulNumber($transaction['balance']);
-        $text .= "\n" . 'تاریخ: ' . beautifulNumber($transaction['date']->format(), null);
-        $text .= "\n" . 'ساعت: ' . beautifulNumber($transaction['time'], null);
+            $data['text'] .= "\n" . 'بانک: ' . beautifulNumber($transaction['bank'], null);
+            $data['text'] .= "\n" . 'مبلغ: ' . beautifulNumber($transaction['amount']);
+            $data['text'] .= "\n" . 'نوع: ' . beautifulNumber($transaction['type'] == 'inward' ? 'واریز' : 'برداشت', null);
+            $data['text'] .= "\n" . 'موجودی فعلی: ' . beautifulNumber($transaction['balance']);
+            $data['text'] .= "\n" . 'تاریخ: ' . beautifulNumber($transaction['date']->format(), null);
+            $data['text'] .= "\n" . 'ساعت: ' . beautifulNumber($transaction['time'], null);
 
-        $data['reply_markup'] = ['inline_keyboard' => [[
-            ['text' => 'ثبت تراکنش', 'callback_data' => json_encode(['add_mssg_transaction' => null])]
-        ]]];
+            $inline_keyboard = [];
+            foreach ($accounts as $account) {
+                $button_text = '(' . beautifulNumber($account['type'], null) . ') ' . beautifulNumber($account['name'], null);
+                $inline_keyboard[] = [
+                    ['text' => $button_text, 'callback_data' => json_encode(['add_mssg_transaction' => $account['id']])]
+                ];
+            }
 
-    } else $text = 'پیام نامفهوم است!';
+            $data['reply_markup'] = ['inline_keyboard' => $inline_keyboard];
+        } else $data['text'] = 'پیام نامفهوم است!';
+
+    } else $data['text'] = 'پیام نامفهوم است!';
 
     // Send default message of this level
     sendToTelegram('sendMessage', $data);
@@ -2402,17 +2410,41 @@ function addTransaction(User $user, array $callback_query, array $message, Datab
 
         $result = $db->create('transactions', [
             'user_id' => $user->getId(),
+            'account_id' => $callback_query['data']['add_mssg_transaction'],
             'type' => $transaction['type'],
             'date' => $transaction['date'],
             'time' => $transaction['time'],
             'amount' => $transaction['amount'],
         ]);
 
-        sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
-        $text = $result ? '✅ تراکنش جدید با موفقیت ثبت شد!' : '❌ خطای پایگاه داده در ثبت تراکنش جدید!';
+        if ($result) {
+            $db->update('accounts', ['current_balance' => $transaction['balance']], ['id' => $callback_query['data']['add_mssg_transaction']]);
+            $text = '✅ تراکنش جدید با موفقیت ثبت شد!';
+        } else
+            $text = '❌ خطای پایگاه داده در ثبت تراکنش جدید!';
+
         sendToTelegram('editMessageText', ['chat_id' => $user->getId(), 'message_id' => $message['message_id'], 'text' => $text]);
+        sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
     }
-    exit();
+    exit;
+}
+
+#[NoReturn]
+function sendTransactions(User $user, DatabaseManager $db): void
+{
+    $transactions = $db->read('transactions', ['user_id' => $user->getId()], orderBy: ['category' => 'ASC']);
+    if ($transactions) {
+        $data['text'] = 'لیست تراکنش‌های شما:';
+
+        foreach ($transactions as $transaction) {
+            $data['text'] .= '';
+        }
+
+    } else {
+        $data['text'] = 'شما هنوز تراکنشی ثبت نکرده‌اید!';
+    }
+    sendToTelegram('sendMessage', $data);
+    exit;
 }
 
 // ==========================================
@@ -2969,7 +3001,7 @@ function createLoanDetailKeyboard(array $loan): array
     }
 
     if ($keyboard_row) $keyboard[] = $keyboard_row;
-    $keyboard[] = [['text' => 'برگشت به لیست وام‌ها', 'callback_data' => json_encode(['loan_list' => null])]];
+    $keyboard[] = [['text' => 'برگشت به لیست وام‌ها', 'callback_data' => json_encode(['loans_list' => null])]];
 
     return $keyboard;
 
