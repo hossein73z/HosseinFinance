@@ -842,8 +842,8 @@ function level_2(
     if ($response) {
         $db->update('users', ['last_btn' => $level_button->getId(), 'progress' => null], ['id' => $user->getId()]);
         if ($command_data) {
-            $loans = getLoansWithInstallments(['l.id' => $command_data, 'l.user_id' => $user->getId()], $db, true);
-            if ($loans) sendLoanDetail($loans[0], $data);
+            $loan = getLoanWithInstallments(user_id: $user->getId(), db: $db, jalali: true, loan_id: $command_data);
+            if ($loan) sendLoanDetail($loan, $data);
             else sendAllLoans($user, $db, $response['result']['message_id']);
 
         } else sendAllLoans($user, $db, $response['result']['message_id']);
@@ -1062,9 +1062,9 @@ function handleLoansTextMessage(User $user, array $data, array $message, Databas
     $matched = preg_match("/^\/start showLoan_loanId(\d+?)(_loansMssgId(\d+?))?(_initMssgId(\d+?))?$/m", $message['text'], $matches);
     if ($matched && !empty($matches[1])) {
 
-        $loans = getLoansWithInstallments(['l.id' => $matches[1], 'l.user_id' => $user->getId()], $db, true);
+        $loan = getLoanWithInstallments(user_id: $user->getId(), db: $db, jalali: true, loan_id: $matches[1]);
 
-        if ($loans) {
+        if ($loan) {
             /** else: Send default Irrelevance message */
 
             // Delete redundant messages
@@ -1073,11 +1073,11 @@ function handleLoansTextMessage(User $user, array $data, array $message, Databas
             sendToTelegram('deleteMessage', ['chat_id' => $user->getid(), 'message_id' => $matches[3]]); ############ Loans
             sendToTelegram('deleteMessage', ['chat_id' => $user->getid(), 'message_id' => $message['message_id']]); # Deep-Link
 
-            sendLoanDetail($loans[0], $data);
+            sendLoanDetail($loan, $data);
 
             $db->update(
                 table: 'users',
-                data: ['progress' => json_encode(['view_loan' => ['loan_id' => $loans[0]['id']]])],
+                data: ['progress' => json_encode(['view_loan' => ['loan_id' => $loan['id']]])],
                 conditions: ['id' => $user->getId()]
             );
             exit;
@@ -1108,7 +1108,7 @@ function handleLoansTextMessage(User $user, array $data, array $message, Databas
                 conditions: ['id' => $installment['id']]
             );
 
-            $loan = getLoansWithInstallments(['l.id' => $installment['loan_id'], 'l.user_id' => $user->getId()], $db, true)[0];
+            $loan = getLoanWithInstallments(user_id: $user->getId(), db: $db, jalali: true, loan_id: $installment['loan_id']);
 
             if ($loan) {
                 sendToTelegram('editMessageText', [
@@ -1130,7 +1130,7 @@ function handleLoansTextMessage(User $user, array $data, array $message, Databas
      */
     $progress = $user->getProgress();
     if ($progress && key($progress) === 'view_loan') {
-        $loan = getLoansWithInstallments(['l.id' => $progress['view_loan']['loan_id'], 'l.user_id' => $user->getId()], $db, true)[0];
+        $loan = getLoanWithInstallments(user_id: $user->getId(), db: $db, jalali: true, loan_id: $progress['view_loan']['loan_id']);
         if ($loan) {
             array_unshift($data['reply_markup']['keyboard'], [
                 createWebAppBtn(
@@ -1149,7 +1149,7 @@ function handleLoansTextMessage(User $user, array $data, array $message, Databas
 
 function sendAllLoans(User $user, DatabaseManager $db, ?string $initial_mssg_id = null, ?string $mssg_id_to_edit = null, bool $summerized = true): void
 {
-    $loans = getLoansWithInstallments(['l.user_id' => $user->getId()], $db, true);
+    $loans = getLoanWithInstallments(user_id: $user->getId(), db: $db, jalali: true);
 
     if ($loans) {
         if (!$mssg_id_to_edit) { // TODO: I'm not satisfied with this
@@ -2551,6 +2551,7 @@ function getHoldingsWithAssetDetails(array $conditions, DatabaseManager $db, boo
 }
 
 /**
+ * // TODO: Rewrite this for the new parameters
  * - Returns a list of all user's loans with related installments under `installments` key,
  *      sorted by remaining days to the next payment.
  * - All loans and installments dates are returned as string (Gregorian or Jalali).
@@ -2560,88 +2561,102 @@ function getHoldingsWithAssetDetails(array $conditions, DatabaseManager $db, boo
  * - Each loan as an `insts_summary` key storing the count and summation of
  *      paid, overdue and remaining installments for that loan.
  */
-function getLoansWithInstallments(array $conditions, DatabaseManager $db, bool $jalali = false): bool|array
+function getLoanWithInstallments(int|string $user_id, DatabaseManager $db, bool $jalali = false, int|string|null $loan_id = null, int|string|null $installment_id = null): bool|array
 {
-    $loans = $db->read(
-        table: 'loans l',
-        conditions: $conditions,
-        selectColumns: '
-            l.*,
-            CONCAT("[",
-                GROUP_CONCAT(
-                    JSON_OBJECT(
-                        "id", i.id,
-                        "loan_id", i.loan_id,
-                        "amount", i.amount,
-                        "due_date", i.due_date,
-                        "alert_date", i.alert_date,
-                        "is_paid", i.is_paid
-                    ) ORDER BY due_date ASC
-                ),
-            "]") AS installments',
-        join: 'LEFT JOIN installments i on i.loan_id = l.id',
-        groupBy: 'l.id'
-    );
-    if ($loans)
-        foreach ($loans as &$loan) {
+    if ($loan_id) $loan_select = "l.id = $loan_id and";
+    elseif ($installment_id) $loan_select = "l.id = (select loan_id from installments where id = $installment_id) and";
+    else $loan_select = '';
 
-            // Decode installments JSON into an array of installments
-            $loan['installments'] = json_decode($loan['installments'], true);
-            if ($loan['installments'][0]['id'] == null) $loan['installments'] = null;
+    $query = $db->query("
+            select
+                l.*,
+                CONCAT('[',
+                    GROUP_CONCAT(
+                        JSON_OBJECT(
+                            'id', i.id,
+                            'loan_id', i.loan_id,
+                            'amount', i.amount,
+                            'due_date', i.due_date,
+                            'alert_date', i.alert_date,
+                            'is_paid', i.is_paid
+                        ) ORDER BY due_date ASC
+                    ),
+                ']') AS installments
+            from loans l
+            LEFT JOIN installments i on i.loan_id = l.id
+            where
+                $loan_select
+                l.user_id = $user_id
+            group by l.id
+            ");
 
-            // Convert received date to Jalali
-            if ($jalali) $loan['received_date'] = JalaliDate::fromGregorianString($loan['received_date'])->format();
+    function prepareLoan(array $loan, bool $jalali): array
+    {
+        // Decode installments JSON into an array of installments
+        $loan['installments'] = json_decode($loan['installments'], true);
+        if ($loan['installments'][0]['id'] == null) $loan['installments'] = null;
 
-            if ($loan['installments']) {
-                $loan['next_payment'] = null;
-                $loan['insts_summary']['paid_count'] = 0;
-                $loan['insts_summary']['overdue_count'] = 0;
-                $loan['insts_summary']['remaining_count'] = 0;
-                $loan['insts_summary']['paid_sum'] = 0;
-                $loan['insts_summary']['overdue_sum'] = 0;
-                $loan['insts_summary']['remaining_sum'] = 0;
-                foreach ($loan['installments'] as &$installment) {
+        // Convert received date to Jalali
+        if ($jalali) $loan['received_date'] = JalaliDate::fromGregorianString($loan['received_date'])->format();
 
-                    // Create `due_date` object just for calculations
-                    $due_date = DateTime::createFromFormat('Y-m-d', $installment['due_date']);
+        if ($loan['installments']) {
+            $loan['next_payment'] = null;
+            $loan['insts_summary']['paid_count'] = 0;
+            $loan['insts_summary']['overdue_count'] = 0;
+            $loan['insts_summary']['remaining_count'] = 0;
+            $loan['insts_summary']['paid_sum'] = 0;
+            $loan['insts_summary']['overdue_sum'] = 0;
+            $loan['insts_summary']['remaining_sum'] = 0;
+            foreach ($loan['installments'] as &$installment) {
 
-                    // Create `is_due` and `is_paid` boolean values
-                    $is_due = boolval((new DateTime())->modify('-1 seconds')->diff($due_date)->invert);
-                    $is_paid = boolval($installment['is_paid']);
+                // Create `due_date` object just for calculations
+                $due_date = DateTime::createFromFormat('Y-m-d', $installment['due_date']);
 
-                    // Calculate and add remaining days to next payment
-                    if ($loan['next_payment'] === null && !$is_due && !$is_paid)
-                        $loan['next_payment'] = $due_date;
+                // Create `is_due` and `is_paid` boolean values
+                $is_due = boolval((new DateTime())->modify('-1 seconds')->diff($due_date)->invert);
+                $is_paid = boolval($installment['is_paid']);
 
-                    // Initialize installments' summary
-                    if ($is_paid) $summary_key_word = 'paid';
-                    elseif ($is_due) $summary_key_word = 'overdue';
-                    else $summary_key_word = 'remaining';
+                // Calculate and add remaining days to next payment
+                if ($loan['next_payment'] === null && !$is_due && !$is_paid)
+                    $loan['next_payment'] = $due_date;
 
-                    // Add installments' summary to loan object
-                    $loan['insts_summary'][$summary_key_word . '_count'] += 1;
-                    $loan['insts_summary'][$summary_key_word . '_sum'] += $installment['amount'];
+                // Initialize installments' summary
+                if ($is_paid) $summary_key_word = 'paid';
+                elseif ($is_due) $summary_key_word = 'overdue';
+                else $summary_key_word = 'remaining';
 
-                    // Add `is_due` and `is_paid` to the installment
-                    $installment['is_due'] = $is_due;
-                    $installment['is_paid'] = $is_paid;
+                // Add installments' summary to loan object
+                $loan['insts_summary'][$summary_key_word . '_count'] += 1;
+                $loan['insts_summary'][$summary_key_word . '_sum'] += $installment['amount'];
 
-                    // Change dates to Jalali string
-                    if ($jalali) {
-                        $installment['due_date'] = JalaliDate::fromGregorianString($installment['due_date'])->format();
-                        $installment['alert_date'] = JalaliDate::fromGregorianString($installment['alert_date'])->format();
-                    }
+                // Add `is_due` and `is_paid` to the installment
+                $installment['is_due'] = $is_due;
+                $installment['is_paid'] = $is_paid;
+
+                // Change dates to Jalali string
+                if ($jalali) {
+                    $installment['due_date'] = JalaliDate::fromGregorianString($installment['due_date'])->format();
+                    $installment['alert_date'] = JalaliDate::fromGregorianString($installment['alert_date'])->format();
                 }
             }
         }
+        return $loan;
+    }
 
-    usort($loans, function ($a, $b) {
-        if ($a['next_payment'] == null) return 1;
-        elseif ($b['next_payment'] == null) return -1;
-        else return $a['next_payment']->diff(new DateTime())->days <=> $b['next_payment']->diff(new DateTime())->days;
-    });
-
-    return $loans;
+    if ($loan_id || $installment_id) {
+        $loan = $query->fetch();
+        if ($loan) $loan = prepareLoan($loan, $jalali);
+        return $loan;
+    } else {
+        $loans = $query->fetchAll();
+        if ($loans) foreach ($loans as &$loan) $loan = prepareLoan($loan, $jalali);
+        usort($loans, function ($a, $b) {
+            if ($a['next_payment'] == null) return 1;
+            elseif ($b['next_payment'] == null) return -1;
+            else return $a['next_payment']->diff(new DateTime())->days <=> $b['next_payment']->diff(new DateTime())->days;
+        });
+        return $loans;
+    }
 }
 
 function createWebAppBtn(string $text, string $path, array $params = [], bool $add_api = false): array
