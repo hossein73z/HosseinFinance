@@ -2996,14 +2996,18 @@ function createLoansView(array $loans, ?string $loans_mssg_id = null, ?string $i
 }
 
 /**
- * Considerations for `$loan` array:
- *  -- It must have all related installments
- *     under `installments` key.
- *  -- All dates (loan's received date and installments' due
- *     and alert date) must be in Jalali string.
- *  -- Installments must be sorted ascending by their due date.
- *  -- Installments must have 'is_due' bool value.
- * TODO: Rewrite for the new parameters
+ * Generates a formatted loan details text with installment information.
+ *
+ * Requirements for the `$loan` array structure:
+ * - Must contain all related installments under the 'installments' key
+ * - All dates (loan received date and installment due/alert dates) must be in Jalali string format
+ * - Installments must be sorted in ascending order by due date
+ * - Each installment must include an 'is_due' boolean flag
+ *
+ * @param array $loan The loan data array containing loan details and installments
+ * @param string|null $markdown Optional Markdown formatting flag
+ * @param string|null $mssg_id Optional message ID for payment toggle links
+ * @return string Formatted loan details text
  */
 function createLoanDetailText(array $loan, ?string $markdown = null, ?string $mssg_id = null): string
 {
