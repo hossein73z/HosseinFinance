@@ -867,14 +867,10 @@ function handleLoansCallback(User $user, array $callback_query, array $data, arr
     switch ($query_key) {
         case 'loans_list':
 
-            // HACK: If the bottom keyboard won't stick in telegram, uncomment the line bellow
-            // sendToTelegram('deleteMessage', ['chat_id' => $user->getid(), 'message_id' => $message['message_id']]);
             $response = sendToTelegram('sendMessage', $data);
             if ($response) {
                 sendToTelegram('deleteMessage', ['chat_id' => $user->getId(), 'message_id' => $response['result']['message_id']]);
                 sendAllLoans($user, $db, null, $message['message_id']);
-                // HACK: And replace the line above, with the one bellow
-                // sendAllLoans($user, $db, $response['result']['message_id']);
             }
             break;
 
@@ -1092,8 +1088,9 @@ function handleLoansTextMessage(User $user, array $data, array $message, Databas
             // Delete redundant messages
             if (isset($matches[5]))
                 sendToTelegram('deleteMessage', ['chat_id' => $user->getid(), 'message_id' => $matches[5]]); ######## Initial
-            // sendToTelegram('deleteMessage', ['chat_id' => $user->getid(), 'message_id' => $matches[3]]); ############ Loans HACK: Uncomment this if edit button won't stick
             sendToTelegram('deleteMessage', ['chat_id' => $user->getid(), 'message_id' => $message['message_id']]); # Deep-Link
+            // HACK: Uncomment this if edit button won't stick
+            // sendToTelegram('deleteMessage', ['chat_id' => $user->getid(), 'message_id' => $matches[3]]); ################# Loans
 
             $db->update(
                 table: 'users',
