@@ -2657,6 +2657,46 @@ function getHoldingsWithAssetDetails(array $conditions, DatabaseManager $db, boo
     return $holdings;
 }
 
+/**
+ * Retrieves loans with their related installments for a specific user.
+ *
+ * Key Features:
+ * - Returns all user loans with installments nested under `installments` key
+ * - Supports both Gregorian and Jalali date formats (configurable)
+ * - Provides comprehensive installment status information
+ * - Includes smart sorting based on payment urgency
+ *
+ * Data Structure Details:
+ * - Loans are sorted by remaining days to next payment (soonest first)
+ * - All date fields are returned as strings in requested format (Gregorian/Jalali)
+ * - Each installment includes:
+ *   - Standard fields (id, amount, dates)
+ *   - `is_due` boolean flag indicating overdue status
+ *   - `is_paid` boolean flag for payment status
+ *
+ * - Each loan includes:
+ *   - `next_payment`: DateTime object of next due date (null if all paid/overdue)
+ *   - `insts_summary`: Payment statistics containing:
+ *     - Count and sum of paid installments
+ *     - Count and sum of overdue installments
+ *     - Count and sum of remaining (future) installments
+ *
+ * Filtering Options:
+ * - Can retrieve all user loans (default)
+ * - Can filter by specific loan ID
+ * - Can filter by specific installment ID (returns parent loan)
+ *
+ * @param int|string $user_id The user ID to retrieve loans for
+ * @param DatabaseManager $db Database connection instance
+ * @param bool $jalali Whether to return dates in Jalali format (default: false)
+ * @param int|string|null $loan_id Optional loan ID filter
+ * @param int|string|null $installment_id Optional installment ID filter
+ * @return bool|array Returns:
+ *   - Single loan array when filtered by loan_id/installment_id
+ *   - Array of loans sorted by payment urgency
+ *   - false on error
+ * @throws Exception
+ */
 function getLoanWithInstallments(int|string $user_id, DatabaseManager $db, bool $jalali = false, int|string|null $loan_id = null, int|string|null $installment_id = null): bool|array
 {
     if ($loan_id) $loan_select = "l.id = $loan_id and";
