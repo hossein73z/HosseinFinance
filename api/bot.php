@@ -883,6 +883,19 @@ function handleLoansCallback(User $user, array $callback_query, array $data, arr
             sendAllLoans($user, $db, null, $message['message_id'], !$query_data[$query_key]);
             break;
 
+        case 'view_loan':
+            $loan = getLoanWithInstallments(user_id: $user->getId(), db: $db, jalali: true, loan_id: $query_data[$query_key]);
+            if ($loan) {
+                // HACK: The edit button might not stick on Telegram
+                sendLoanDetail($loan, $data, $message['message_id']);
+                $db->update(
+                    table: 'users',
+                    data: ['progress' => json_encode(['view_loan' => ['loan_id' => $loan['id']]])],
+                    conditions: ['id' => $user->getId()]
+                );
+            }
+            break;
+
         default:
             sendToTelegram('editMessageText', [
                 'chat_id' => $user->getid(),
@@ -1167,17 +1180,33 @@ function sendAllLoans(User $user, DatabaseManager $db, ?string $initial_mssg_id 
             if ($temp_mssg) $mssg_id_to_edit = $temp_mssg['result']['message_id'];
         }
 
+        $keyboard = [[[
+            'text' => $summerized ? 'نمایش جزئیات وام‌ها' : 'پنهان کردن جزئیات',
+            'callback_data' => json_encode(['detailed_loans' => $summerized])
+        ]]];
+        $keyboard_row = [];
+        $btn_in_row = 3;
+        foreach ($loans as $loan) {
+            $keyboard_row[] = [
+                'text' => beautifulNumber($loan['name'], null),
+                'callback_data' => json_encode(['view_loan' => $loan['id']])
+            ];
+
+            if (sizeof($keyboard_row) >= $btn_in_row) {
+                $keyboard[] = $keyboard_row;
+                $keyboard_row = [];
+            }
+        }
+
+        if ($keyboard_row) $keyboard[] = $keyboard_row;
+
         if ($mssg_id_to_edit)
             sendToTelegram('editMessageText', [
                 'chat_id' => $user->getid(),
                 'message_id' => $mssg_id_to_edit,
                 'text' => createLoansView($loans, $mssg_id_to_edit, $initial_mssg_id, $summerized),
                 'parse_mode' => 'MarkdownV2',
-                'reply_markup' => ['inline_keyboard' => [[
-                    [
-                        'text' => $summerized ? 'نمایش جزئیات وام‌ها' : 'پنهان کردن جزئیات',
-                        'callback_data' => json_encode(['detailed_loans' => $summerized])
-                    ]]]]
+                'reply_markup' => ['inline_keyboard' => $keyboard]
             ]);
     } else {
         sendToTelegram('sendMessage', ['chat_id' => $user->getid(), 'text' => 'هیچ وام یا قسطی برای شما ثبت نشده است!']);
