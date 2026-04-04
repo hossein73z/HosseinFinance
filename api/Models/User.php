@@ -145,6 +145,20 @@ class User implements JsonSerializable
         return $this;
     }
 
+    public function getDetailedLoan(): ?string
+    {
+        $settings = $this->getSettings();
+        return $settings['detailed_loan'] ?? false;
+    }
+
+    public function setDetailedLoan(bool $detailed = false): self
+    {
+        $settings = $this->getSettings() ?? [];
+        $settings['detailed_loan'] = $detailed;
+        $this->setSettings($settings);
+        return $this;
+    }
+
     // --- Helper Methods ---
 
     public function getFullName(): string
@@ -184,6 +198,7 @@ class User implements JsonSerializable
             'is_admin' => $this->isAdmin,
             'last_btn' => $this->lastBtn,
             'base_currency' => $this->getBaseCurrency(),
+            'detailed_loan' => $this->getDetailedLoan(),
         ];
     }
 }
