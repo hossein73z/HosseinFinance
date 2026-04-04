@@ -1114,7 +1114,7 @@ function handleLoansTextMessage(User $user, array $data, array $message, Databas
                 sendToTelegram('editMessageText', [
                     'chat_id' => $user->getid(),
                     'message_id' => $matches[2],
-                    'text' => createLoanDetailText($loan, $matches[2]),
+                    'text' => createLoanDetailText($loan, 'MarkdownV2', $matches[2]),
                     'parse_mode' => 'MarkdownV2',
                     'reply_markup' => ['inline_keyboard' => [[['text' => 'برگشت به لیست وام‌ها', 'callback_data' => json_encode(['loan_list' => null])]]]]
                 ]);
@@ -1190,7 +1190,7 @@ function sendLoanDetail(array $loan, array $data): void
     if ($temp_mssg) {
 
         $data['message_id'] = $temp_mssg['result']['message_id'];
-        $data['text'] = createLoanDetailText($loan, $temp_mssg['result']['message_id']);
+        $data['text'] = createLoanDetailText($loan, 'MarkdownV2', $temp_mssg['result']['message_id']);
         $data['parse_mode'] = 'MarkdownV2';
         $data['reply_markup'] = ['inline_keyboard' => [[['text' => 'برگشت به لیست وام‌ها', 'callback_data' => json_encode(['loan_list' => null])]]]];
 
@@ -2868,7 +2868,7 @@ function createLoansView(array $loans, ?string $loans_mssg_id = null, ?string $i
  *  -- Installments must be sorted ascending by their due date.
  *  -- Installments must have 'is_due' bool value.
  */
-function createLoanDetailText(array $loan, string $mssg_id): string
+function createLoanDetailText(array $loan, ?string $markdown = null, ?string $mssg_id = null): string
 {
     $installments = &$loan['installments'];
     if ($installments) {
@@ -2876,33 +2876,42 @@ function createLoanDetailText(array $loan, string $mssg_id): string
         $installments_text = '';
         foreach ($installments as $i => &$installment) {
 
-            // Add payment status icon
-            if ($installment['is_paid']) {
-                $installment['is_paid'] = "🟢";
-            } elseif ($installment['is_due']) {
-                $installment['is_paid'] = "🔴";
-            } else {
-                $installment['is_paid'] = "⚪";
-            }
+            // Create payment status emoji
+            if ($installment['is_paid']) $payment_emoji = "🟢";
+            elseif ($installment['is_due']) $payment_emoji = "🔴";
+            else $payment_emoji = "⚪";
 
             // Create installment text
             $inst_num = beautifulNumber(intval($i) + 1, null);
             $date = beautifulNumber($installment['due_date'], null);
             $amount = beautifulNumber($installment['amount']);
-            $link = "https://ble.ir/" . BOT_ID . "?start=toggleInstPayment_instId{$installment['id']}_mssgId$mssg_id";
 
-            $installments_text .= "\n‏    $inst_num\) {$installment['is_paid']}  $date:  $amount    [تغییر وضعیت پرداخت]($link)";
+            if ($markdown) {
+                $link = "https://ble.ir/" . BOT_ID . "?start=toggleInstPayment_instId$installment[id]_mssgId$mssg_id";
+                $installments_text .= "\n" . '‏' . '    ' . markdownScape($inst_num) . "\) [$payment_emoji]($link)  " . markdownScape($date) . ':  ' . markdownScape($amount);
+            } else
+                $installments_text .= "\n" . '‏' . "    $inst_num) $payment_emoji  $date:  $amount";
 
         }
 
-        $text = "‏*" . markdownScape($loan['name']) . "*:\n" .
-            "\n مبلغ وام\: " . markdownScape(beautifulNumber($loan['total_amount'])) .
-            "\n تاریخ دریافت\: " . markdownScape(beautifulNumber($loan['received_date'], null)) .
-            "\n کل بازپرداخت\: " . markdownScape(beautifulNumber(array_sum(array_column($installments, 'amount')))) .
-            "\n " . markdownScape(beautifulNumber($loan['insts_summary']['paid_count']) . " قسط پرداخت‌شده، معادل " . beautifulNumber($loan['insts_summary']['paid_sum'])) .
-            "\n " . markdownScape(beautifulNumber($loan['insts_summary']['remaining_count']) . " قسط باقی مانده، معادل " . beautifulNumber($loan['insts_summary']['remaining_sum'])) .
-            "\n " . markdownScape(beautifulNumber($loan['insts_summary']['overdue_count']) . " قسط معوقه، معادل " . beautifulNumber($loan['insts_summary']['overdue_sum'])) .
-            "\n جزئیات اقساط\: ";
+        if ($markdown)
+            $text = "‏*" . markdownScape($loan['name']) . "*:\n" .
+                "\n مبلغ وام\: " . markdownScape(beautifulNumber($loan['total_amount'])) .
+                "\n تاریخ دریافت\: " . markdownScape(beautifulNumber($loan['received_date'], null)) .
+                "\n کل بازپرداخت\: " . markdownScape(beautifulNumber(array_sum(array_column($installments, 'amount')))) .
+                "\n " . markdownScape(beautifulNumber($loan['insts_summary']['paid_count']) . " قسط پرداخت‌شده، معادل " . beautifulNumber($loan['insts_summary']['paid_sum'])) .
+                "\n " . markdownScape(beautifulNumber($loan['insts_summary']['remaining_count']) . " قسط باقی مانده، معادل " . beautifulNumber($loan['insts_summary']['remaining_sum'])) .
+                "\n " . markdownScape(beautifulNumber($loan['insts_summary']['overdue_count']) . " قسط معوقه، معادل " . beautifulNumber($loan['insts_summary']['overdue_sum'])) .
+                "\n جزئیات اقساط\: ";
+        else
+            $text = "‏*" . $loan['name'] . "*:\n" .
+                "\n مبلغ وام\: " . beautifulNumber($loan['total_amount']) .
+                "\n تاریخ دریافت\: " . beautifulNumber($loan['received_date'], null) .
+                "\n کل بازپرداخت\: " . beautifulNumber(array_sum(array_column($installments, 'amount'))) .
+                "\n " . beautifulNumber($loan['insts_summary']['paid_count']) . " قسط پرداخت‌شده، معادل " . beautifulNumber($loan['insts_summary']['paid_sum']) .
+                "\n " . beautifulNumber($loan['insts_summary']['remaining_count']) . " قسط باقی مانده، معادل " . beautifulNumber($loan['insts_summary']['remaining_sum']) .
+                "\n " . beautifulNumber($loan['insts_summary']['overdue_count']) . " قسط معوقه، معادل " . beautifulNumber($loan['insts_summary']['overdue_sum']) .
+                "\n جزئیات اقساط\: ";
 
         $text .= $installments_text;
 
