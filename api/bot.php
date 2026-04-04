@@ -2511,7 +2511,7 @@ function empty_level(
 
     if (!$progress) backButton($user, $db, $parent_btn_id);
 
-    // Note: Text and keyboard must be initialized within progress handler
+    // NOTE: Text and keyboard must be initialized within progress handler
     $data = [
         'chat_id' => $user->getid(),
         'text' => &$text,
@@ -2606,7 +2606,7 @@ function empty_level(
         }
 
         // Send default progress related text and bottom keyboard
-        // Note: Entering level or Wrong number format reach here
+        // NOTE: Entering level or Wrong number format reach here
         sendToTelegram('sendMessage', $data);
         exit;
     }
