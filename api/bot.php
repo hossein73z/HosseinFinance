@@ -1116,7 +1116,7 @@ function handleLoansTextMessage(User $user, array $data, array $message, Databas
                     'message_id' => $matches[2],
                     'text' => createLoanDetailText($loan, 'MarkdownV2', $matches[2]),
                     'parse_mode' => 'MarkdownV2',
-                    'reply_markup' => ['inline_keyboard' => [[['text' => 'برگشت به لیست وام‌ها', 'callback_data' => json_encode(['loan_list' => null])]]]]
+                    'reply_markup' => ['inline_keyboard' => createLoanDetailKeyboard($loan)]
                 ]);
             }
             exit;
@@ -1192,7 +1192,7 @@ function sendLoanDetail(array $loan, array $data): void
         $data['message_id'] = $temp_mssg['result']['message_id'];
         $data['text'] = createLoanDetailText($loan, 'MarkdownV2', $temp_mssg['result']['message_id']);
         $data['parse_mode'] = 'MarkdownV2';
-        $data['reply_markup'] = ['inline_keyboard' => [[['text' => 'برگشت به لیست وام‌ها', 'callback_data' => json_encode(['loan_list' => null])]]]];
+        $data['reply_markup'] = ['inline_keyboard' => createLoanDetailKeyboard($loan)];
 
         sendToTelegram('editMessageText', $data);
     }
@@ -2918,6 +2918,34 @@ function createLoanDetailText(array $loan, ?string $markdown = null, ?string $ms
     } else $text = 'هیچ قسطی برای این وام ثبت نشده است!';
 
     return $text;
+}
+
+function createLoanDetailKeyboard(array $loan): array
+{
+    $keyboard = [];
+    $keyboard_row = [];
+    $btn_in_row = 2;
+    foreach ($loan['installments'] as $installment) {
+        $due_date = JalaliDate::fromString($installment['due_date'])->format();
+        if ($installment['is_paid']) $payment_icon = '🟢';
+        elseif ($installment['is_due']) $payment_icon = '🔴';
+        else $payment_icon = '⚪';
+        $keyboard_row[] = [
+            'text' => $payment_icon . ' ' . beautifulNumber($due_date, null),
+            'callback_data' => json_encode(['inplace_inst_pay_toggle' => $installment['id']])
+        ];
+
+        if (sizeof($keyboard_row) >= $btn_in_row) {
+            $keyboard[] = $keyboard_row;
+            $keyboard_row = [];
+        }
+    }
+
+    if ($keyboard_row) $keyboard[] = $keyboard_row;
+    $keyboard[] = [['text' => 'برگشت به لیست وام‌ها', 'callback_data' => json_encode(['loan_list' => null])]];
+
+    return $keyboard;
+
 }
 
 function calculateProLos(float $p1, float $p2, float $amount = 1, float $conversion_rate = 1): float
