@@ -1175,9 +1175,10 @@ function sendAllLoans(User $user, DatabaseManager $db, ?string $initial_mssg_id 
     $loans = getLoanWithInstallments(user_id: $user->getId(), db: $db, jalali: true);
 
     if ($loans) {
-        if (!$mssg_id_to_edit) { // TODO: I'm not satisfied with this approach
+        if (!$mssg_id_to_edit) {
             $temp_mssg = sendLoadingMessage($user->getid(), 'در حال دریافت اطلاعات وام‌ها ...');
             if ($temp_mssg) $mssg_id_to_edit = $temp_mssg['result']['message_id'];
+            else exit;
         }
 
         $keyboard = [[[
@@ -1197,17 +1198,15 @@ function sendAllLoans(User $user, DatabaseManager $db, ?string $initial_mssg_id 
                 $keyboard_row = [];
             }
         }
-
         if ($keyboard_row) $keyboard[] = $keyboard_row;
 
-        if ($mssg_id_to_edit)
-            sendToTelegram('editMessageText', [
-                'chat_id' => $user->getid(),
-                'message_id' => $mssg_id_to_edit,
-                'text' => createLoansView($loans, $mssg_id_to_edit, $initial_mssg_id, $summerized),
-                'parse_mode' => 'MarkdownV2',
-                'reply_markup' => ['inline_keyboard' => $keyboard]
-            ]);
+        sendToTelegram('editMessageText', [
+            'chat_id' => $user->getid(),
+            'message_id' => $mssg_id_to_edit,
+            'text' => createLoansView($loans, $mssg_id_to_edit, $initial_mssg_id, $summerized),
+            'parse_mode' => 'MarkdownV2',
+            'reply_markup' => ['inline_keyboard' => $keyboard]
+        ]);
     } else {
         sendToTelegram('sendMessage', ['chat_id' => $user->getid(), 'text' => 'هیچ وام یا قسطی برای شما ثبت نشده است!']);
     }
@@ -1226,19 +1225,18 @@ function sendLoanDetail(array $loan, array $data, string|int|null $mssg_id_to_ed
     $response = sendToTelegram('sendMessage', $data);
     if ($response) sendToTelegram('deleteMessage', ['chat_id' => $data['chat_id'], 'message_id' => $response['result']['message_id']]);
 
-    if (!$mssg_id_to_edit) { // TODO: I'm not satisfied with this approach
+    if (!$mssg_id_to_edit) {
         $temp_mssg = sendLoadingMessage($data['chat_id'], 'در حال دریافت اطلاعات اقساط ...');
         if ($temp_mssg) $mssg_id_to_edit = $temp_mssg['result']['message_id'];
+        else exit;
     }
-    if ($mssg_id_to_edit) {
 
-        $data['message_id'] = $mssg_id_to_edit;
-        $data['text'] = createLoanDetailText($loan, 'MarkdownV2', $mssg_id_to_edit);
-        $data['parse_mode'] = 'MarkdownV2';
-        $data['reply_markup'] = ['inline_keyboard' => createLoanDetailKeyboard($loan)];
+    $data['message_id'] = $mssg_id_to_edit;
+    $data['text'] = createLoanDetailText($loan, 'MarkdownV2', $mssg_id_to_edit);
+    $data['parse_mode'] = 'MarkdownV2';
+    $data['reply_markup'] = ['inline_keyboard' => createLoanDetailKeyboard($loan)];
 
-        sendToTelegram('editMessageText', $data);
-    }
+    sendToTelegram('editMessageText', $data);
 }
 
 #[NoReturn]
@@ -2659,17 +2657,6 @@ function getHoldingsWithAssetDetails(array $conditions, DatabaseManager $db, boo
     return $holdings;
 }
 
-/**
- * // TODO: Rewrite this for the new parameters
- * - Returns a list of all user's loans with related installments under `installments` key,
- *      sorted by remaining days to the next payment.
- * - All loans and installments dates are returned as string (Gregorian or Jalali).
- * - Each returned installment has an `is_due` boolean key.
- * - Each loan has a `next_payment` key, storing due date of the next installment in
- *      DateTime object or null if all the installments are due.
- * - Each loan as an `insts_summary` key storing the count and summation of
- *      paid, overdue and remaining installments for that loan.
- */
 function getLoanWithInstallments(int|string $user_id, DatabaseManager $db, bool $jalali = false, int|string|null $loan_id = null, int|string|null $installment_id = null): bool|array
 {
     if ($loan_id) $loan_select = "l.id = $loan_id and";
