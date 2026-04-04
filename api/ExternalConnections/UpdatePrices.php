@@ -321,7 +321,7 @@ function updateLiveMessages(array $new_assets, DatabaseManager $db): void
     if ($users) foreach ($users as &$user) {
         if (!$user['fav_assets']) continue;
         $user['fav_assets'] = json_decode($user['fav_assets'], true);
-        sendFavorites(User::fromDbRow($user), $db, $user['live_message_id']);
+        sendAllFavorites(User::fromDbRow($user), $db, $user['live_message_id']);
         /*
          * TODO
          *  With telegram, test with deleted message and deleted user

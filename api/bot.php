@@ -120,7 +120,7 @@ function handleIncomingMessage(array $message, DatabaseManager $db): void
     if ($text === '/prices') /*********/ level_5(user: $user, db: $db);
     if ($text === '/ai') /*************/ level_6(user: $user, db: $db);
     if ($text === '/accounts') /*******/ level_9(user: $user, db: $db);
-    if ($text === '/favorites') /******/ sendFavorites($user, $db);
+    if ($text === '/favorites') /******/ sendAllFavorites($user, $db);
     if ($text === '/base_currency') /**/ sendSelectBaseCurrencyMessage($user, $db);
 
     // Levels' Sub Commands
@@ -271,7 +271,7 @@ function specialButtonHandler(User $user, Button $pressed_button, DatabaseManage
 {
     if ($pressed_button->getId() === "s0") backButton($user, $db);
     if ($pressed_button->getId() === "s1") cancelButton($user, $db);
-    if ($pressed_button->getId() === "s2") sendFavorites($user, $db);
+    if ($pressed_button->getId() === "s2") sendAllFavorites($user, $db);
     if ($pressed_button->getId() === "s4") sendSelectBaseCurrencyMessage($user, $db);
 
     exit;
@@ -1303,7 +1303,7 @@ function level_5(
         $db->update('users', ['last_btn' => $level_button->getId(), 'progress' => null], ['id' => $user->getId()]);
 
         // Send Informative message
-        sendFavorites($user, $db);
+        sendAllFavorites($user, $db);
     }
 
     exit;
@@ -1443,7 +1443,7 @@ function handlePricesCallback(User $user, array $callback_query, array $message,
 
             sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
             sendToTelegram('editMessageText', $data);
-            sendFavorites($user, $db);
+            sendAllFavorites($user, $db);
 
         // Show confirmation message for deleting a favorite
         case 'del_fav':
@@ -1478,19 +1478,19 @@ function handlePricesCallback(User $user, array $callback_query, array $message,
 
             sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
             sendToTelegram('editMessageText', $data);
-            sendFavorites($user, $db);
+            sendAllFavorites($user, $db);
 
         // Start showing live price updates on the current message
         case 'set_live':
             sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
             deleteOldActiveLiveMessage($user, $message['message_id'], $db);
             setLiveMessage($user->getId(), $query_data['set_live'], $message['message_id'], $db);
-            sendFavorites($user, $db, $message['message_id']);
+            sendAllFavorites($user, $db, $message['message_id']);
 
         // Show the main favorites' message
         case 'show_favorites':
             sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
-            sendFavorites($user, $db, $message['message_id']);
+            sendAllFavorites($user, $db, $message['message_id']);
 
         default:
             sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
@@ -1724,7 +1724,7 @@ function level_8(
         $db->update('users', ['last_btn' => $level_button->getId(), 'progress' => null], ['id' => $user->getId()]);
 
         // Send Informative message
-        sendAlerts($user, $db);
+        sendAllAlerts($user, $db);
     }
 
     exit;
@@ -1752,7 +1752,7 @@ function handleAlertsTextMessage(array $data): void
 
 }
 
-function sendAlerts(User $user, DatabaseManager $db, int|string|null $message_id = null): void
+function sendAllAlerts(User $user, DatabaseManager $db, int|string|null $message_id = null): void
 {
     $message_id = ($message_id !== null) ?
         $message_id :
@@ -1960,13 +1960,13 @@ function managePriceAlerts(User $user, array $callback_query, array $message, Da
 
             sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
             sendToTelegram('editMessageText', $data);
-            sendAlerts($user, $db);
+            sendAllAlerts($user, $db);
             exit;
 
         // Show main list of alerts
         case 'show_alerts':
             sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
-            sendAlerts($user, $db, $message['message_id']);
+            sendAllAlerts($user, $db, $message['message_id']);
             exit;
     }
 
@@ -2016,7 +2016,7 @@ function level_9(
         $db->update('users', ['last_btn' => $level_button->getId(), 'progress' => null], ['id' => $user->getId()]);
 
         // Send Informative message
-        sendAccounts($user, $db);
+        sendAllAccounts($user, $db);
     }
 
     exit;
@@ -2044,7 +2044,7 @@ function handleAccountsTextMessage(array $data): void
 
 }
 
-function sendAccounts(User $user, DatabaseManager $db, int|string|null $message_id = null): void
+function sendAllAccounts(User $user, DatabaseManager $db, int|string|null $message_id = null): void
 {
     $message_id = ($message_id !== null) ?
         $message_id :
@@ -2279,7 +2279,7 @@ function level_11(
         $db->update('users', ['last_btn' => $level_button->getId(), 'progress' => null], ['id' => $user->getId()]);
 
         // Send Informative message
-        sendTransactions($user, $db);
+        sendAllTransactions($user, $db);
     }
 
     exit;
@@ -2430,7 +2430,7 @@ function addTransaction(User $user, array $callback_query, array $message, Datab
 }
 
 #[NoReturn]
-function sendTransactions(User $user, DatabaseManager $db): void
+function sendAllTransactions(User $user, DatabaseManager $db): void
 {
     $transactions = $db->read(
         table: 'transactions t',

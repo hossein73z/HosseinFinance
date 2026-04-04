@@ -22,7 +22,7 @@ function sendLoadingMessage(string $chat_id, string $text): array|false
  * @return void
  */
 #[NoReturn]
-function sendFavorites(User $user, DatabaseManager $db, int|string|null $message_id = null): void
+function sendAllFavorites(User $user, DatabaseManager $db, int|string|null $message_id = null): void
 {
     $message_id = ($message_id !== null) ?
         $message_id :
