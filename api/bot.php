@@ -846,10 +846,9 @@ function level_2(
         $db->update('users', ['last_btn' => $level_button->getId(), 'progress' => null], ['id' => $user->getId()]);
         if ($command_data) {
             $loan = getLoanWithInstallments(user_id: $user->getId(), db: $db, jalali: true, loan_id: $command_data);
-            if ($loan) sendLoanDetail($loan, $data);
-            else sendAllLoans($user, $db, $response['result']['message_id']);
-
-        } else sendAllLoans($user, $db, $response['result']['message_id']);
+            if ($loan) sendLoanDetail($loan, $data, $response['result']['message_id']);
+        }
+        sendAllLoans($user, $db, null, $response['result']['message_id']);
     }
 
     exit;
@@ -887,12 +886,12 @@ function handleLoansCallback(User $user, array $callback_query, array $data, arr
             $loan = getLoanWithInstallments(user_id: $user->getId(), db: $db, jalali: true, loan_id: $query_data[$query_key]);
             if ($loan) {
                 // HACK: The edit button might not stick on Telegram
-                sendLoanDetail($loan, $data, $message['message_id']);
                 $db->update(
                     table: 'users',
                     data: ['progress' => json_encode(['view_loan' => ['loan_id' => $loan['id']]])],
                     conditions: ['id' => $user->getId()]
                 );
+                sendLoanDetail($loan, $data, $message['message_id']);
             }
             break;
 
@@ -1096,14 +1095,12 @@ function handleLoansTextMessage(User $user, array $data, array $message, Databas
             // sendToTelegram('deleteMessage', ['chat_id' => $user->getid(), 'message_id' => $matches[3]]); ############ Loans HACK: Uncomment this if edit button won't stick
             sendToTelegram('deleteMessage', ['chat_id' => $user->getid(), 'message_id' => $message['message_id']]); # Deep-Link
 
-            sendLoanDetail($loan, $data, $matches[3]);
-
             $db->update(
                 table: 'users',
                 data: ['progress' => json_encode(['view_loan' => ['loan_id' => $loan['id']]])],
                 conditions: ['id' => $user->getId()]
             );
-            exit;
+            sendLoanDetail($loan, $data, $matches[3]);
         }
     }
 
@@ -1172,6 +1169,8 @@ function handleLoansTextMessage(User $user, array $data, array $message, Databas
 
 function sendAllLoans(User $user, DatabaseManager $db, ?string $initial_mssg_id = null, ?string $mssg_id_to_edit = null, bool $summerized = true): void
 {
+    // HACK: If telegram won't remove bottom keyboard when the
+    //  message creating it deletes, remove usage of $initial_mssg_id everywhere
     $loans = getLoanWithInstallments(user_id: $user->getId(), db: $db, jalali: true);
 
     if ($loans) {
@@ -1214,6 +1213,7 @@ function sendAllLoans(User $user, DatabaseManager $db, ?string $initial_mssg_id 
     $db->update('users', ['progress' => null], ['id' => $user->getId()]);
 }
 
+#[NoReturn]
 function sendLoanDetail(array $loan, array $data, string|int|null $mssg_id_to_edit = null): void
 {
 
@@ -1237,6 +1237,8 @@ function sendLoanDetail(array $loan, array $data, string|int|null $mssg_id_to_ed
     $data['reply_markup'] = ['inline_keyboard' => createLoanDetailKeyboard($loan)];
 
     sendToTelegram('editMessageText', $data);
+
+    exit;
 }
 
 #[NoReturn]
@@ -2695,7 +2697,6 @@ function getHoldingsWithAssetDetails(array $conditions, DatabaseManager $db, boo
  *   - Single loan array when filtered by loan_id/installment_id
  *   - Array of loans sorted by payment urgency
  *   - false on error
- * @throws Exception
  */
 function getLoanWithInstallments(int|string $user_id, DatabaseManager $db, bool $jalali = false, int|string|null $loan_id = null, int|string|null $installment_id = null): bool|array
 {
