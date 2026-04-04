@@ -165,6 +165,8 @@ function handleCallbackQuery(array $callback_query, DatabaseManager $db): void
             case 'cron_inst_paid':
                 payInstallmentFromCronJob($user, $callback_query, $message, $db);
 
+            case'inplace_inst_pay_toggle':
+                inplaceInstallmentPaymentToggle($user, $callback_query, $message, $db);
             case 'edit_fav':
             case 'new_fav_type':
             case 'new_fav_name':
@@ -1152,7 +1154,7 @@ function sendAllLoans(User $user, DatabaseManager $db, ?string $initial_mssg_id 
     $loans = getLoanWithInstallments(user_id: $user->getId(), db: $db, jalali: true);
 
     if ($loans) {
-        if (!$mssg_id_to_edit) { // TODO: I'm not satisfied with this
+        if (!$mssg_id_to_edit) { // TODO: I'm not satisfied with this approach
             $temp_mssg = sendLoadingMessage($user->getid(), 'در حال دریافت اطلاعات وام‌ها ...');
             if ($temp_mssg) $mssg_id_to_edit = $temp_mssg['result']['message_id'];
         }
@@ -1219,6 +1221,30 @@ function payInstallmentFromCronJob(User $user, array $callback_query, array $mes
 
     sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
     sendToTelegram('editMessageText', ['chat_id' => $user->getId(), 'text' => $text, 'message_id' => $message['message_id']]);
+    exit();
+}
+
+
+#[NoReturn]
+function inplaceInstallmentPaymentToggle(User $user, array $callback_query, array $message, DatabaseManager $db): void
+{
+
+    $installment_id = $callback_query['data']['inplace_inst_pay_toggle'];
+
+    // FIXME: Duplicate code fragment
+    $db->query("update installments set is_paid = !is_paid where id = $installment_id")->fetch();
+
+    $loan = getLoanWithInstallments(user_id: $user->getId(), db: $db, jalali: true, installment_id: $installment_id);
+
+    if ($loan) {
+        sendToTelegram('editMessageText', [
+            'chat_id' => $user->getid(),
+            'message_id' => $message['message_id'],
+            'text' => createLoanDetailText($loan, 'MarkdownV2', $message['message_id']),
+            'parse_mode' => 'MarkdownV2',
+            'reply_markup' => ['inline_keyboard' => createLoanDetailKeyboard($loan)]
+        ]);
+    }
     exit();
 }
 
@@ -2867,6 +2893,7 @@ function createLoansView(array $loans, ?string $loans_mssg_id = null, ?string $i
  *     and alert date) must be in Jalali string.
  *  -- Installments must be sorted ascending by their due date.
  *  -- Installments must have 'is_due' bool value.
+ * TODO: Rewrite for the new parameters
  */
 function createLoanDetailText(array $loan, ?string $markdown = null, ?string $mssg_id = null): string
 {
