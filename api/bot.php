@@ -848,14 +848,14 @@ function level_2(
             $loan = getLoanWithInstallments(user_id: $user->getId(), db: $db, jalali: true, loan_id: $command_data);
             if ($loan) sendLoanDetail($loan, $data, $response['result']['message_id']);
         }
-        sendAllLoans($user, $db, null, $response['result']['message_id']);
+        sendAllLoans($user, $db, null, $response['result']['message_id'], $user->getDetailedLoan());
     }
 
     exit;
 }
 
 #[NoReturn]
-function handleLoansCallback(User $user, array $callback_query, array $data, array $message, $db): void
+function handleLoansCallback(User $user, array $callback_query, array $data, array $message, DatabaseManager $db): void
 {
     $query_data = $callback_query['data'];
 
@@ -870,12 +870,14 @@ function handleLoansCallback(User $user, array $callback_query, array $data, arr
             $response = sendToTelegram('sendMessage', $data);
             if ($response) {
                 sendToTelegram('deleteMessage', ['chat_id' => $user->getId(), 'message_id' => $response['result']['message_id']]);
-                sendAllLoans($user, $db, null, $message['message_id']);
+                sendAllLoans($user, $db, null, $message['message_id'], $user->getDetailedLoan());
             }
             break;
 
         case 'detailed_loans':
-            sendAllLoans($user, $db, null, $message['message_id'], !$query_data[$query_key]);
+            sendAllLoans($user, $db, null, $message['message_id'], $query_data[$query_key]);
+            $user->setDetailedLoan($query_data[$query_key]);
+            $db->update('users', ['settings' => json_encode($user->getSettings())], ['id' => $user->getId()]);
             break;
 
         case 'view_loan':
@@ -964,7 +966,7 @@ function handleLoansWebAppData(User $user, array $data, array $message, Database
                 'Loan: ' . json_encode($new_loan) . "\n" .
                 'Error: ' . $e->getMessage());
         }
-        sendAllLoans($user, $db);
+        sendAllLoans($user, $db, summerized: $user->getDetailedLoan());
         exit;
 
     }
@@ -1035,7 +1037,7 @@ function handleLoansWebAppData(User $user, array $data, array $message, Database
         }
 
         sendToTelegram('sendMessage', $data);
-        sendAllLoans($user, $db);
+        sendAllLoans($user, $db, summerized: $user->getDetailedLoan());
         exit;
 
     }
@@ -1058,7 +1060,7 @@ function handleLoansWebAppData(User $user, array $data, array $message, Database
         }
 
         sendToTelegram('sendMessage', $data);
-        sendAllLoans($user, $db);
+        sendAllLoans($user, $db, summerized: $user->getDetailedLoan());
         exit;
     }
 
@@ -1067,7 +1069,7 @@ function handleLoansWebAppData(User $user, array $data, array $message, Database
     $data['text'] = 'داده‌های ارسالی قابل پردازش نیستند!';
     sendToTelegram('sendMessage', $data);
 
-    sendAllLoans($user, $db);
+    sendAllLoans($user, $db, summerized: $user->getDetailedLoan());
     exit;
 
 }
@@ -1179,7 +1181,7 @@ function sendAllLoans(User $user, DatabaseManager $db, ?string $initial_mssg_id 
 
         $keyboard = [[[
             'text' => $summerized ? 'نمایش جزئیات وام‌ها' : 'پنهان کردن جزئیات',
-            'callback_data' => json_encode(['detailed_loans' => $summerized])
+            'callback_data' => json_encode(['detailed_loans' => !$summerized])
         ]]];
         $keyboard_row = [];
         $btn_in_row = 3;
