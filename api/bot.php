@@ -895,7 +895,23 @@ function handleLoansCallback(User $user, array $callback_query, array $data, arr
                     data: ['progress' => json_encode(['view_loan' => ['loan_id' => $loan['id']]])],
                     conditions: ['id' => $user->getId()]
                 );
-                sendLoanDetail($loan, $data, $message['message_id']);
+
+                $inplace = $query_data[$query_key]['inplace'] ?? false;
+
+                $data['text'] = "/loan_$loan[id]\n";
+                $data['text'] .= 'جزئیات وام «' . $loan['name'] . '»';
+                array_unshift($data['reply_markup']['keyboard'], [createWebAppBtn('✏ ویرایش وام «' . $loan['name'] . '»', '/assets/loan.html', ['data' => base64_encode(json_encode($loan))])]);
+                $response = sendToTelegram('sendMessage', $data);
+
+                if ($response) {
+                    if ($inplace) {
+                        sendToTelegram('deleteMessage', ['chat_id' => $data['chat_id'], 'message_id' => $response['result']['message_id']]);
+                        sendLoanDetail($loan, $data, $message['message_id']);
+                    } else {
+                        sendToTelegram('deleteMessage', ['chat_id' => $data['chat_id'], 'message_id' => $message['message_id']]);
+                        sendLoanDetail($loan, $data, $response['result']['message_id']);
+                    }
+                }
             }
             break;
 
@@ -1212,14 +1228,6 @@ function sendAllLoans(User $user, DatabaseManager $db, ?string $initial_mssg_id 
 #[NoReturn]
 function sendLoanDetail(array $loan, array $data, string|int|null $mssg_id_to_edit = null): void
 {
-
-    $data['text'] = "/loan_$loan[id]\n";
-    $data['text'] .= 'جزئیات وام «' . $loan['name'] . '»';
-
-    array_unshift($data['reply_markup']['keyboard'], [createWebAppBtn('✏ ویرایش وام «' . $loan['name'] . '»', '/assets/loan.html', ['data' => base64_encode(json_encode($loan))])]);
-
-    $response = sendToTelegram('sendMessage', $data);
-    if ($response) sendToTelegram('deleteMessage', ['chat_id' => $data['chat_id'], 'message_id' => $response['result']['message_id']]);
 
     if (!$mssg_id_to_edit) {
         $temp_mssg = sendLoadingMessage($data['chat_id'], 'در حال دریافت اطلاعات اقساط ...');
