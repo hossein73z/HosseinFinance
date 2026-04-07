@@ -848,7 +848,7 @@ function level_2(
             $loan = getLoanWithInstallments(user_id: $user->getId(), db: $db, jalali: true, loan_id: $command_data);
             if ($loan) sendLoanDetail($loan, $data, $response['result']['message_id']);
         }
-        sendAllLoans($user, $db, null, $response['result']['message_id'], $user->getDetailedLoan());
+        sendInstallmentsForNextNDays($user, $db);
     }
 
     exit;
@@ -1220,6 +1220,51 @@ function sendAllLoans(User $user, DatabaseManager $db, ?string $initial_mssg_id 
         ]);
     } else {
         sendToTelegram('sendMessage', ['chat_id' => $user->getid(), 'text' => 'هیچ وام یا قسطی برای شما ثبت نشده است!']);
+    }
+
+    $db->update('users', ['progress' => null], ['id' => $user->getId()]);
+}
+
+function sendInstallmentsForNextNDays(User $user, DatabaseManager $db, ?string $mssg_id_to_edit = null): void
+{
+    $installments = $db->query("
+        select i.*, l.name as loan_name
+        from installments i
+        join loans l on i.loan_id = l.id
+        where
+            l.user_id = " . $user->getId() . " and
+            i.due_date between curdate() and date_add(curdate(), interval 30 day)
+        ")->fetchAll();
+
+    if ($installments) {
+        if (!$mssg_id_to_edit) {
+            $temp_mssg = sendLoadingMessage($user->getid(), 'در حال دریافت اطلاعات وام‌ها ...');
+            if ($temp_mssg) $mssg_id_to_edit = $temp_mssg['result']['message_id'];
+            else exit;
+        }
+
+        $keyboard = [[[
+            'text' => 'لیست کامل وام‌ها',
+            'callback_data' => json_encode(['loans_list' => null])
+        ]]];
+
+        $text = '';
+        foreach ($installments as $installment) {
+            $text .= "\n" .
+                $installment['loan_name'] . ': ' .
+                beautifulNumber($installment['amount']) . ' در ' .
+                beautifulNumber(JalaliDate::fromGregorianString($installment['due_date'])->format(), null);
+        }
+
+        sendToTelegram('editMessageText', [
+            'chat_id' => $user->getid(),
+            'message_id' => $mssg_id_to_edit,
+            'text' => $text,
+            'parse_mode' => 'MarkdownV2',
+            'reply_markup' => ['inline_keyboard' => $keyboard]
+        ]);
+    } else {
+        sendAllLoans($user, $db, null, $mssg_id_to_edit, $user->getDetailedLoan());
     }
 
     $db->update('users', ['progress' => null], ['id' => $user->getId()]);
