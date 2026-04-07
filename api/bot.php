@@ -867,10 +867,16 @@ function handleLoansCallback(User $user, array $callback_query, array $data, arr
     switch ($query_key) {
         case 'loans_list':
 
+            $inplace = $query_data[$query_key]['inplace'] ?? false;
             $response = sendToTelegram('sendMessage', $data);
             if ($response) {
-                sendToTelegram('deleteMessage', ['chat_id' => $user->getId(), 'message_id' => $response['result']['message_id']]);
-                sendAllLoans($user, $db, null, $message['message_id'], $user->getDetailedLoan());
+                if ($inplace) {
+                    sendToTelegram('deleteMessage', ['chat_id' => $user->getId(), 'message_id' => $response['result']['message_id']]);
+                    sendAllLoans($user, $db, null, $message['message_id'], $user->getDetailedLoan());
+                } else {
+                    sendAllLoans($user, $db, null, $response['result']['message_id'], $user->getDetailedLoan());
+                    sendToTelegram('deleteMessage', ['chat_id' => $user->getId(), 'message_id' => $message['message_id']]);
+                }
             }
             break;
 
@@ -3074,7 +3080,7 @@ function createLoanDetailKeyboard(array $loan): array
     }
 
     if ($keyboard_row) $keyboard[] = $keyboard_row;
-    $keyboard[] = [['text' => 'برگشت به لیست وام‌ها', 'callback_data' => json_encode(['loans_list' => null])]];
+    $keyboard[] = [['text' => 'لیست وام‌ها', 'callback_data' => json_encode(['loans_list' => null])]];
 
     return $keyboard;
 
