@@ -1173,30 +1173,6 @@
         return `${y}/${String(m).padStart(2, '0')}/${String(d).padStart(2, '0')}`;
     }
 
-    function calculateAlertDate(dueDateStr, offsetDays) {
-        // Convert Persian input to English digits for calculation
-        dueDateStr = toEnglishDigits(dueDateStr);
-        const parts = dueDateStr.split('/').map(Number);
-        if (parts.length !== 3) return dueDateStr;
-        let y = parts[0], m = parts[1], d = parts[2];
-        let daysToSubtract = parseInt(offsetDays) || 0;
-        // Subtract days one by one (safe for Jalali calendar)
-        while (daysToSubtract > 0) {
-            d--;
-            if (d < 1) {
-                m--;
-                if (m < 1) {
-                    m = 12;
-                    y--;
-                }
-                // Determine max days in previous month
-                d = (m <= 6) ? 31 : (m <= 11) ? 30 : 29;
-            }
-            daysToSubtract--;
-        }
-        return `${y}/${String(m).padStart(2, '0')}/${String(d).padStart(2, '0')}`;
-    }
-
     const viewMain = document.getElementById('view-main');
     const viewInst = document.getElementById('view-installments');
     const stepGen = document.getElementById('step-generator');
@@ -1446,13 +1422,10 @@
             alert_offset: Number(alertOffsetVal) || 0
         };
 
-        const alertOffset = currentData.alert_offset;
         const optimizedInstallments = finalInstallments.map(inst => {
-            const alertDate = calculateAlertDate(inst.due_date, alertOffset);
             let clean = {
                 due_date: inst.due_date,
                 amount: inst.amount,
-                alert_date: alertDate,
                 is_paid: inst.is_paid,
             };
             // Only send ID if it exists (for edits)

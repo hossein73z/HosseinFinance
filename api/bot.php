@@ -907,12 +907,6 @@ function handleLoansCallback(User $user, array $callback_query, array $data, arr
 #[NoReturn]
 function handleLoansWebAppData(User $user, array $data, array $message, DatabaseManager $db): void
 {
-    /*
-     * TODO: Add Triggers to automatically calculate `alert_date` column:
-     *  `after insert` trigger for installments and
-     *  `after update` trigger for loans table
-     */
-
     $web_app_data = json_decode($message['web_app_data']['data'], true);
     // Add new loan and installments
     if (isset($web_app_data['loan']) &&
@@ -937,14 +931,12 @@ function handleLoansWebAppData(User $user, array $data, array $message, Database
                 try {
 
                     $due_date = JalaliDate::fromString($inst['due_date'])->toGregorian();
-                    $alert_date = JalaliDate::fromString($inst['alert_date'])->toGregorian();
                     $db->create(
                         table: 'installments',
                         data: [
                             'loan_id' => $loan_id,
                             'amount' => $inst['amount'],
                             'due_date' => $due_date->format('Y-m-d'),
-                            'alert_date' => $alert_date->format('Y-m-d'),
                             'is_paid' => $inst['is_paid']
                         ]);
                     $count++;
@@ -1002,7 +994,6 @@ function handleLoansWebAppData(User $user, array $data, array $message, Database
             foreach ($new_insts as &$new_inst) {
                 $new_inst['loan_id'] = $web_app_data['id'];
                 $new_inst['due_date'] = JalaliDate::fromString($new_inst['due_date'])->toGregorian()->format('Y-m-d');
-                $new_inst['alert_date'] = JalaliDate::fromString($new_inst['alert_date'])->toGregorian()->format('Y-m-d');
             }
 
             // Update the Existing installments, based on their IDs or dates
