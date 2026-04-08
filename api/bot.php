@@ -377,13 +377,16 @@ function backButton(User $user, DatabaseManager $db, int|string|null $parent_btn
     );
     $current_btn = Button::fromDbRow($current_level);
 
-    if ($progress && sizeof($progress[array_key_first($progress)]) > 1) {
-        $current_progress = &$progress[array_key_first($progress)];
-        // Delete the last level
-        array_pop($current_progress);
-        // Clear the current last level
-        $current_progress[array_key_last($current_progress)] = null;
-        normalButtonHandler($user->setProgress($progress), $current_btn, $db);
+    if ($progress) {
+        if (sizeof($progress[array_key_first($progress)]) > 1) {
+            $current_progress = &$progress[array_key_first($progress)];
+            // Delete the last level
+            array_pop($current_progress);
+            // Clear the current last level
+            $current_progress[array_key_last($current_progress)] = null;
+            normalButtonHandler($user->setProgress($progress), $current_btn, $db);
+        } else
+            normalButtonHandler($user->setProgress(null), $current_btn, $db);
     } else {
         // If user is at level 1 of a progress or has no
         // progress at all Redirect them back to the parent level.
