@@ -168,6 +168,12 @@ function handleCallbackQuery(array $callback_query, DatabaseManager $db): void
             case'inplace_inst_pay_toggle':
                 inplaceInstallmentPaymentToggle($user, $callback_query, $message, $db);
 
+            case'insts_for_n_days':
+                $has_insts = sendInstallmentsForNextNDays($user, $db, mssg_id_to_edit: $message['message_id']);
+                if (!$has_insts)
+                    sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id'], 'text' => 'هیچ قسطی در ۳۰ روز آینده ندارید!']);
+                break;
+
             case 'edit_fav':
             case 'new_fav_type':
             case 'new_fav_name':
@@ -848,7 +854,8 @@ function level_2(
             $loan = getLoanWithInstallments(user_id: $user->getId(), db: $db, jalali: true, loan_id: $command_data);
             if ($loan) sendLoanDetail($loan, $data, $response['result']['message_id']);
         }
-        sendInstallmentsForNextNDays($user, $db);
+        if (!sendInstallmentsForNextNDays($user, $db))
+            sendAllLoans($user, $db, null, $response['result']['message_id'], $user->getDetailedLoan());
     }
 
     exit;
@@ -1193,9 +1200,13 @@ function sendAllLoans(User $user, DatabaseManager $db, ?string $initial_mssg_id 
         }
 
         $keyboard = [[[
-            'text' => $summerized ? 'نمایش جزئیات وام‌ها' : 'پنهان کردن جزئیات',
+            'text' => $summerized ? 'نمایش وام‌ها با جزئیات' : 'پنهان کردن جزئیات',
             'callback_data' => json_encode(['detailed_loans' => !$summerized])
         ]]];
+        $keyboard[] = [[
+            'text' => 'اقساط ۳۰ روز آینده',
+            'callback_data' => json_encode(['insts_for_n_days' => 30])
+        ]];
         $keyboard_row = [];
         $btn_in_row = 3;
         foreach ($loans as $loan) {
@@ -1225,7 +1236,7 @@ function sendAllLoans(User $user, DatabaseManager $db, ?string $initial_mssg_id 
     $db->update('users', ['progress' => null], ['id' => $user->getId()]);
 }
 
-function sendInstallmentsForNextNDays(User $user, DatabaseManager $db, ?string $mssg_id_to_edit = null): void
+function sendInstallmentsForNextNDays(User $user, DatabaseManager $db, int $n = 30, ?string $mssg_id_to_edit = null): bool
 {
     $installments = $db->query("
         select i.*, l.name as loan_name
@@ -1233,7 +1244,8 @@ function sendInstallmentsForNextNDays(User $user, DatabaseManager $db, ?string $
         join loans l on i.loan_id = l.id
         where
             l.user_id = " . $user->getId() . " and
-            i.due_date between curdate() and date_add(curdate(), interval 30 day)
+            i.due_date between curdate() and date_add(curdate(), interval $n day)
+        order by i.due_date asc
         ")->fetchAll();
 
     if ($installments) {
@@ -1248,7 +1260,7 @@ function sendInstallmentsForNextNDays(User $user, DatabaseManager $db, ?string $
             'callback_data' => json_encode(['loans_list' => null])
         ]]];
 
-        $text = '';
+        $text = 'اقساط پرداخت نشده‌ی ' . beautifulNumber($n, null) . ' روز آینده' . "\n";
         foreach ($installments as $installment) {
             $text .= "\n" .
                 $installment['loan_name'] . ': ' .
@@ -1263,11 +1275,9 @@ function sendInstallmentsForNextNDays(User $user, DatabaseManager $db, ?string $
             'parse_mode' => 'MarkdownV2',
             'reply_markup' => ['inline_keyboard' => $keyboard]
         ]);
-    } else {
-        sendAllLoans($user, $db, null, $mssg_id_to_edit, $user->getDetailedLoan());
-    }
-
-    $db->update('users', ['progress' => null], ['id' => $user->getId()]);
+        return true;
+    } else
+        return false;
 }
 
 #[NoReturn]
