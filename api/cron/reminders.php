@@ -25,11 +25,6 @@ try {
         port: getenv('DB_PORT') ?: '3306'
     );
 
-    // Send triggered notification to admins
-    $admins = $db->read('users', ['is_admin' => true]);
-    foreach ($admins as $admin)
-        sendToTelegram('sendMessage', ['chat_id' => $admin['id'], 'text' => 'Crown Triggered!']);
-
     $installments = $db->query("
         select
             i.*,
@@ -43,8 +38,6 @@ try {
             curdate() between i.alert_date and i.due_date;
     ")->fetchAll();
     if ($installments) foreach ($installments as $installment) {
-
-        echo "\n$installment[loan_name]\n";
 
         $due_date = JalaliDate::fromGregorianString($installment['due_date']);
         $remaining_days = $due_date->diffInDays(JalaliDate::fromGregorian());
