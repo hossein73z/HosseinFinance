@@ -874,17 +874,9 @@ function handleLoansCallback(User $user, array $callback_query, array $data, arr
     switch ($query_key) {
         case 'loans_list':
 
-            $inplace = $query_data[$query_key]['inplace'] ?? false;
+            sendAllLoans($user, $db, null, $message['message_id'], $user->getDetailedLoan());
             $response = sendToTelegram('sendMessage', $data);
-            if ($response) {
-                if ($inplace) {
-                    sendToTelegram('deleteMessage', ['chat_id' => $user->getId(), 'message_id' => $response['result']['message_id']]);
-                    sendAllLoans($user, $db, null, $message['message_id'], $user->getDetailedLoan());
-                } else {
-                    sendAllLoans($user, $db, null, $response['result']['message_id'], $user->getDetailedLoan());
-                    sendToTelegram('deleteMessage', ['chat_id' => $user->getId(), 'message_id' => $message['message_id']]);
-                }
-            }
+            if ($response) sendToTelegram('deleteMessage', ['chat_id' => $user->getId(), 'message_id' => $response['result']['message_id']]);
             break;
 
         case 'detailed_loans':
@@ -897,27 +889,19 @@ function handleLoansCallback(User $user, array $callback_query, array $data, arr
             $loan = getLoanWithInstallments(user_id: $user->getId(), db: $db, jalali: true, loan_id: $query_data[$query_key]);
             if ($loan) {
                 // HACK: The edit button might not stick on Telegram
-                $db->update(
-                    table: 'users',
-                    data: ['progress' => json_encode(['view_loan' => ['loan_id' => $loan['id']]])],
-                    conditions: ['id' => $user->getId()]
-                );
 
-                $inplace = $query_data[$query_key]['inplace'] ?? false;
-
-                $data['text'] = "/loan_$loan[id]\n";
-                $data['text'] .= 'جزئیات وام «' . $loan['name'] . '»';
+                $data['text'] = 'جزئیات وام «' . $loan['name'] . '»';
                 array_unshift($data['reply_markup']['keyboard'], [createWebAppBtn('✏ ویرایش وام «' . $loan['name'] . '»', '/assets/loan.html', ['data' => base64_encode(json_encode($loan))])]);
-                $response = sendToTelegram('sendMessage', $data);
 
+                $response = sendToTelegram('sendMessage', $data);
                 if ($response) {
-                    if ($inplace) {
-                        sendToTelegram('deleteMessage', ['chat_id' => $data['chat_id'], 'message_id' => $response['result']['message_id']]);
-                        sendLoanDetail($loan, $data, $message['message_id']);
-                    } else {
-                        sendToTelegram('deleteMessage', ['chat_id' => $data['chat_id'], 'message_id' => $message['message_id']]);
-                        sendLoanDetail($loan, $data, $response['result']['message_id']);
-                    }
+                    $db->update(
+                        table: 'users',
+                        data: ['progress' => json_encode(['view_loan' => ['loan_id' => $loan['id']]])],
+                        conditions: ['id' => $user->getId()]
+                    );
+                    sendToTelegram('deleteMessage', ['chat_id' => $data['chat_id'], 'message_id' => $response['result']['message_id']]);
+                    sendLoanDetail($loan, $data, $message['message_id']);
                 }
             }
             break;
@@ -1188,8 +1172,9 @@ function handleLoansTextMessage(User $user, array $data, array $message, Databas
 
 function sendAllLoans(User $user, DatabaseManager $db, ?string $initial_mssg_id = null, ?string $mssg_id_to_edit = null, bool $summerized = true): void
 {
-    // HACK: If telegram won't remove bottom keyboard when the
-    //  message creating it deletes, remove usage of $initial_mssg_id everywhere
+    // HACK: If telegram doesn't remove bottom keyboard when the message
+    //  creating it gets deleted, remove usage of $initial_mssg_id everywhere
+
     $loans = getLoanWithInstallments(user_id: $user->getId(), db: $db, jalali: true);
 
     if ($loans) {
