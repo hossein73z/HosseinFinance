@@ -2836,11 +2836,15 @@ function getLoanWithInstallments(int|string $user_id, DatabaseManager $db, bool 
     } else {
         $loans = $query->fetchAll();
         if ($loans) foreach ($loans as &$loan) $loan = prepareLoan($loan, $jalali);
-        usort($loans, function ($a, $b) {
-            if ($a['next_payment'] == null) return 1;
-            elseif ($b['next_payment'] == null) return -1;
-            else return $a['next_payment']->diff(new DateTime())->days <=> $b['next_payment']->diff(new DateTime())->days;
-        });
+        try {
+            usort($loans, function ($a, $b) {
+                if ($a['next_payment'] == null) return 1;
+                elseif ($b['next_payment'] == null) return -1;
+                else return $a['next_payment']->diff(new DateTime())->days <=> $b['next_payment']->diff(new DateTime())->days;
+            });
+        } catch (Exception $e) {
+            error_log('Error sorting loans: ' . $e->getMessage());
+        }
         return $loans;
     }
 }
