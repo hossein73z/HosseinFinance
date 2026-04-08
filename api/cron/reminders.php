@@ -48,9 +48,10 @@ try {
 
         $due_date = JalaliDate::fromGregorianString($installment['due_date']);
         $remaining_days = $due_date->diffInDays(JalaliDate::fromGregorian());
+        $remaining_days_str = $remaining_days ? ($remaining_days == 1 ? 'فردا' : $remaining_days . ' روز دیگر') : 'امروز';
 
         $text = 'یادآور پرداخت قسط وام «' . $installment['loan_name'] . '»' . "\n";
-        $text .= "\n" . 'سررسید: ' . beautifulNumber($due_date->format() . ' (' . $remaining_days . ' روز دیگر' . ')', null);
+        $text .= "\n" . 'سررسید: ' . beautifulNumber($due_date->format() . ' (' . $remaining_days_str . ')', null);
         $text .= "\n" . 'مبلغ: ' . beautifulNumber($installment['amount']);
 
         $reply_markup = ['inline_keyboard' => [[
