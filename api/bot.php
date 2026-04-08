@@ -1248,7 +1248,7 @@ function sendInstallmentsForNextNDays(User $user, DatabaseManager $db, int $n = 
             'callback_data' => json_encode(['loans_list' => null])
         ]]];
 
-        $text = 'اقساط پرداخت نشده‌ی ' . beautifulNumber($n, null) . ' روز آینده' . "\n";
+        $text = 'اقساط ' . beautifulNumber($n, null) . ' روز آینده' . "\n";
         foreach ($installments as $installment) {
             $text .= "\n" .
                 $installment['loan_name'] . ': ' .
@@ -3035,7 +3035,10 @@ function createLoansView(array $loans, ?string $loans_mssg_id = null, ?string $i
 
         if (isset($loan['next_payment'])) {
             $remaining_days = $loan['next_payment']->diff((new DateTime())->modify('-5 seconds'))->days;
-            $next_payment_text = beautifulNumber($remaining_days . ' روز دیگر در ' . JalaliDate::fromGregorianObject($loan['next_payment'])->format(), null);
+            $next_payment_text =
+                $remaining_days == 0 ? 'امروز' :
+                    ($remaining_days == 1 ? 'فردا' :
+                        $remaining_days . ' روز دیگر در ' . JalaliDate::fromGregorianObject($loan['next_payment'])->format());
 
         } else $next_payment_text = 'پایان یافته';
 
@@ -3044,11 +3047,11 @@ function createLoansView(array $loans, ?string $loans_mssg_id = null, ?string $i
                 "\n‏      │  " .
                 "\n‏      ┤─ " . 'مبلغ وام: ' . beautifulNumber($loan['total_amount']) .
                 "\n‏      ┤─ " . 'تاریخ دریافت: ' . beautifulNumber($loan['received_date'], null) .
-                "\n‏      ┤─ " . 'قسط بعدی: ' . $next_payment_text;
+                "\n‏      ┤─ " . 'قسط بعدی: ' . beautifulNumber($next_payment_text, null);
 
             $detail .= $installments_detail . "\n";
         } else
-            $detail = ': ' . $next_payment_text . "\n" . $summerized_insts_text . "\n";
+            $detail = ': ' . beautifulNumber($next_payment_text, null) . "\n" . $summerized_insts_text . "\n";
 
         $text .= $loan_name . markdownScape($detail);
     }
