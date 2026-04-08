@@ -2797,8 +2797,9 @@ function getLoanWithInstallments(int|string $user_id, DatabaseManager $db, bool 
                 $due_date = DateTime::createFromFormat('Y-m-d', $installment['due_date']);
 
                 // Create `is_due` and `is_paid` boolean values
-                $is_due = boolval((new DateTime())->modify('-1 seconds')->diff($due_date)->invert);
                 $is_paid = boolval($installment['is_paid']);
+                // NOTE: Today installments won't be marked as due so it won't be dismissed as next payment
+                $is_due = boolval((new DateTime())->modify('-5 seconds')->diff($due_date)->invert);
 
                 // Calculate and add remaining days to next payment
                 if ($loan['next_payment'] === null && !$is_due && !$is_paid)
@@ -2983,7 +2984,7 @@ function createHoldingDetailText(
  *  -- Each loan must have all related installments
  *     under `installments` column.
  *  -- All dates (loans' received date and installments' due
- *     and alert date) must be in Jalali object.
+ *     and alert date) must be in Jalali string.
  *  -- Installments must be sorted ascending by their due date.
  *  -- Installments must have 'is_due' bool value.
  */
@@ -3000,12 +3001,19 @@ function createLoansView(array $loans, ?string $loans_mssg_id = null, ?string $i
             $summerized_insts_text = '‏';
             foreach ($installments as $installment) {
 
-                if ($summerized && $installment['is_paid']) $summerized_insts_text .= "🟢";
-                if ($summerized && !$installment['is_paid']) $summerized_insts_text .= $installment['is_due'] ? "🔴" : "⚪";
+                $due_date = JalaliDate::fromString($installment['due_date']);
+                $due_today = $due_date->diffInDays(JalaliDate::fromGregorian()) == 0;
 
-                $due_year = JalaliDate::fromString($installment['due_date'])->jy;
-                if (!$summerized && $installment['is_paid']) $insts_per_year[$due_year][] = "🟢";
-                if (!$summerized && !$installment['is_paid']) $insts_per_year[$due_year][] = $installment['is_due'] ? "🔴" : "⚪";
+                if ($summerized) {
+                    if ($installment['is_paid']) $summerized_insts_text .= "🟢";
+                    elseif ($installment['is_due']) $summerized_insts_text .= "🔴";
+                    else $summerized_insts_text .= $due_today ? "🟡" : "⚪";
+                } else {
+                    $due_year = $due_date->jy;
+                    if ($installment['is_paid']) $insts_per_year[$due_year][] = "🟢";
+                    elseif ($installment['is_due']) $insts_per_year[$due_year][] = "🔴";
+                    else $insts_per_year[$due_year][] = $due_today ? "🟡" : "⚪";
+                }
             }
 
             $last_year = array_key_last($insts_per_year);
@@ -3026,7 +3034,7 @@ function createLoansView(array $loans, ?string $loans_mssg_id = null, ?string $i
         $loan_name = "\n‏" . "\-* [" . beautifulNumber($loan['name'], null) . "]($deep_link)*";
 
         if (isset($loan['next_payment'])) {
-            $remaining_days = $loan['next_payment']->diff((new DateTime())->modify('-2 seconds'))->days;
+            $remaining_days = $loan['next_payment']->diff((new DateTime())->modify('-5 seconds'))->days;
             $next_payment_text = beautifulNumber($remaining_days . ' روز دیگر در ' . JalaliDate::fromGregorianObject($loan['next_payment'])->format(), null);
 
         } else $next_payment_text = 'پایان یافته';
@@ -3069,10 +3077,12 @@ function createLoanDetailText(array $loan, ?string $markdown = null, ?string $ms
         $installments_text = '';
         foreach ($installments as $i => $installment) {
 
+            $due_today = JalaliDate::fromString($installment['due_date'])->diffInDays(JalaliDate::fromGregorian()) == 0;
+
             // Create payment status emoji
             if ($installment['is_paid']) $payment_emoji = "🟢";
             elseif ($installment['is_due']) $payment_emoji = "🔴";
-            else $payment_emoji = "⚪";
+            else $payment_emoji = $due_today ? "🟡" : "⚪";
 
             // Create installment text
             $inst_num = beautifulNumber(intval($i) + 1, null);
@@ -3119,12 +3129,14 @@ function createLoanDetailKeyboard(array $loan): array
     $keyboard_row = [];
     $btn_in_row = 3;
     foreach ($loan['installments'] as $installment) {
-        $due_date = JalaliDate::fromString($installment['due_date'])->format();
+
+        $due_today = JalaliDate::fromString($installment['due_date'])->diffInDays(JalaliDate::fromGregorian()) == 0;
+
         if ($installment['is_paid']) $payment_icon = '🟢';
         elseif ($installment['is_due']) $payment_icon = '🔴';
-        else $payment_icon = '⚪';
+        else $payment_icon = $due_today ? "🟡" : "⚪";
         $keyboard_row[] = [
-            'text' => $payment_icon . ' ' . beautifulNumber($due_date, null),
+            'text' => $payment_icon . ' ' . beautifulNumber($installment['due_date'], null),
             'callback_data' => json_encode(['inplace_inst_pay_toggle' => $installment['id']])
         ];
 
