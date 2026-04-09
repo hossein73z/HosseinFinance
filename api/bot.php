@@ -1249,8 +1249,15 @@ function sendInstallmentsForNextNDays(User $user, DatabaseManager $db, int $n = 
 
         $text = 'اقساط ' . beautifulNumber($n, null) . ' روز آینده' . "\n";
         foreach ($installments as $installment) {
+
+            $due_date = JalaliDate::fromGregorianString($installment['due_date']);
+            $due_today = $due_date->diffInDays(JalaliDate::fromGregorian()) == 0;
+
+            if ($installment['is_paid']) $payment_emoji = "🟢";
+            else $payment_emoji = $due_today ? "🟡" : "⚪";
+
             $text .= "\n" .
-                $installment['loan_name'] . ': ' .
+                $payment_emoji . ' ' . $installment['loan_name'] . ': ' .
                 beautifulNumber($installment['amount']) . ' در ' .
                 beautifulNumber(JalaliDate::fromGregorianString($installment['due_date'])->format(), null);
         }
