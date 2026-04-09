@@ -2790,7 +2790,7 @@ function getLoanWithInstallments(int|string $user_id, DatabaseManager $db, bool 
         if ($jalali) $loan['received_date'] = JalaliDate::fromGregorianString($loan['received_date'])->format();
 
         if ($loan['installments']) {
-            $loan['next_payment'] = null;
+            $loan['next_installment'] = null;
             $loan['insts_summary']['paid_count'] = 0;
             $loan['insts_summary']['overdue_count'] = 0;
             $loan['insts_summary']['remaining_count'] = 0;
@@ -2807,10 +2807,6 @@ function getLoanWithInstallments(int|string $user_id, DatabaseManager $db, bool 
                 // NOTE: Today installments won't be marked as due so it won't be dismissed as next payment
                 $is_due = boolval((new DateTime())->modify('-5 seconds')->diff($due_date)->invert);
 
-                // Calculate and add remaining days to next payment
-                if ($loan['next_payment'] === null && !$is_due && !$is_paid)
-                    $loan['next_payment'] = $due_date;
-
                 // Initialize installments' summary
                 if ($is_paid) $summary_key_word = 'paid';
                 elseif ($is_due) $summary_key_word = 'overdue';
@@ -2823,6 +2819,13 @@ function getLoanWithInstallments(int|string $user_id, DatabaseManager $db, bool 
                 // Add `is_due` and `is_paid` to the installment
                 $installment['is_due'] = $is_due;
                 $installment['is_paid'] = $is_paid;
+
+                // Store next installment
+                // NOTE: Due date is stored as Gregorian object
+                if ($loan['next_installment'] === null && !$is_due && !$is_paid) {
+                    $loan['next_installment'] = $installment;
+                    $loan['next_installment']['due_date'] = $due_date;
+                }
 
                 // Change dates to Jalali string
                 if ($jalali) {
@@ -2843,9 +2846,13 @@ function getLoanWithInstallments(int|string $user_id, DatabaseManager $db, bool 
         if ($loans) foreach ($loans as &$loan) $loan = prepareLoan($loan, $jalali);
         try {
             usort($loans, function ($a, $b) {
-                if ($a['next_payment'] == null) return 1;
-                elseif ($b['next_payment'] == null) return -1;
-                else return $a['next_payment']->diff(new DateTime())->days <=> $b['next_payment']->diff(new DateTime())->days;
+                if ($a['next_installment'] == null) return 1;
+                elseif ($b['next_installment'] == null) return -1;
+                else {
+                    $a_due = $a['next_installment']['due_date'];
+                    $b_due = $b['next_installment']['due_date'];
+                    return $a_due->diff(new DateTime())->days <=> $b_due->diff(new DateTime())->days;
+                }
             });
         } catch (Exception $e) {
             error_log('Error sorting loans: ' . $e->getMessage());
@@ -3039,12 +3046,13 @@ function createLoansView(array $loans, ?string $loans_mssg_id = null, ?string $i
         $deep_link = "https://ble.ir/" . BOT_ID . "?start=showLoan_loanId{$loan['id']}" . ($loans_mssg_id ? "_loansMssgId" . $loans_mssg_id : '') . ($initial_mssg_id ? "_initMssgId" . $initial_mssg_id : '');
         $loan_name = "\n‏" . "\-* [" . beautifulNumber($loan['name'], null) . "]($deep_link)*";
 
-        if (isset($loan['next_payment'])) {
-            $remaining_days = $loan['next_payment']->diff((new DateTime())->modify('-5 seconds'))->days;
+        if (isset($loan['next_installment'])) {
+            $next_due_date = $loan['next_installment']['due_date'];
+            $remaining_days = $next_due_date->diff((new DateTime())->modify('-5 seconds'))->days;
             $next_payment_text =
                 $remaining_days == 0 ? 'امروز' :
                     ($remaining_days == 1 ? 'فردا' :
-                        $remaining_days . ' روز دیگر در ' . JalaliDate::fromGregorianObject($loan['next_payment'])->format());
+                        $remaining_days . ' روز دیگر در ' . JalaliDate::fromGregorianObject($next_due_date)->format());
 
         } else $next_payment_text = 'پایان یافته';
 
