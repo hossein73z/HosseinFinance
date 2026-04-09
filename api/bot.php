@@ -279,7 +279,7 @@ function specialButtonHandler(User $user, Button $pressed_button, DatabaseManage
     if ($pressed_button->getId() === "s1") cancelButton($user, $db);
     if ($pressed_button->getId() === "s2") sendAllFavorites($user, $db);
     if ($pressed_button->getId() === "s4") sendSelectBaseCurrencyMessage($user, $db);
-    if ($pressed_button->getId() === "s5") sendDBInformation($user, $db);
+    if ($pressed_button->getId() === "s5") sendDBInformation($user);
 
     exit;
 }
@@ -1748,7 +1748,36 @@ function setBaseCurrency(User $user, array $callback_query, array $message, Data
 }
 
 #[NoReturn]
-function sendDBInformation(User $user, DatabaseManager $db): void
+function sendSelectBaseCurrencyMessage(User $user, DatabaseManager $db): void
+{
+    $base_currencies = $db->read(
+        table: 'assets',
+        conditions: ['asset_type' => 'ارزهای آزاد'],
+        selectColumns: 'name',
+    );
+
+    if ($base_currencies) {
+
+        $base_currencies = array_column($base_currencies, 'name');
+
+        $keyboard = [];
+        foreach ($base_currencies as $base_currency)
+            if ($base_currency != $user->getBaseCurrency())
+                $keyboard[] = [['text' => $base_currency, 'callback_data' => json_encode(['set_base_currency' => $base_currency])]];
+
+        $data = [
+            'reply_markup' => ['inline_keyboard' => $keyboard],
+            'text' => 'ارز پایه کنونی شما: ' . $user->getBaseCurrency() . "\n" . 'شما می‌توانید از طریق دکمه‌های شیشه‌ای زیرو ارز پایه‌ی خود را تغییر دهید.',
+            'chat_id' => $user->getid()
+        ];
+
+        sendToTelegram('sendMessage', $data);
+    }
+    exit;
+}
+
+#[NoReturn]
+function sendDBInformation(User $user): void
 {
     $data = [
         'text' =>
