@@ -3047,21 +3047,22 @@ function createLoansView(array $loans, ?string $loans_mssg_id = null, ?string $i
         $loan_name = "\n‏" . "\-* [" . beautifulNumber($loan['name'], null) . "]($deep_link)*";
 
         if (isset($loan['next_installment'])) {
-            $next_due_date = $loan['next_installment']['due_date'];
+            $next_installment = $loan['next_installment'];
+            $next_due_date = $next_installment['due_date'];
             $remaining_days = $next_due_date->diff((new DateTime())->modify('-5 seconds'))->days;
             $next_payment_text =
-                $remaining_days == 0 ? 'امروز' :
-                    ($remaining_days == 1 ? 'فردا' :
-                        $remaining_days . ' روز دیگر در ' . JalaliDate::fromGregorianObject($next_due_date)->format());
+                $remaining_days == 0 ? beautifulNumber($next_installment['amount']) . ' ریال برای ' . 'امروز' :
+                    ($remaining_days == 1 ? beautifulNumber($next_installment['amount']) . ' ریال برای ' . 'فردا' :
+                        beautifulNumber($next_installment['amount']) . ' ریال در ' . JalaliDate::fromGregorianObject($next_due_date)->format()) . ' (' . $remaining_days . ' روز دیگر)';
 
         } else $next_payment_text = 'پایان یافته';
 
         if (!$summerized) {
             $detail =
-                "\n‏      │  " .
-                "\n‏      ┤─ " . 'مبلغ وام: ' . beautifulNumber($loan['total_amount']) .
-                "\n‏      ┤─ " . 'تاریخ دریافت: ' . beautifulNumber($loan['received_date'], null) .
-                "\n‏      ┤─ " . 'قسط بعدی: ' . beautifulNumber($next_payment_text, null);
+                "\n‏   │  " .
+                "\n‏   ┤─ " . 'مبلغ وام: ' . beautifulNumber($loan['total_amount']) .
+                "\n‏   ┤─ " . 'تاریخ دریافت: ' . beautifulNumber($loan['received_date'], null) .
+                "\n‏   ┤─ " . 'قسط بعدی: ' . beautifulNumber($next_payment_text, null);
 
             $detail .= $installments_detail . "\n";
         } else
