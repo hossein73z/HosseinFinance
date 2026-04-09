@@ -857,8 +857,7 @@ function level_2(
             $loan = getLoanWithInstallments(user_id: $user->getId(), db: $db, jalali: true, loan_id: $command_data);
             if ($loan) sendLoanDetail($loan, $data, $response['result']['message_id']);
         }
-        if (!sendInstallmentsForNextNDays($user, $db))
-            sendAllLoans($user, $db, null, $response['result']['message_id'], $user->getDetailedLoan());
+        sendAllLoans($user, $db, null, $response['result']['message_id'], $user->getDetailedLoan());
     }
 
     exit;
@@ -1188,7 +1187,7 @@ function sendAllLoans(User $user, DatabaseManager $db, ?string $initial_mssg_id 
         }
 
         $keyboard = [[[
-            'text' => $summerized ? 'نمایش وام‌ها با جزئیات' : 'پنهان کردن جزئیات',
+            'text' => $summerized ? 'نمایش توضیحات وام‌ها' : 'پنهان کردن توضیحات وام‌ها',
             'callback_data' => json_encode(['detailed_loans' => !$summerized])
         ]]];
         $keyboard[] = [[
