@@ -281,6 +281,7 @@ function specialButtonHandler(User $user, Button $pressed_button, DatabaseManage
     if ($pressed_button->getId() === "s2") sendAllFavorites($user, $db);
     if ($pressed_button->getId() === "s4") sendSelectBaseCurrencyMessage($user, $db);
     if ($pressed_button->getId() === "s5") sendDBInformation($user);
+    if ($pressed_button->getId() === "s6") sendHostInformation($user);
 
     exit;
 }
@@ -1719,10 +1720,26 @@ function sendDBInformation(User $user): void
 {
     $data = [
         'text' =>
-            'host: ' /**/ . DB_HOST . "\n" .
-            'db: ' /****/ . DB_NAME . "\n" .
-            'user: ' /**/ . DB_USER . "\n" .
-            'port: ' /**/ . DB_PORT . "\n",
+            '*HOST*: ' . DB_HOST . "\n" .
+            '*NAME*: ' . DB_NAME . "\n" .
+            '*USER*: ' . DB_USER . "\n" .
+            '*PORT*: ' . DB_PORT . "\n",
+        'chat_id' => $user->getid()
+    ];
+
+    sendToTelegram('sendMessage', $data);
+    exit;
+}
+
+#[NoReturn]
+function sendHostInformation(User $user): void
+{
+    $data = [
+        'text' =>
+            '*Host Name*: ' /****/ . markdownScape(gethostname()) . "\n" .
+            '*OS Info*: ' /******/ . markdownScape(php_uname()) . "\n" .
+            '*IP*: ' /***********/ . markdownScape($_SERVER['SERVER_ADDR']) . "\n" .
+            '*PHP Version*: ' /**/ . markdownScape(phpinfo()) . "\n",
         'chat_id' => $user->getid()
     ];
 
