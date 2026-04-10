@@ -175,8 +175,9 @@ function handleCallbackQuery(array $callback_query, DatabaseManager $db): void
                 break;
 
             case 'edit_fav':
-            case 'new_fav_type':
-            case 'new_fav_name':
+            case 'mng_fav_del':
+            case 'mng_fav_add':
+            case 'mng_fav_type':
             case 'del_fav':
             case 'conf_del_fav':
             case 'set_live':
@@ -297,6 +298,7 @@ function normalButtonHandler(User $user, Button $pressed_button, DatabaseManager
     if ($pressed_button->getId() == 9) level_9(user: $user, db: $db, level_button: $pressed_button);
     if ($pressed_button->getId() == 10) level_10(user: $user, db: $db, level_button: $pressed_button);
     if ($pressed_button->getId() == 11) level_11(user: $user, db: $db, level_button: $pressed_button);
+//    if ($pressed_button->getId() == 12) level_12(user: $user, db: $db, level_button: $pressed_button);
 
     // Default Actions for normal button
     $response = sendToTelegram('sendMessage', [
@@ -1420,96 +1422,67 @@ function handlePricesCallback(User $user, array $callback_query, array $message,
         // Show menu to add/remove a favorite asset
         case 'edit_fav':
 
-            $action = $query_data['edit_fav'];
+            $data['text'] = 'یکی از دسته‌بندی‌های زیر را انتخاب کنید:';
+            $data['reply_markup']['inline_keyboard'] = [[
+                ['text' => '🔙 برگشت 🔙', 'callback_data' => json_encode(['show_favorites' => null])]
+            ]];
 
-            // Show main menu for editing favorites
-            if ($action === null) {
-
-                $data['text'] = 'عملیات مورد نظر را انتخاب کنید:';
-                $data['reply_markup']['inline_keyboard'] = [
-                    [['text' => 'حذف', 'callback_data' => json_encode(['edit_fav' => 'remove'])]],
-                    [['text' => 'افزودن', 'callback_data' => json_encode(['edit_fav' => 'add'])]],
-                    [['text' => '🔙 برگشت 🔙', 'callback_data' => json_encode(['show_favorites' => null])]],
-                ];
-                setLiveMessage($user->getId(), false, $message['message_id'], $db);
-            }
-
-            // Show list of asset types for adding new asset
-            if ($action === 'add') {
-
-                $data['text'] = 'یکی از دسته‌بندی‌های زیر را انتخاب کنید:';
-                $data['reply_markup']['inline_keyboard'] = [[
-                    ['text' => '🔙 برگشت 🔙', 'callback_data' => json_encode(['edit_fav' => null])],
-                    ['text' => '❌ لغو ❌', 'callback_data' => json_encode(['show_favorites' => null])]
-                ]];
-
-                foreach ($asset_types as $asset_type) {
-                    array_unshift(
-                        $data['reply_markup']['inline_keyboard'],
-                        [['text' => beautifulNumber($asset_type, null), 'callback_data' => json_encode(['new_fav_type' => $asset_type])]]
-                    );
-                }
-            }
-
-            // Show list of favorites to choose for deletion
-            if ($action === 'remove') {
-
-                $favorites = $db->read(
-                    table: 'favorites f',
-                    conditions: ['f.user_id' => $user->getId()],
-                    selectColumns: 'a.*, f.id as fav_id',
-                    join: 'JOIN assets a ON a.name=f.asset_name', // Join is required for sorting the based on asset type
-                    orderBy: ['asset_type' => 'ASC']
+            foreach ($asset_types as $asset_type) {
+                array_unshift(
+                    $data['reply_markup']['inline_keyboard'],
+                    [['text' => beautifulNumber($asset_type, null), 'callback_data' => json_encode(['mng_fav_type' => $asset_type])]]
                 );
-                $data['reply_markup']['inline_keyboard'] = [[
-                    ['text' => '🔙 برگشت 🔙', 'callback_data' => json_encode(['edit_fav' => null])],
-                    ['text' => '❌ لغو ❌', 'callback_data' => json_encode(['show_favorites' => null])]
-                ]];
-                if ($favorites) {
-
-                    $data['text'] = 'کدام گزینه را می‌خواهید حذف کنید؟';
-
-                    foreach ($favorites as $favorite) {
-                        array_unshift(
-                            $data['reply_markup']['inline_keyboard'],
-                            [['text' => beautifulNumber($favorite['name'], null), 'callback_data' => json_encode(['del_fav' => $favorite['fav_id']])]]
-                        );
-                    }
-                } else {
-                    sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id'], 'text' => 'لیست علاقه‌مندی‌های شما خالی‌ست!']);
-                    exit;
-                }
             }
 
             sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
             sendToTelegram('editMessageText', $data);
             exit;
 
-        // Show list of assets in a specific type for user to add to their favorites
-        case 'new_fav_type':
+        // Add/Remove assets to/from user's favorites
+        case 'mng_fav_type':
+        case 'mng_fav_add':
+        case 'mng_fav_del':
 
             $data['reply_markup']['inline_keyboard'] = [[
-                ['text' => '🔙 برگشت 🔙', 'callback_data' => json_encode(['edit_fav' => 'add'])],
-                ['text' => '❌ لغو ❌', 'callback_data' => json_encode(['show_favorites' => null])]
+                ['text' => '🔙 برگشت 🔙', 'callback_data' => json_encode(['edit_fav' => null])],
+                ['text' => '🔚 پایان 🔚', 'callback_data' => json_encode(['show_favorites' => null])]
             ]];
 
+            if ($query_key != 'mng_fav_type') {
+                try {
+                    $asset_type = array_key_first($query_data[$query_key]);
+                    $asset_name = $query_data[$query_key][$asset_type];
+                    if ($query_key == 'mng_fav_add') $db->create('favorites', ['user_id' => $user->getId(), 'asset_name' => $asset_name]);
+                    if ($query_key == 'mng_fav_del') $db->delete('favorites', ['user_id' => $user->getId(), 'asset_name' => $asset_name], true);
+                } catch (Exception $e) {
+                    error_log('Error adding new favorite: ' . $e->getMessage());
+                    exit;
+                }
+            } else $asset_type = $query_data['mng_fav_type'];
+
             // Read assets excluding the ones already in user's list of favorites
-            $assets = $db->query(
-                "select a.* from assets a " .
-                "left join favorites f on f.asset_name = a.name where " . // Join favorites to filter out existing ones
-                "a.asset_type = '$query_data[new_fav_type]' and" . ///////// Get assets with the received type
-                "(f.user_id is null or" . /////////////////////////////////// Include assets which are not in favorites table
-                " f.user_id!=" . $user->getId() . ")" ////////////////////// Exclude assets which are already in user's list
+            $assets = $db->query("
+                select
+                    a.*, CASE WHEN f.user_id IS NULL THEN 0 ELSE 1 END AS in_favorites
+                from assets a 
+                left join favorites f
+                    on f.asset_name = a.name
+                    AND f.user_id = " . $user->getId() . "
+                where
+                    a.asset_type = '$asset_type'"
             )->fetchAll();
 
             if ($assets) {
                 $data['text'] = 'گزینه‌ی مد نظر خود را از لیست زیر انتخاب کنید:';
 
-                foreach ($assets as $asset)
+                foreach ($assets as $asset) {
+                    $asset_name = ($asset['in_favorites'] ? '☑ ' : '☐ ') . beautifulNumber($asset['name'], null);
+                    $callback_data = json_encode([($asset['in_favorites'] ? 'mng_fav_del' : 'mng_fav_add') => [$asset_type => $asset['name']]]);
                     array_unshift(
                         $data['reply_markup']['inline_keyboard'],
-                        [['text' => beautifulNumber($asset['name'], null), 'callback_data' => json_encode(['new_fav_name' => $asset['name']])]]
+                        [['text' => $asset_name, 'callback_data' => $callback_data]]
                     );
+                }
 
             } else $data['text'] = 'دسته‌بندی مورد نظر خالی‌ست!';
 
@@ -1518,7 +1491,7 @@ function handlePricesCallback(User $user, array $callback_query, array $message,
             exit;
 
         // Add new favorite to the table and send the favorites message to the user
-        case 'new_fav_name':
+        case 'new_fav_name': # Old Approach
 
             $asset_name = $query_data['new_fav_name'];
             try {
@@ -1532,41 +1505,6 @@ function handlePricesCallback(User $user, array $callback_query, array $message,
                 $data['text'] = '✅ «' . beautifulNumber($asset_name, null) . '» به لیست علاقه‌مندی‌های شما افزوده شد!';
             } catch (Exception $e) {
                 error_log('Error adding new favorite: ' . $e->getMessage());
-                $data['text'] = '❌ خطای پایگاه داده!';
-            }
-
-            sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
-            sendToTelegram('editMessageText', $data);
-            sendAllFavorites($user, $db);
-
-        // Show confirmation message for deleting a favorite
-        case 'del_fav':
-
-            $favorite_id = $query_data['del_fav'];
-
-            $data['text'] = 'آیا از حذف اطمینان دارید؟';
-            $data['reply_markup']['inline_keyboard'] = [[
-                ['text' => 'لغو', 'callback_data' => json_encode(['show_favorites' => null])],
-                ['text' => 'تایید', 'callback_data' => json_encode(['conf_del_fav' => $favorite_id])],
-            ]];
-
-            sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
-            sendToTelegram('editMessageText', $data);
-            exit;
-
-        // Delete favorite from the database and send the favorites message to the user
-        case 'conf_del_fav':
-
-            $favorite_id = $query_data['conf_del_fav'];
-            try {
-                $db->delete(
-                    table: 'favorites',
-                    conditions: ['id' => $favorite_id],
-                    resetAutoIncrement: true
-                );
-                $data['text'] = '✅ حذف موفقیت آمیز بود!';
-            } catch (Exception $e) {
-                error_log('Error deleting a favorite: ' . $e->getMessage());
                 $data['text'] = '❌ خطای پایگاه داده!';
             }
 
@@ -2567,6 +2505,172 @@ function sendAllTransactions(User $user, DatabaseManager $db): void
     sendToTelegram('sendMessage', $data);
     exit;
 }
+
+// ==========================================
+//          LEVEL 10: Add New Account
+// ==========================================
+
+//#[NoReturn]
+//function level_10(
+//    User            $user,
+//    DatabaseManager $db,
+//    ?Button         $level_button = null,
+//    ?array          $message = null,
+//    ?array          $callback_query = null
+//): void
+//{
+//    // Initialize button object if null is given
+//    $level_button = $level_button ?? Button::fromDbRow($db->read('buttons', ['id' => 10], true));
+//
+//    // Create keyboards
+//    $keyboard = createKeyboardsArray(parent_btn_id: $level_button->getId(), admin: $user->isAdmin(), db: $db);
+//
+//    $data = [
+//        'chat_id' => $user->getid(),
+//        'text' => $level_button->getText(),
+//        'reply_markup' => [
+//            'keyboard' => $keyboard,
+//            'resize_keyboard' => true,
+//            'is_persistent' => true,
+//            'input_field_placeholder' => $level_button->getText()
+//        ]
+//    ];
+//
+//    if ($callback_query) handleAddAccountsCallback($user, $message);
+//
+//    addAccountProgress($user, $data, $message, $db);
+//}
+//
+//#[NoReturn]
+//function handleAddAccountsCallback(User $user, array $message): void
+//{
+//    $data = [
+//        'chat_id' => $user->getid(),
+//        'message_id' => $message['message_id'],
+//        'text' => 'این پیام منقضی شده است.'];
+//
+//    sendToTelegram('editMessageText', $data);
+//    exit;
+//}
+//
+//#[NoReturn]
+//function addAccountProgress(User $user, array $data, ?array $message, DatabaseManager $db): void
+//{
+//    /**
+//     * Required fields for new account: user_id, type and name.
+//     *
+//     * If any of the three values are not presented, asks for it,
+//     * Otherwise adds the account to the database.
+//     */
+//
+//    $progress = $user->getProgress();
+//    if (!$progress || !isset($progress['add_account'])) {
+//        // Starting adding account process
+//        $progress = ['add_account' => ['type' => null]];
+//        $db->update('users', ['last_btn' => 10, 'progress' => json_encode($progress)], ['id' => $user->getId()]);
+//        askForAccountType($user->setProgress($progress), $data, $db);
+//
+//    } else {
+//        /*
+//         * Each `if works with this principle:
+//         *  $message == null -> asks for certain information.
+//         *  $message != null -> saves the received information
+//         */
+//        if (!isset($progress['add_account']['type'])) {
+//            if (!$message) askForAccountType($user, $data, $db);
+//            $progress['add_account']['type'] = $message['text'];
+//            addAccountProgress($user->setProgress($progress), $data, null, $db);
+//        }
+//        if (!isset($progress['add_account']['name'])) {
+//            if (!$message) askForAccountName($user, $data, $db);
+//            $progress['add_account']['name'] = $message['text'];
+//            addAccountProgress($user->setProgress($progress), $data, null, $db);
+//        }
+//        if (!isset($progress['add_account']['starting_balance'])) {
+//            if (!$message) askForAccountStartingBalance($user, $data, $db);
+//            $amount = cleanAndValidateNumber($message['text']);
+//            if ($amount === null)
+//                askForAccountStartingBalance($user, $data, $db, 'پیام نامفهوم بود. لطفاً موجودی را تنها با استفاده از ارقام وارد کنید!');
+//            $progress['add_account']['starting_balance'] = $amount;
+//            addAccountProgress($user->setProgress($progress), $data, null, $db);
+//        }
+//    }
+//
+//    // Add the account if all the required values are presented
+//    addAccount($user, [
+//        'user_id' => $user->getId(),
+//        'type' => $progress['add_account']['type'],
+//        'name' => $progress['add_account']['name'],
+//        'starting_balance' => $progress['add_account']['starting_balance'],
+//        'current_balance' => $progress['add_account']['starting_balance']
+//    ], $data, $db);
+//}
+//
+//#[NoReturn]
+//function askForAccountType(User $user, array $data, DatabaseManager $db): void
+//{
+//    $data['text'] = 'نوع حساب را وارد کنید' . "\n" . 'مثال: بانک، نقد، شخص';
+//    $response = sendToTelegram('sendMessage', $data);
+//    if ($response) {
+//        $progress = ['add_account' => ['type' => null]];
+//        $db->update(
+//            'users',
+//            ['progress' => json_encode($progress)],
+//            ['id' => $user->getId()]);
+//    }
+//    exit;
+//}
+//
+//#[NoReturn]
+//function askForAccountName(User $user, array $data, DatabaseManager $db): void
+//{
+//    $data['text'] = 'نام حساب را وارد کنید' . "\n" . 'مثال: سپه، ملی، کیف‌پول، علی‌رضا';
+//    $response = sendToTelegram('sendMessage', $data);
+//    if ($response) {
+//        $progress = $user->getProgress();
+//        $progress['add_account']['name'] = null;
+//        $db->update(
+//            'users',
+//            ['progress' => json_encode($progress)],
+//            ['id' => $user->getId()]);
+//    }
+//    exit;
+//}
+//
+//#[NoReturn]
+//function askForAccountStartingBalance(User $user, array $data, DatabaseManager $db, ?string $text = null): void
+//{
+//    $data['text'] = $text ?? 'موجودی کنونی حساب را وارد کنید';
+//    $response = sendToTelegram('sendMessage', $data);
+//    if ($response) {
+//        $progress = $user->getProgress();
+//        $progress['add_account']['starting_balance'] = null;
+//        $db->update(
+//            'users',
+//            ['progress' => json_encode($progress)],
+//            ['id' => $user->getId()]);
+//    }
+//    exit;
+//}
+//
+//#[NoReturn]
+//function addAccount(User $user, array $account, array $data, DatabaseManager $db): void
+//{
+//    try {
+//        $db->create('accounts', $account);
+//        $data['text'] = '✅ حساب جدید با موفقیت ثبت شد.';
+//
+//    } catch (PDOException $e) {
+//        error_log('Error: ' . json_encode($e->errorInfo, JSON_PRETTY_PRINT));
+//        $data['text'] = '❌ خطای پایگاه داده در ثبت دارایی: ' . $e->errorInfo[2];
+//    }
+//
+//    // Send success/failure message
+//    sendToTelegram('sendMessage', $data);
+//
+//    // Redirect user to view all accounts
+//    level_9($user, $db);
+//}
 
 // ==========================================
 //          LEVEL S3: EMPTY LEVEL

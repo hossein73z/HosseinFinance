@@ -110,10 +110,10 @@ function createFavoritesInlineKeyboard(
             [['text' => 'توقف نمایش زنده ⏸', 'callback_data' => json_encode(['set_live' => false])]] :
             [['text' => 'نمایش زنده قیمت‌ها ▶', 'callback_data' => json_encode(['set_live' => true])]],
         [['text' => 'افزودن هشدار قیمت', 'callback_data' => json_encode(['fav_alert' => null])]],
-        [['text' => 'ویرایش لیست', 'callback_data' => json_encode(['edit_fav' => null])]]
+        [['text' => 'حذف / اضافه', 'callback_data' => json_encode(['edit_fav' => null])]]
     ];
     else $inline_keyboard = [
-        [['text' => 'ویرایش لیست', 'callback_data' => json_encode(['edit_fav' => null])]]
+        [['text' => 'حذف / اضافه', 'callback_data' => json_encode(['edit_fav' => null])]]
     ];
 
     return $inline_keyboard;
