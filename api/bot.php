@@ -1738,10 +1738,15 @@ function sendHostInformation(User $user): void
 {
     $data = [
         'text' =>
-            '*Host Name*: ' /****/ . markdownScape(gethostname()) . "\n" .
-            '*OS Info*: ' /******/ . markdownScape(php_uname()) . "\n" .
-            '*IP*: ' /***********/ . markdownScape($_SERVER['SERVER_ADDR']) . "\n" .
-            '*PHP Version*: ' /**/ . markdownScape(phpinfo()) . "\n",
+            '*Host Name*: ' . markdownScape(gethostname()) . "\n" .
+            '*IP*: ' . markdownScape($_SERVER['SERVER_ADDR']) . "\n" .
+            '*PHP Version*: ' . markdownScape(phpinfo()) . "\n" .
+            '*OS Info*: ' . "\n" .
+            '    OS Name: ' . markdownScape(php_uname('s')) . "\n" .
+            '    Host Name: ' . markdownScape(php_uname('n')) . "\n" .
+            '    Kernel Release: ' . markdownScape(php_uname('r')) . "\n" .
+            '    OS Version: ' . markdownScape(php_uname('v')) . "\n" .
+            '    Architecture: ' . markdownScape(php_uname('m')) . "\n",
         'chat_id' => $user->getid()
     ];
 
