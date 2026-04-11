@@ -315,7 +315,7 @@ function normalButtonHandler(User $user, Button $pressed_button, DatabaseManager
 
     if ($response) $db->update(
         table: 'users',
-        data: ['last_btn' => $pressed_button->getId()],
+        data: ['last_btn' => $pressed_button->getId(), 'progress' => null],
         conditions: ['id' => $user->getId()]
     );
 
@@ -382,8 +382,12 @@ function backButton(User $user, DatabaseManager $db, int|string|null $parent_btn
     $current_btn = Button::fromDbRow($current_level);
 
     if ($progress) {
-        if (sizeof($progress[array_key_first($progress)]) > 1) {
-            $current_progress = &$progress[array_key_first($progress)];
+
+        if (array_key_exists('data', $progress)) $progress_data = &$progress['data'];
+        else $progress_data = &$progress;
+
+        if (sizeof($progress_data) > 1) {
+            $current_progress = &$progress_data[array_key_first($progress_data)];
             // Delete the last level
             array_pop($current_progress);
             // Clear the current last level
@@ -392,8 +396,7 @@ function backButton(User $user, DatabaseManager $db, int|string|null $parent_btn
         } else
             normalButtonHandler($user->setProgress(null), $current_btn, $db);
     } else {
-        // If user is at level 1 of a progress or has no
-        // progress at all Redirect them back to the parent level.
+        // If user has no progress redirect back to the parent level.
         $parent_level = $db->read(
             table: 'buttons',
             conditions: ['id' => $current_btn->getBelongTo()],
@@ -1095,14 +1098,13 @@ function handleLoansTextMessage(User $user, array $data, array $message, Databas
         $loan = getLoanWithInstallments(user_id: $user->getId(), db: $db, jalali: true, loan_id: $matches[1]);
 
         if ($loan) {
+            // TODO: Send a temporary message to show edit button
             /** else: Send default Irrelevance message */
 
             // Delete redundant messages
             if (isset($matches[5]))
                 sendToTelegram('deleteMessage', ['chat_id' => $user->getid(), 'message_id' => $matches[5]]); ######## Initial
             sendToTelegram('deleteMessage', ['chat_id' => $user->getid(), 'message_id' => $message['message_id']]); # Deep-Link
-            // HACK: Uncomment this if edit button won't stick
-            // sendToTelegram('deleteMessage', ['chat_id' => $user->getid(), 'message_id' => $matches[3]]); ################# Loans
 
             $db->update(
                 table: 'users',
@@ -2720,7 +2722,7 @@ function empty_level(
     $progress_data = $progress['data'];
 
     ##########################
-    #    Progress handler    #
+    ##   Progress handler   ##
     ##########################
 
     if (array_key_first($progress_data) == 'set_alert') {
