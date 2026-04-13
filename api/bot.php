@@ -1098,7 +1098,6 @@ function handleLoansTextMessage(User $user, array $data, array $message, Databas
         $loan = getLoanWithInstallments(user_id: $user->getId(), db: $db, jalali: true, loan_id: $matches[1]);
 
         if ($loan) {
-            // TODO: Send a temporary message to show edit button
             /** else: Send default Irrelevance message */
 
             // Delete redundant messages
@@ -1106,12 +1105,18 @@ function handleLoansTextMessage(User $user, array $data, array $message, Databas
                 sendToTelegram('deleteMessage', ['chat_id' => $user->getid(), 'message_id' => $matches[5]]); ######## Initial
             sendToTelegram('deleteMessage', ['chat_id' => $user->getid(), 'message_id' => $message['message_id']]); # Deep-Link
 
-            $db->update(
-                table: 'users',
-                data: ['progress' => json_encode(['view_loan' => ['loan_id' => $loan['id']]])],
-                conditions: ['id' => $user->getId()]
-            );
-            sendLoanDetail($loan, $data, $matches[3]);
+            array_unshift($data['reply_markup']['keyboard'], [createWebAppBtn('✏ ویرایش وام «' . $loan['name'] . '»', '/assets/loan.html', ['data' => base64_encode(json_encode($loan))])]);
+
+            $response = sendToTelegram('sendMessage', $data);
+            if ($response) {
+                sendToTelegram('deleteMessage', ['chat_id' => $data['chat_id'], 'message_id' => $response['result']['message_id']]);
+                $db->update(
+                    table: 'users',
+                    data: ['progress' => json_encode(['view_loan' => ['loan_id' => $loan['id']]])],
+                    conditions: ['id' => $user->getId()]
+                );
+                sendLoanDetail($loan, $data, $matches[3]);
+            }
         }
     }
 
