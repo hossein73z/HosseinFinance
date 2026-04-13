@@ -2200,15 +2200,17 @@ function handleAddAccountsCallback(User $user, array $message): void
 function addAccountProgress(User $user, array $data, ?array $message, DatabaseManager $db): void
 {
     /**
-     * Required fields for new account: user_id, type and name.
+     * Required fields for new account:
+     *  - name
+     *  - type
      *
-     * If any of the three values are not presented, asks for it,
-     * Otherwise adds the account to the database.
+     * If any of these values are not presented, asks for it,
+     * otherwise adds the account to the database.
      */
 
     $progress = $user->getProgress();
     if (!$progress || !isset($progress['add_account'])) {
-        // Starting adding account process
+        // Start adding account process
         $progress = ['add_account' => ['type' => null]];
         $db->update('users', ['last_btn' => 10, 'progress' => json_encode($progress)], ['id' => $user->getId()]);
         askForAccountType($user->setProgress($progress), $data, $db);
@@ -2536,11 +2538,11 @@ function sendAllTransactions(User $user, DatabaseManager $db): void
 }
 
 // ==========================================
-//          LEVEL 10: Add New Account
+//          LEVEL 12: Add New Account
 // ==========================================
 
 //#[NoReturn]
-//function level_10(
+//function level_12(
 //    User            $user,
 //    DatabaseManager $db,
 //    ?Button         $level_button = null,
@@ -2565,13 +2567,13 @@ function sendAllTransactions(User $user, DatabaseManager $db): void
 //        ]
 //    ];
 //
-//    if ($callback_query) handleAddAccountsCallback($user, $message);
+//    if ($callback_query) handleAddTransactionCallback($user, $message);
 //
-//    addAccountProgress($user, $data, $message, $db);
+//    addTransactionProgress($user, $data, $message, $db);
 //}
 //
 //#[NoReturn]
-//function handleAddAccountsCallback(User $user, array $message): void
+//function handleAddTransactionCallback(User $user, array $message): void
 //{
 //    $data = [
 //        'chat_id' => $user->getid(),
@@ -2583,21 +2585,27 @@ function sendAllTransactions(User $user, DatabaseManager $db): void
 //}
 //
 //#[NoReturn]
-//function addAccountProgress(User $user, array $data, ?array $message, DatabaseManager $db): void
+//function addTransactionProgress(User $user, array $data, ?array $message, DatabaseManager $db): void
 //{
 //    /**
-//     * Required fields for new account: user_id, type and name.
+//     * Required fields for new transaction:
+//     *  - account_id
+//     *  - amount
+//     *  - category
+//     *  - type
+//     *  - date
+//     *  - time
 //     *
-//     * If any of the three values are not presented, asks for it,
-//     * Otherwise adds the account to the database.
+//     * If any of these values are not presented, asks for it,
+//     * otherwise adds the transaction to the database.
 //     */
 //
 //    $progress = $user->getProgress();
-//    if (!$progress || !isset($progress['add_account'])) {
-//        // Starting adding account process
-//        $progress = ['add_account' => ['type' => null]];
-//        $db->update('users', ['last_btn' => 10, 'progress' => json_encode($progress)], ['id' => $user->getId()]);
-//        askForAccountType($user->setProgress($progress), $data, $db);
+//    if (!$progress || !isset($progress['add_transaction'])) {
+//        // Start adding transaction process
+//        $progress = ['add_transaction' => ['account_id' => null]];
+//        $db->update('users', ['last_btn' => 12, 'progress' => json_encode($progress)], ['id' => $user->getId()]);
+//        askForTransactionAccount($user->setProgress($progress), $data, $db);
 //
 //    } else {
 //        /*
@@ -2636,9 +2644,16 @@ function sendAllTransactions(User $user, DatabaseManager $db): void
 //}
 //
 //#[NoReturn]
-//function askForAccountType(User $user, array $data, DatabaseManager $db): void
+//function askForTransactionAccount(User $user, array $data, DatabaseManager $db): void
 //{
-//    $data['text'] = 'نوع حساب را وارد کنید' . "\n" . 'مثال: بانک، نقد، شخص';
+//    $accounts = $db->read('accounts', ['user_id' => $user->getId()]);
+//    if ($accounts) {
+//        $data['text'] = 'حساب مبدا/مقصد را از دکمه‌های پایین انتخاب کنید:';
+//        foreach ($accounts as $account) {
+//
+//        }
+//    } else backButton($user, $db);
+//
 //    $response = sendToTelegram('sendMessage', $data);
 //    if ($response) {
 //        $progress = ['add_account' => ['type' => null]];
