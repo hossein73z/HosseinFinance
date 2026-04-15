@@ -900,7 +900,17 @@ function handleLoansCallback(User $user, array $callback_query, array $data, arr
                 // HACK: The edit button might not stick on Telegram
 
                 $data['text'] = 'جزئیات وام «' . $loan['name'] . '»';
-                array_unshift($data['reply_markup']['keyboard'], [createWebAppBtn('✏ ویرایش وام «' . $loan['name'] . '»', '/assets/loan.html', ['data' => base64_encode(json_encode($loan))])]);
+
+                $simplified_loan = $loan;
+                unset($simplified_loan['user_id']);
+                unset($simplified_loan['created_at']);
+                foreach ($simplified_loan['installments'] as &$installment) {
+                    unset($installment['loan_id']);
+                    unset($installment['alert_date']);
+                    unset($installment['is_due']);
+                    unset($installment['remaining_days']);
+                }
+                array_unshift($data['reply_markup']['keyboard'], [createWebAppBtn('✏ ویرایش وام «' . $loan['name'] . '»', '/assets/loan.html', ['data' => base64_encode(json_encode($simplified_loan))])]);
 
                 $response = sendToTelegram('sendMessage', $data);
                 if ($response) {
@@ -1105,7 +1115,16 @@ function handleLoansTextMessage(User $user, array $data, array $message, Databas
                 sendToTelegram('deleteMessage', ['chat_id' => $user->getid(), 'message_id' => $matches[5]]); ######## Initial
             sendToTelegram('deleteMessage', ['chat_id' => $user->getid(), 'message_id' => $message['message_id']]); # Deep-Link
 
-            array_unshift($data['reply_markup']['keyboard'], [createWebAppBtn('✏ ویرایش وام «' . $loan['name'] . '»', '/assets/loan.html', ['data' => base64_encode(json_encode($loan))])]);
+            $simplified_loan = $loan;
+            unset($simplified_loan['user_id']);
+            unset($simplified_loan['created_at']);
+            foreach ($simplified_loan['installments'] as &$installment) {
+                unset($installment['loan_id']);
+                unset($installment['alert_date']);
+                unset($installment['is_due']);
+                unset($installment['remaining_days']);
+            }
+            array_unshift($data['reply_markup']['keyboard'], [createWebAppBtn('✏ ویرایش وام «' . $loan['name'] . '»', '/assets/loan.html', ['data' => base64_encode(json_encode($simplified_loan))])]);
 
             $response = sendToTelegram('sendMessage', $data);
             if ($response) {
@@ -1168,11 +1187,20 @@ function handleLoansTextMessage(User $user, array $data, array $message, Databas
     if ($progress && key($progress) === 'view_loan') {
         $loan = getLoanWithInstallments(user_id: $user->getId(), db: $db, jalali: true, loan_id: $progress['view_loan']['loan_id']);
         if ($loan) {
+            $simplified_loan = $loan;
+            unset($simplified_loan['user_id']);
+            unset($simplified_loan['created_at']);
+            foreach ($simplified_loan['installments'] as &$installment) {
+                unset($installment['loan_id']);
+                unset($installment['alert_date']);
+                unset($installment['is_due']);
+                unset($installment['remaining_days']);
+            }
             array_unshift($data['reply_markup']['keyboard'], [
                 createWebAppBtn(
                     text: '✏ ویرایش وام «' . $loan['name'] . '»',
                     path: '/assets/loan.html',
-                    params: ['data' => base64_encode(json_encode($loan))])
+                    params: ['data' => base64_encode(json_encode($simplified_loan))])
             ]);
         }
     }
@@ -1328,7 +1356,6 @@ function payInstallmentFromCronJob(User $user, array $callback_query, array $mes
     sendToTelegram('editMessageText', ['chat_id' => $user->getId(), 'text' => $text, 'message_id' => $message['message_id']]);
     exit();
 }
-
 
 #[NoReturn]
 function inplaceInstallmentPaymentToggle(User $user, array $callback_query, array $message, DatabaseManager $db): void
