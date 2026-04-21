@@ -2996,8 +2996,8 @@ function getLoanWithInstallments(int|string $user_id, DatabaseManager $db, bool 
 
                 // Create `is_due` and `is_paid` boolean values
                 $is_paid = boolval($installment['is_paid']);
-                $remaining_days = (new DateTime())->modify('-5 seconds')->diff($due_date);
-                $is_due = boolval($remaining_days->invert);
+                $remaining_days = (new DateTime())->diff($due_date);
+                $is_due = $remaining_days->days === 0 || $remaining_days->invert;
 
                 // Initialize installments' summary
                 if ($is_paid) $summary_key_word = 'paid';
@@ -3207,13 +3207,13 @@ function createLoansView(array $loans, ?string $loans_mssg_id = null, ?string $i
 
                 if ($summerized) {
                     if ($installment['is_paid']) $summerized_insts_text .= "🟢";
-                    elseif ($installment['is_due']) $summerized_insts_text .= "🔴";
-                    else $summerized_insts_text .= $installment['remaining_days'] == 0 ? "🟡" : "⚪";
+                    elseif ($installment['is_due']) $summerized_insts_text .= $installment['remaining_days'] == 0 ? "🟡" : "🔴";
+                    else $summerized_insts_text .= "⚪";
                 } else {
                     $due_year = $due_date->jy;
                     if ($installment['is_paid']) $insts_per_year[$due_year][] = "🟢";
-                    elseif ($installment['is_due']) $insts_per_year[$due_year][] = "🔴";
-                    else $insts_per_year[$due_year][] = $installment['remaining_days'] == 0 ? "🟡" : "⚪";
+                    elseif ($installment['is_due']) $insts_per_year[$due_year][] = $installment['remaining_days'] == 0 ? "🟡" : "🔴";
+                    else $insts_per_year[$due_year][] = "⚪";
                 }
             }
 
@@ -3284,8 +3284,8 @@ function createLoanDetailText(array $loan, ?string $markdown = null, ?string $ms
 
             // Create payment status emoji
             if ($installment['is_paid']) $payment_emoji = "🟢";
-            elseif ($installment['is_due']) $payment_emoji = "🔴";
-            else $payment_emoji = $installment['remaining_days'] == 0 ? "🟡" : "⚪";
+            elseif ($installment['is_due']) $payment_emoji = $installment['remaining_days'] == 0 ? "🟡" : "🔴";
+            else $payment_emoji = "⚪";
 
             // Create installment text
             $inst_num = beautifulNumber(intval($i) + 1, null);
@@ -3334,8 +3334,8 @@ function createLoanDetailKeyboard(array $loan): array
     foreach ($loan['installments'] as $installment) {
 
         if ($installment['is_paid']) $payment_icon = '🟢';
-        elseif ($installment['is_due']) $payment_icon = '🔴';
-        else $payment_icon = $installment['remaining_days'] == 0 ? "🟡" : "⚪";
+        elseif ($installment['is_due']) $payment_icon = $installment['remaining_days'] == 0 ? "🟡" : '🔴';
+        else $payment_icon = "⚪";
 
         $keyboard_row[] = [
             'text' => $payment_icon . ' ' . beautifulNumber($installment['due_date'], null),
