@@ -901,16 +901,7 @@ function handleLoansCallback(User $user, array $callback_query, array $data, arr
 
                 $data['text'] = 'جزئیات وام «' . $loan['name'] . '»';
 
-                $simplified_loan = $loan;
-                unset($simplified_loan['user_id']);
-                unset($simplified_loan['created_at']);
-                foreach ($simplified_loan['installments'] as &$installment) {
-                    unset($installment['loan_id']);
-                    unset($installment['alert_date']);
-                    unset($installment['is_due']);
-                    unset($installment['remaining_days']);
-                }
-                array_unshift($data['reply_markup']['keyboard'], [createWebAppBtn('✏ ویرایش وام «' . $loan['name'] . '»', '/assets/loan.html', ['data' => base64_encode(json_encode($simplified_loan))])]);
+                array_unshift($data['reply_markup']['keyboard'], [createWebAppBtn('✏ ویرایش وام «' . $loan['name'] . '»', '/assets/loan.html', ['data' => base64_encode(json_encode(prepareLoanForWebApp($loan)))])]);
 
                 $response = sendToTelegram('sendMessage', $data);
                 if ($response) {
@@ -1115,16 +1106,7 @@ function handleLoansTextMessage(User $user, array $data, array $message, Databas
                 sendToTelegram('deleteMessage', ['chat_id' => $user->getid(), 'message_id' => $matches[5]]); ######## Initial
             sendToTelegram('deleteMessage', ['chat_id' => $user->getid(), 'message_id' => $message['message_id']]); # Deep-Link
 
-            $simplified_loan = $loan;
-            unset($simplified_loan['user_id']);
-            unset($simplified_loan['created_at']);
-            foreach ($simplified_loan['installments'] as &$installment) {
-                unset($installment['loan_id']);
-                unset($installment['alert_date']);
-                unset($installment['is_due']);
-                unset($installment['remaining_days']);
-            }
-            array_unshift($data['reply_markup']['keyboard'], [createWebAppBtn('✏ ویرایش وام «' . $loan['name'] . '»', '/assets/loan.html', ['data' => base64_encode(json_encode($simplified_loan))])]);
+            array_unshift($data['reply_markup']['keyboard'], [createWebAppBtn('✏ ویرایش وام «' . $loan['name'] . '»', '/assets/loan.html', ['data' => base64_encode(json_encode(prepareLoanForWebApp($loan)))])]);
 
             $response = sendToTelegram('sendMessage', $data);
             if ($response) {
@@ -1187,20 +1169,11 @@ function handleLoansTextMessage(User $user, array $data, array $message, Databas
     if ($progress && key($progress) === 'view_loan') {
         $loan = getLoanWithInstallments(user_id: $user->getId(), db: $db, jalali: true, loan_id: $progress['view_loan']['loan_id']);
         if ($loan) {
-            $simplified_loan = $loan;
-            unset($simplified_loan['user_id']);
-            unset($simplified_loan['created_at']);
-            foreach ($simplified_loan['installments'] as &$installment) {
-                unset($installment['loan_id']);
-                unset($installment['alert_date']);
-                unset($installment['is_due']);
-                unset($installment['remaining_days']);
-            }
             array_unshift($data['reply_markup']['keyboard'], [
                 createWebAppBtn(
                     text: '✏ ویرایش وام «' . $loan['name'] . '»',
                     path: '/assets/loan.html',
-                    params: ['data' => base64_encode(json_encode($simplified_loan))])
+                    params: ['data' => base64_encode(json_encode(prepareLoanForWebApp($loan)))])
             ]);
         }
     }
@@ -1209,6 +1182,20 @@ function handleLoansTextMessage(User $user, array $data, array $message, Databas
     sendToTelegram('sendMessage', $data);
     exit;
 
+}
+
+function prepareLoanForWebApp(array $loan): array
+{
+    unset($loan['user_id']);
+    unset($loan['created_at']);
+    foreach ($loan['installments'] as &$installment) {
+        unset($installment['loan_id']);
+        unset($installment['alert_date']);
+        unset($installment['is_due']);
+        unset($installment['remaining_days']);
+    }
+
+    return $loan;
 }
 
 function sendAllLoans(User $user, DatabaseManager $db, ?string $initial_mssg_id = null, ?string $mssg_id_to_edit = null, bool $summerized = true): void
