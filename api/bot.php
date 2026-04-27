@@ -194,7 +194,7 @@ function handleCallbackQuery(array $callback_query, DatabaseManager $db): void
                 managePriceAlerts($user, $callback_query, $message, $db);
 
             case 'add_mssg_transaction':
-                addTransaction($user, $callback_query, $message, $db);
+                addTransactionFromMessage($user, $callback_query, $message, $db);
 
             default:
                 choosePath(message: $message, user: $user, callback_query: $callback_query, db: $db);
@@ -262,6 +262,7 @@ function callbackHandler(User $user, array $callback_query, DatabaseManager $db)
     if ($user->getLastBtn() == 6) /***/ level_6(user: $user, db: $db, message: $message, callback_query: $callback_query);
     if ($user->getLastBtn() == 8) /***/ level_8(user: $user, db: $db, message: $message, callback_query: $callback_query);
     if ($user->getLastBtn() == 11) /**/ level_11(user: $user, db: $db, message: $message, callback_query: $callback_query);
+    if ($user->getLastBtn() == 12) /**/ level_12(user: $user, db: $db, message: $message, callback_query: $callback_query);
 
     // Fallback if not handled
     sendToTelegram('editMessageText', [
@@ -299,7 +300,7 @@ function normalButtonHandler(User $user, Button $pressed_button, DatabaseManager
     if ($pressed_button->getId() == 9) level_9(user: $user, db: $db, level_button: $pressed_button);
     if ($pressed_button->getId() == 10) level_10(user: $user, db: $db, level_button: $pressed_button);
     if ($pressed_button->getId() == 11) level_11(user: $user, db: $db, level_button: $pressed_button);
-//    if ($pressed_button->getId() == 12) level_12(user: $user, db: $db, level_button: $pressed_button);
+    if ($pressed_button->getId() == 12) level_12(user: $user, db: $db, level_button: $pressed_button);
 
     // Default Actions for normal button
     $response = sendToTelegram('sendMessage', [
@@ -333,6 +334,7 @@ function nonButtonHandler(User $user, array $message, DatabaseManager $db): void
     if ($user->getLastBtn() == '8') /***/ level_8(user: $user, db: $db, message: $message);
     if ($user->getLastBtn() == '10') /**/ level_10(user: $user, db: $db, message: $message);
     if ($user->getLastBtn() == '11') /**/ level_11(user: $user, db: $db, message: $message);
+    if ($user->getLastBtn() == '12') /**/ level_12(user: $user, db: $db, message: $message);
 
     if ($user->getLastBtn() == 's3') /**/ empty_level(user: $user, db: $db, message: $message);
 
@@ -2231,8 +2233,8 @@ function addAccountProgress(User $user, array $data, ?array $message, DatabaseMa
 
     } else {
         /*
-         * Each `if works with this principle:
-         *  $message == null -> asks for certain information.
+         * Each `if` works with this principle:
+         *  $message == null -> asks for the information.
          *  $message != null -> saves the received information
          */
         if (!isset($progress['add_account']['type'])) {
@@ -2482,7 +2484,7 @@ function extractTransactionFromText(string $text): ?array
 }
 
 #[NoReturn]
-function addTransaction(User $user, array $callback_query, array $message, DatabaseManager $db): void
+function addTransactionFromMessage(User $user, array $callback_query, array $message, DatabaseManager $db): void
 {
     if ($message) {
 //        preg_match('/^بانک: (.+?)$/um', $message['text'], $bank);
@@ -2552,102 +2554,90 @@ function sendAllTransactions(User $user, DatabaseManager $db): void
 }
 
 // ==========================================
-//          LEVEL 12: Add New Account
+//          LEVEL 12: Add New Transaction
 // ==========================================
 
-//#[NoReturn]
-//function level_12(
-//    User            $user,
-//    DatabaseManager $db,
-//    ?Button         $level_button = null,
-//    ?array          $message = null,
-//    ?array          $callback_query = null
-//): void
-//{
-//    // Initialize button object if null is given
-//    $level_button = $level_button ?? Button::fromDbRow($db->read('buttons', ['id' => 10], true));
-//
-//    // Create keyboards
-//    $keyboard = createKeyboardsArray(parent_btn_id: $level_button->getId(), admin: $user->isAdmin(), db: $db);
-//
-//    $data = [
-//        'chat_id' => $user->getid(),
-//        'text' => $level_button->getText(),
-//        'reply_markup' => [
-//            'keyboard' => $keyboard,
-//            'resize_keyboard' => true,
-//            'is_persistent' => true,
-//            'input_field_placeholder' => $level_button->getText()
-//        ]
-//    ];
-//
-//    if ($callback_query) handleAddTransactionCallback($user, $message);
-//
-//    addTransactionProgress($user, $data, $message, $db);
-//}
-//
-//#[NoReturn]
-//function handleAddTransactionCallback(User $user, array $message): void
-//{
-//    $data = [
-//        'chat_id' => $user->getid(),
-//        'message_id' => $message['message_id'],
-//        'text' => 'این پیام منقضی شده است.'];
-//
-//    sendToTelegram('editMessageText', $data);
-//    exit;
-//}
-//
-//#[NoReturn]
-//function addTransactionProgress(User $user, array $data, ?array $message, DatabaseManager $db): void
-//{
-//    /**
-//     * Required fields for new transaction:
-//     *  - account_id
-//     *  - amount
-//     *  - category
-//     *  - type
-//     *  - date
-//     *  - time
-//     *
-//     * If any of these values are not presented, asks for it,
-//     * otherwise adds the transaction to the database.
-//     */
-//
-//    $progress = $user->getProgress();
-//    if (!$progress || !isset($progress['add_transaction'])) {
-//        // Start adding transaction process
-//        $progress = ['add_transaction' => ['account_id' => null]];
-//        $db->update('users', ['last_btn' => 12, 'progress' => json_encode($progress)], ['id' => $user->getId()]);
-//        askForTransactionAccount($user->setProgress($progress), $data, $db);
-//
-//    } else {
-//        /*
-//         * Each `if works with this principle:
-//         *  $message == null -> asks for certain information.
-//         *  $message != null -> saves the received information
-//         */
-//        if (!isset($progress['add_account']['type'])) {
-//            if (!$message) askForAccountType($user, $data, $db);
-//            $progress['add_account']['type'] = $message['text'];
-//            addAccountProgress($user->setProgress($progress), $data, null, $db);
-//        }
-//        if (!isset($progress['add_account']['name'])) {
-//            if (!$message) askForAccountName($user, $data, $db);
-//            $progress['add_account']['name'] = $message['text'];
-//            addAccountProgress($user->setProgress($progress), $data, null, $db);
-//        }
-//        if (!isset($progress['add_account']['starting_balance'])) {
-//            if (!$message) askForAccountStartingBalance($user, $data, $db);
-//            $amount = cleanAndValidateNumber($message['text']);
-//            if ($amount === null)
-//                askForAccountStartingBalance($user, $data, $db, 'پیام نامفهوم بود. لطفاً موجودی را تنها با استفاده از ارقام وارد کنید!');
-//            $progress['add_account']['starting_balance'] = $amount;
-//            addAccountProgress($user->setProgress($progress), $data, null, $db);
-//        }
-//    }
-//
-//    // Add the account if all the required values are presented
+#[NoReturn]
+function level_12(
+    User            $user,
+    DatabaseManager $db,
+    ?Button         $level_button = null,
+    ?array          $message = null,
+    ?array          $callback_query = null
+): void
+{
+    // Initialize button object if null is given
+    $level_button = $level_button ?? Button::fromDbRow($db->read('buttons', ['id' => 12], true));
+
+    // Create keyboards
+    $keyboard = createKeyboardsArray(parent_btn_id: $level_button->getId(), admin: $user->isAdmin(), db: $db);
+
+    $data = [
+        'chat_id' => $user->getid(),
+        'text' => $level_button->getText(),
+        'reply_markup' => [
+            'keyboard' => $keyboard,
+            'resize_keyboard' => true,
+            'is_persistent' => true,
+            'input_field_placeholder' => $level_button->getText()
+        ]
+    ];
+
+    if ($callback_query) handleAddTransactionCallback($user, $callback_query, $message);
+
+    addTransactionProgress($user, $data, $message, $db);
+}
+
+#[NoReturn]
+function handleAddTransactionCallback(User $user, array $callback_query, array $message): void
+{
+    $data = [
+        'chat_id' => $user->getid(),
+        'message_id' => $message['message_id'],
+        'text' => 'این پیام منقضی شده است.'];
+
+    sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
+    sendToTelegram('editMessageText', $data);
+    exit;
+}
+
+#[NoReturn]
+function addTransactionProgress(User $user, array $data, ?array $message, DatabaseManager $db): void
+{
+    /**
+     * Required fields for new transaction:
+     *  - account_id
+     *  - amount
+     *  - category
+     *  - type
+     *  - date
+     *  - time
+     *
+     * If any of these values are not presented, asks for it,
+     * otherwise adds the transaction to the database.
+     */
+
+    $progress = $user->getProgress();
+    if (!$progress || !isset($progress['add_transaction'])) {
+        // Start adding transaction process
+        $progress = ['add_transaction' => ['account_id' => null]];
+        $db->update('users', ['last_btn' => 12, 'progress' => json_encode($progress)], ['id' => $user->getId()]);
+        askForTransactionAccount($user->setProgress($progress), $data, $db);
+
+    } else {
+        /*
+         * Each `if` works with this principle:
+         *  $message == null -> asks for the information.
+         *  $message != null -> saves the received information
+         */
+        if (!isset($progress['add_account']['type'])) {
+            if (!$message) askForAccountType($user, $data, $db);
+            $progress['add_account']['type'] = $message['text'];
+            addAccountProgress($user->setProgress($progress), $data, null, $db);
+        }
+    }
+
+    // Add the account if all the required values are presented
 //    addAccount($user, [
 //        'user_id' => $user->getId(),
 //        'type' => $progress['add_account']['type'],
@@ -2655,80 +2645,33 @@ function sendAllTransactions(User $user, DatabaseManager $db): void
 //        'starting_balance' => $progress['add_account']['starting_balance'],
 //        'current_balance' => $progress['add_account']['starting_balance']
 //    ], $data, $db);
-//}
-//
-//#[NoReturn]
-//function askForTransactionAccount(User $user, array $data, DatabaseManager $db): void
-//{
-//    $accounts = $db->read('accounts', ['user_id' => $user->getId()]);
-//    if ($accounts) {
-//        $data['text'] = 'حساب مبدا/مقصد را از دکمه‌های پایین انتخاب کنید:';
-//        foreach ($accounts as $account) {
-//
-//        }
-//    } else backButton($user, $db);
-//
-//    $response = sendToTelegram('sendMessage', $data);
-//    if ($response) {
-//        $progress = ['add_account' => ['type' => null]];
-//        $db->update(
-//            'users',
-//            ['progress' => json_encode($progress)],
-//            ['id' => $user->getId()]);
-//    }
-//    exit;
-//}
-//
-//#[NoReturn]
-//function askForAccountName(User $user, array $data, DatabaseManager $db): void
-//{
-//    $data['text'] = 'نام حساب را وارد کنید' . "\n" . 'مثال: سپه، ملی، کیف‌پول، علی‌رضا';
-//    $response = sendToTelegram('sendMessage', $data);
-//    if ($response) {
-//        $progress = $user->getProgress();
-//        $progress['add_account']['name'] = null;
-//        $db->update(
-//            'users',
-//            ['progress' => json_encode($progress)],
-//            ['id' => $user->getId()]);
-//    }
-//    exit;
-//}
-//
-//#[NoReturn]
-//function askForAccountStartingBalance(User $user, array $data, DatabaseManager $db, ?string $text = null): void
-//{
-//    $data['text'] = $text ?? 'موجودی کنونی حساب را وارد کنید';
-//    $response = sendToTelegram('sendMessage', $data);
-//    if ($response) {
-//        $progress = $user->getProgress();
-//        $progress['add_account']['starting_balance'] = null;
-//        $db->update(
-//            'users',
-//            ['progress' => json_encode($progress)],
-//            ['id' => $user->getId()]);
-//    }
-//    exit;
-//}
-//
-//#[NoReturn]
-//function addAccount(User $user, array $account, array $data, DatabaseManager $db): void
-//{
-//    try {
-//        $db->create('accounts', $account);
-//        $data['text'] = '✅ حساب جدید با موفقیت ثبت شد.';
-//
-//    } catch (PDOException $e) {
-//        error_log('Error: ' . json_encode($e->errorInfo, JSON_PRETTY_PRINT));
-//        $data['text'] = '❌ خطای پایگاه داده در ثبت دارایی: ' . $e->errorInfo[2];
-//    }
-//
-//    // Send success/failure message
-//    sendToTelegram('sendMessage', $data);
-//
-//    // Redirect user to view all accounts
-//    level_9($user, $db);
-//}
+}
+
+#[NoReturn]
+function askForTransactionAccount(User $user, array $data, DatabaseManager $db): void
+{
+    $accounts = $db->read('accounts', ['user_id' => $user->getId()]);
+    if ($accounts) {
+        $data['text'] = 'حساب مبدأ/مقصد را از دکمه‌های پایین انتخاب کنید:';
+        $data['reply_markup'] = ['keyboard' => &$keyboard];
+        $keyboard = [];
+        foreach ($accounts as $account) $keyboard[] = [['text' => beautifulNumber($account['name'], null)]];
+        $button = $db->read('buttons', ['id' => ['s0', 's1']]);
+        $keyboard[] = json_decode($button['s0']['attrs'], true);
+        $keyboard[] = json_decode($button['s1']['attrs'], true);
+    } else backButton($user, $db);
+
+    $response = sendToTelegram('sendMessage', $data);
+    if ($response) {
+        $progress = ['add_transaction' => ['account' => null]];
+        $db->update(
+            'users',
+            ['progress' => json_encode($progress)],
+            ['id' => $user->getId()]);
+    }
+    exit;
+}
+
 
 // ==========================================
 //          LEVEL S3: EMPTY LEVEL
