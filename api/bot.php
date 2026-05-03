@@ -387,27 +387,26 @@ function backButton(User $user, DatabaseManager $db, int|string|null $parent_btn
 
         if (array_key_exists('data', $progress)) $progress_data = &$progress['data'];
         else $progress_data = &$progress;
+        $current_progress = &$progress_data[array_key_first($progress_data)];
 
-        if (sizeof($progress_data) > 1) {
-            $current_progress = &$progress_data[array_key_first($progress_data)];
+        if (sizeof($current_progress) > 1) {
             // Delete the last level
             array_pop($current_progress);
             // Clear the current last level
             $current_progress[array_key_last($current_progress)] = null;
             normalButtonHandler($user->setProgress($progress), $current_btn, $db);
-        } else
-            normalButtonHandler($user->setProgress(null), $current_btn, $db);
-    } else {
-        // If user has no progress redirect back to the parent level.
-        $parent_level = $db->read(
-            table: 'buttons',
-            conditions: ['id' => $current_btn->getBelongTo()],
-            single: true
-        );
-
-        $last_btn = Button::fromDbRow($parent_level);
-        normalButtonHandler(user: $user->setProgress(null), pressed_button: $last_btn, db: $db);
+        }
     }
+
+    // If user has no progress (Or is at level 1) redirect back to the parent level.
+    $parent_level = $db->read(
+        table: 'buttons',
+        conditions: ['id' => $current_btn->getBelongTo()],
+        single: true
+    );
+
+    $last_btn = Button::fromDbRow($parent_level);
+    normalButtonHandler(user: $user->setProgress(null), pressed_button: $last_btn, db: $db);
 }
 
 #[NoReturn]
