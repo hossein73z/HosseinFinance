@@ -1,5 +1,3 @@
-<!-- START OF FILE loan.html -->
-
 <!DOCTYPE html>
 <html lang="fa" dir="rtl">
 <head>
@@ -7,20 +5,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>ثبت وام و اقساط</title>
 
-    <script src="https://tapi.bale.ai/miniapp.js?3"></script> <!-- HACK: Needs to be changed when using for telegram -->
-
-    <!--    <script src="https://telegram.org/js/telegram-web-app.js"></script>-->
-    <!--    <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css" rel="stylesheet"-->
-    <!--          type="text/css"/>-->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css" rel="stylesheet"
+          type="text/css"/>
 
     <style>
         :root {
-            --bg-color: #fff;
-            --secondary-bg-color: #f4f4f9;
-            --text-color: #222;
-            --hint-color: #999;
-            --button-color: #4a90e2;
-            --button-text-color: #ffffff;
+            /* Map colors to Telegram theme properties with fallbacks */
+            --bg-color: var(--tg-theme-bg-color, #fff);
+            --secondary-bg-color: var(--tg-theme-secondary-bg-color, #f4f4f9);
+            --text-color: var(--tg-theme-text-color, #222);
+            --hint-color: var(--tg-theme-hint-color, #999);
+            --button-color: var(--tg-theme-button-color, #4a90e2);
+            --button-text-color: var(--tg-theme-button-text-color, #ffffff);
             --error-color: #dc3545;
         }
 
@@ -597,9 +594,8 @@
 </div>
 
 <script>
-    // HACK: Change this for telegram
-    const bale = window.Bale.WebApp;
-    bale.expand();
+    const tg = window.Telegram.WebApp;
+    tg.expand();
 
     // --- STATE MANAGEMENT ---
     let appMode = 'add'; // 'add' or 'edit'
@@ -1080,7 +1076,7 @@
                 }
             } catch (e) {
                 console.error("Error parsing data", e);
-                // bale.showAlert("خطا در خواندن اطلاعات وام");
+                tg.showAlert("خطا در خواندن اطلاعات وام");
                 showToast("خطا در خواندن اطلاعات وام");
             }
         }
@@ -1185,7 +1181,7 @@
     btnGoToInstallments.addEventListener('click', () => {
         const dateInput = document.getElementById('received_date');
         if (!isValidJalaliDateString(toEnglishDigits(dateInput.value))) {
-            // bale.showAlert('لطفا تاریخ دریافت را صحیح وارد کنید');
+            tg.showAlert('لطفا تاریخ دریافت را صحیح وارد کنید');
             showToast('لطفا تاریخ دریافت را صحیح وارد کنید');
             return;
         }
@@ -1278,13 +1274,13 @@
         startDateVal = toEnglishDigits(startDateVal);
 
         if (!count || !periodQty || !amount) {
-            // bale.showAlert('لطفا تمام فیلدها را پر کنید');
+            tg.showAlert('لطفا تمام فیلدها را پر کنید');
             showToast('لطفا تمام فیلدها را پر کنید');
             return;
         }
 
         if (!isValidJalaliDateString(startDateVal)) {
-            // bale.showAlert('تاریخ اولین قسط معتبر نیست');
+            tg.showAlert('تاریخ اولین قسط معتبر نیست');
             showToast('تاریخ اولین قسط معتبر نیست');
             return;
         }
@@ -1331,7 +1327,7 @@
         });
 
         if (!isValid) {
-            // bale.showAlert('لطفا تاریخ‌ها و مبالغ را اصلاح کنید');
+            tg.showAlert('لطفا تاریخ‌ها و مبالغ را اصلاح کنید');
             showToast('لطفا تاریخ‌ها و مبالغ را اصلاح کنید');
             return;
         }
@@ -1344,36 +1340,25 @@
     });
 
     // --- DELETE LOGIC ---
-    // HACK: Delete confirmation must be restored
     document.getElementById('deleteBtn').addEventListener('click', function () {
-        const id = document.getElementById('loan_id').value;
-        // Specific JSON format as requested
-        const payload = {
-            delete: true,
-            id: parseInt(id)
-        };
-        bale.sendData(JSON.stringify(payload));
-        bale.close();
-
-        // bale.showPopup({
-        //     title: 'حذف وام',
-        //     message: 'آیا مطمئن هستید که می‌خواهید این وام و تمام اقساط آن را حذف کنید؟ این عملیات غیرقابل بازگشت است.',
-        //     buttons: [
-        //         {id: 'delete', type: 'destructive', text: 'حذف شود'},
-        //         {id: 'cancel', type: 'default', text: 'انصراف'}
-        //     ]
-        // }, function (btn) {
-        //     if (btn === 'delete') {
-        //         const id = document.getElementById('loan_id').value;
-        //         // Specific JSON format as requested
-        //         const payload = {
-        //             delete: true,
-        //             id: parseInt(id)
-        //         };
-        //         bale.sendData(JSON.stringify(payload));
-        //         bale.close();
-        //     }
-        // });
+        tg.showPopup({
+            title: 'حذف وام',
+            message: 'آیا مطمئن هستید که می‌خواهید این وام و تمام اقساط آن را حذف کنید؟ این عملیات غیرقابل بازگشت است.',
+            buttons: [
+                {id: 'delete', type: 'destructive', text: 'حذف شود'},
+                {id: 'cancel', type: 'default', text: 'انصراف'}
+            ]
+        }, function (btnId) {
+            if (btnId === 'delete') {
+                const id = document.getElementById('loan_id').value;
+                const payload = {
+                    delete: true,
+                    id: parseInt(id)
+                };
+                tg.sendData(JSON.stringify(payload));
+                tg.close();
+            }
+        });
     });
 
     // --- SUBMISSION & DIFF LOGIC ---
@@ -1399,7 +1384,7 @@
         e.preventDefault();
 
         if (finalInstallments.length === 0) {
-            // bale.showAlert('لطفا ابتدا اقساط را تعریف کنید');
+            tg.showAlert('لطفا ابتدا اقساط را تعریف کنید');
             showToast('لطفا ابتدا اقساط را تعریف کنید');
             return;
         }
@@ -1410,7 +1395,7 @@
         const alertOffsetVal = toEnglishDigits(document.getElementById('alert_offset').value);
 
         if (!isValidJalaliDateString(receivedDate)) {
-            // bale.showAlert('تاریخ دریافت وام معتبر نیست');
+            tg.showAlert('تاریخ دریافت وام معتبر نیست');
             showToast('تاریخ دریافت وام معتبر نیست');
             return;
         }
@@ -1456,7 +1441,7 @@
             }
 
             if (Object.keys(updates).length === 0) {
-                // bale.showAlert('تغییری داده نشده است');
+                tg.showAlert('تغییری داده نشده است');
                 showToast('تغییری داده نشده است');
                 return;
             }
@@ -1478,13 +1463,13 @@
 
         // Safety check for Telegram limits (approx 4096 bytes)
         if (jsonStr.length > 4000) {
-            // bale.showAlert('حجم داده‌ها زیاد است (' + jsonStr.length + ' بایت). لطفا تعداد اقساط را کاهش دهید.');
+            tg.showAlert('حجم داده‌ها زیاد است (' + jsonStr.length + ' بایت). لطفا تعداد اقساط را کاهش دهید.');
             showToast('حجم داده‌ها زیاد است (' + jsonStr.length + ' بایت). لطفا تعداد اقساط را کاهش دهید.');
             return;
         }
 
-        bale.sendData(jsonStr);
-        bale.close();
+        tg.sendData(jsonStr);
+        tg.close();
     });
 </script>
 </body>

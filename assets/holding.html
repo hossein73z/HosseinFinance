@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <script src="https://tapi.bale.ai/miniapp.js?3"></script> <!-- HACK: Needs to be changed when using for telegram -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <meta charset="UTF-8"/>
     <title>Test Holding Form</title>
     <meta name="viewport" content="width=device-width, initial-scale=1"/>
@@ -462,8 +462,8 @@
      *  All dates are in Jalali with 'yyyy/mm/dd' format.
      */
 
-    const bale = window.Bale.WebApp; // HACK: Changed to match Bale
-    bale.expand();
+    const tg = window.Telegram.WebApp;
+    tg.expand();
 
     /*** STATE MANAGEMENT ***/
     let appMode = 'add';
@@ -1035,7 +1035,7 @@
         if (apiUrl && apiKey) {
             fetchAssets(apiUrl, apiKey);
         } else {
-            // bale.showAlert('خطا: تنظیمات ارتباط با سرور یافت نشد (API URL/Key)');
+            tg.showAlert('خطا: تنظیمات ارتباط با سرور یافت نشد (API URL/Key)');
             showToast('خطا: تنظیمات ارتباط با سرور یافت نشد (API URL/Key)');
         }
 
@@ -1069,7 +1069,7 @@
             })
             .catch(err => {
                 console.error(err);
-                // bale.showAlert("خطا در دریافت لیست دارایی‌ها");
+                tg.showAlert("خطا در دریافت لیست دارایی‌ها");
                 showToast("خطا در دریافت لیست دارایی‌ها");
             });
     }
@@ -1189,7 +1189,7 @@
 
         const assetId = document.getElementById('asset_id').value;
         if (!assetId) {
-            // bale.showAlert("لطفا نام دارایی را انتخاب کنید");
+            // tg.showAlert("لطفا نام دارایی را انتخاب کنید");
             showToast('لطفا نام دارایی را انتخاب کنید');
             return;
         }
@@ -1201,13 +1201,13 @@
         const note = document.getElementById('note').value;
 
         if (!isValidJalaliDateString(dateVal)) {
-            // bale.showAlert("تاریخ وارد شده معتبر نیست");
+            tg.showAlert("تاریخ وارد شده معتبر نیست");
             showToast("تاریخ وارد شده معتبر نیست")
             return;
         }
 
         if (!isValidTimeString(timeVal)) {
-            // bale.showAlert("ساعت وارد شده معتبر نیست");
+            tg.showAlert("ساعت وارد شده معتبر نیست");
             showToast("ساعت وارد شده معتبر نیست")
             return;
         }
@@ -1241,7 +1241,7 @@
             if ((originalHolding.note || '') !== note) updates.note = note;
 
             if (Object.keys(updates).length === 0) {
-                // bale.showAlert("تغییری ایجاد نشده است");
+                tg.showAlert("تغییری ایجاد نشده است");
                 showToast("تغییری ایجاد نشده است");
                 return;
             }
@@ -1254,14 +1254,14 @@
         }
 
         try {
-            bale.sendData(JSON.stringify(payload));
-            bale.close();
+            tg.sendData(JSON.stringify(payload));
+            tg.close();
         } catch (e) {
             showToast(e);
         }
     });
 
-    // HACK: Delete confirmation must be restored
+    // Delete confirmation handler
     document.getElementById('deleteBtn').addEventListener('click', function () {
 
         const payload = {
@@ -1269,29 +1269,29 @@
             id: parseInt(document.getElementById('holding_id').value)
         };
         try {
-            bale.sendData(JSON.stringify(payload));
-            bale.close();
+            tg.sendData(JSON.stringify(payload));
+            tg.close();
         } catch (e) {
             showToast(e);
         }
 
-        // bale.showPopup({
-        //     title: 'حذف دارایی',
-        //     message: 'آیا مطمئن هستید که می‌خواهید این دارایی را حذف کنید؟',
-        //     buttons: [
-        //         {id: 'delete', type: 'destructive', text: 'حذف شود'},
-        //         {id: 'cancel', type: 'default', text: 'انصراف'}
-        //     ]
-        // }, function (btn) {
-        //     if (btn === 'delete') {
-        //         const payload = {
-        //             action: 'delete',
-        //             id: parseInt(document.getElementById('holding_id').value)
-        //         };
-        //         bale.sendData(JSON.stringify(payload));
-        //         bale.close();
-        //     }
-        // });
+        tg.showPopup({
+            title: 'حذف دارایی',
+            message: 'آیا مطمئن هستید که می‌خواهید این دارایی را حذف کنید؟',
+            buttons: [
+                {id: 'delete', type: 'destructive', text: 'حذف شود'},
+                {id: 'cancel', type: 'default', text: 'انصراف'}
+            ]
+        }, function (btn) {
+            if (btn === 'delete') {
+                const payload = {
+                    action: 'delete',
+                    id: parseInt(document.getElementById('holding_id').value)
+                };
+                tg.sendData(JSON.stringify(payload));
+                tg.close();
+            }
+        });
     });
 
 

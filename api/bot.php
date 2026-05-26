@@ -3074,7 +3074,7 @@ function getLoanWithInstallments(int|string $user_id, DatabaseManager $db, bool 
             $loan['insts_summary']['remaining_sum'] = 0;
             foreach ($loan['installments'] as &$installment) {
 
-                // Create `due_date` object just for calculations
+                // Create `due_date` gregorian object just for calculations
                 $due_date = DateTime::createFromFormat('Y-m-d', $installment['due_date']);
 
                 // Create `is_due` and `is_paid` boolean values
