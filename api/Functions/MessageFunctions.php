@@ -186,7 +186,7 @@ function createFavoritesText(
          *  Asset line (not-Specific asset): `"( {3}\\\-\\\- .+?: .+?\n?)+?((\n\n)|$)"`
          *  Type line: `"آخرین قیمت‌های «" . markdownScape($latest_updated_type['name']) . "» در .. .+? .... ساعت ..:.." . "\n"`
          */
-    } else $text = 'لیست علاقه‌مندی‌های شما خالیست!';
+    } else $text = markdownScape('لیست علاقه‌مندی‌های شما خالیست!');
 
     return trim($text);
 }
