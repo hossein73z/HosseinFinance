@@ -784,12 +784,12 @@ function sendHoldingDetail(array $holding, array $data, string $user_base_curren
 
     sendToTelegram('sendMessage', $data);
 
-    $temp_mssg = sendLoadingMessage($data['chat_id'], 'در حال دریافت اطلاعات به دارایی ' . $holding['asset_name'] . ' ...');
+    $temp_mssg = sendLoadingMessage($data['chat_id'], 'در حال دریافت اطلاعات دارایی ' . $holding['asset_name'] . ' ...');
     if ($temp_mssg) {
 
         $data['message_id'] = $temp_mssg['result']['message_id'];
         $data['text'] = createHoldingDetailText($holding, user_base_currency: $user_base_currency);
-        $data['parse_mode'] = 'MarkdownV2';
+//        $data['parse_mode'] = 'MarkdownV2';
         $data['reply_markup'] = ['inline_keyboard' => [[['text' => 'برگشت به لیست دارایی‌ها', 'callback_data' => json_encode(['holdings_list' => null])]]]];
 
         sendToTelegram('editMessageText', $data);
@@ -3259,7 +3259,7 @@ function createHoldingDetailText(
 
         $asset_name = beautifulNumber(markdownScape($holding['asset_name']), null);
         $holding['asset_name'] = "[$asset_name](https://t.me/" . BOT_ID . "?start=viewHolding_holdingId{$holding['id']}" . ($holding_mssg_id ? "_holdingsMssgId" . $holding_mssg_id : '') . ($initial_mssg_id ? "_initMssgId" . $initial_mssg_id : '') . ")" . '‏';
-    }
+    } else $holding['asset_name'] = beautifulNumber($holding['asset_name'], null);
 
     return $holding['asset_name'] . $tree . "\n";
 }
