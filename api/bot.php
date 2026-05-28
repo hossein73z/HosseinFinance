@@ -1448,7 +1448,7 @@ function handlePricesCallback(User $user, array $callback_query, array $message,
             foreach ($asset_types as $asset_type) {
                 array_unshift(
                     $data['reply_markup']['inline_keyboard'],
-                    [['text' => beautifulNumber($asset_type, null), 'callback_data' => json_encode(['mng_fav_type' => $asset_type])]]
+                    [['text' => beautifulNumber($asset_type, null), 'callback_data' => json_encode(['mng_fav_type' => $asset_type], JSON_UNESCAPED_UNICODE)]]
                 );
             }
 
@@ -1495,7 +1495,7 @@ function handlePricesCallback(User $user, array $callback_query, array $message,
 
                 foreach ($assets as $asset) {
                     $asset_name = ($asset['in_favorites'] ? '☑ ' : '☐ ') . beautifulNumber($asset['name'], null);
-                    $callback_data = json_encode([($asset['in_favorites'] ? 'mng_fav_del' : 'mng_fav_add') => [$asset_type => $asset['name']]]);
+                    $callback_data = json_encode([($asset['in_favorites'] ? 'mng_fav_del' : 'mng_fav_add') => [$asset_type => $asset['name']]],JSON_UNESCAPED_UNICODE);
                     array_unshift(
                         $data['reply_markup']['inline_keyboard'],
                         [['text' => $asset_name, 'callback_data' => $callback_data]]
