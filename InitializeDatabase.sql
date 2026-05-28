@@ -2,14 +2,14 @@ USE test;
 
 CREATE TABLE IF NOT EXISTS `users`
 (
-    id         INT AUTO_INCREMENT NOT NULL PRIMARY KEY,
-    first_name TEXT               NOT NULL,
-    last_name  TEXT                        DEFAULT NULL,
-    username   TEXT                        DEFAULT NULL,
-    settings   TEXT                        DEFAULT NULL,
-    progress   TEXT                        DEFAULT NULL,
-    is_admin   BOOLEAN            NOT NULL DEFAULT 0,
-    last_btn   VARCHAR(10)        NOT NULL DEFAULT '0'
+    id         BIGINT      NOT NULL PRIMARY KEY,
+    first_name TEXT        NOT NULL,
+    last_name  TEXT                 DEFAULT NULL,
+    username   TEXT                 DEFAULT NULL,
+    settings   TEXT                 DEFAULT NULL,
+    progress   TEXT                 DEFAULT NULL,
+    is_admin   BOOLEAN     NOT NULL DEFAULT 0,
+    last_btn   VARCHAR(10) NOT NULL DEFAULT '0'
 ) DEFAULT CHARSET = utf8mb4;
 
 CREATE TABLE IF NOT EXISTS `buttons`
@@ -62,7 +62,7 @@ VALUES ('ریال', '🇮🇷', 'ارزهای آزاد', 1, 'ریال', '1357-11
 CREATE TABLE IF NOT EXISTS `holdings`
 (
     id        INT AUTO_INCREMENT PRIMARY KEY,
-    user_id   INT            NOT NULL,
+    user_id   BIGINT         NOT NULL,
     asset_id  INT            NOT NULL,
     amount    NUMERIC(18, 8) NOT NULL DEFAULT 0.0,
     note      TEXT,
@@ -78,7 +78,7 @@ CREATE TABLE IF NOT EXISTS `holdings`
 CREATE TABLE IF NOT EXISTS favorites
 (
     id         INT AUTO_INCREMENT PRIMARY KEY,
-    user_id    INT          NOT NULL,
+    user_id    BIGINT       NOT NULL,
     asset_name VARCHAR(191) NOT NULL,
 
     UNIQUE KEY idx_unique_favorite (user_id, asset_name),
@@ -89,7 +89,7 @@ CREATE TABLE IF NOT EXISTS favorites
 CREATE TABLE IF NOT EXISTS `alerts`
 (
     id             BIGINT AUTO_INCREMENT PRIMARY KEY,
-    user_id        INT                         NOT NULL,
+    user_id        BIGINT                      NOT NULL,
     asset_name     VARCHAR(191)                NOT NULL UNIQUE,
     target_price   NUMERIC(18, 8)              NOT NULL,
     trigger_type   ENUM ('up', 'down', 'both') NOT NULL DEFAULT 'both',
@@ -108,7 +108,7 @@ CREATE TABLE IF NOT EXISTS `alerts`
 CREATE TABLE IF NOT EXISTS `accounts`
 (
     id               INT AUTO_INCREMENT NOT NULL PRIMARY KEY,
-    user_id          INT                NOT NULL,
+    user_id          BIGINT             NOT NULL,
     type             VARCHAR(100)       NOT NULL,
     name             VARCHAR(255)       NOT NULL,
     starting_balance NUMERIC(18, 8)     NOT NULL DEFAULT 0,
@@ -121,7 +121,7 @@ CREATE TABLE IF NOT EXISTS `accounts`
 CREATE TABLE IF NOT EXISTS `transactions`
 (
     id          BIGINT AUTO_INCREMENT PRIMARY KEY,
-    user_id     INT                                    NOT NULL,
+    user_id     BIGINT                                 NOT NULL,
     account_id  INT                                    NOT NULL,
     new_balance NUMERIC(18, 8)                         NOT NULL DEFAULT 0,
     amount      NUMERIC(18, 8)                         NOT NULL,
@@ -138,7 +138,7 @@ CREATE TABLE IF NOT EXISTS `transactions`
 CREATE TABLE IF NOT EXISTS `loans`
 (
     id            INT AUTO_INCREMENT PRIMARY KEY,
-    user_id       INT                 NOT NULL,
+    user_id       BIGINT              NOT NULL,
     name          VARCHAR(191)        NOT NULL,
     total_amount  NUMERIC(18, 8)      NOT NULL,
     received_date DATE      DEFAULT NULL,
@@ -164,7 +164,7 @@ CREATE TABLE IF NOT EXISTS `installments`
 CREATE TABLE IF NOT EXISTS `special_messages`
 (
     id         INT AUTO_INCREMENT PRIMARY KEY,
-    user_id    INT         NOT NULL,
+    user_id    BIGINT      NOT NULL,
     type       VARCHAR(10) NOT NULL,
     is_active  BOOLEAN     NOT NULL DEFAULT 0,
     message_id NUMERIC(6)  NOT NULL,
@@ -174,23 +174,23 @@ CREATE TABLE IF NOT EXISTS `special_messages`
     FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE ON UPDATE CASCADE
 ) DEFAULT CHARSET = utf8mb4;
 
-alter table users
-    auto_increment 0;
-alter table buttons
-    auto_increment 0;
-alter table assets
-    auto_increment 0;
-alter table holdings
-    auto_increment 0;
-alter table favorites
-    auto_increment 0;
-alter table alerts
-    auto_increment 0;
-alter table transactions
-    auto_increment 0;
-alter table loans
-    auto_increment 0;
-alter table installments
-    auto_increment 0;
-alter table special_messages
-    auto_increment 0;
+/*alter table users
+    auto_increment 0;*/
+/*alter table buttons
+    auto_increment 0;*/
+/*alter table assets
+    auto_increment 0;*/
+/*alter table holdings
+    auto_increment 0;*/
+/*alter table favorites
+    auto_increment 0;*/
+/*alter table alerts
+    auto_increment 0;*/
+/*alter table transactions
+    auto_increment 0;*/
+/*alter table loans
+    auto_increment 0;*/
+/*alter table installments
+    auto_increment 0;*/
+/*alter table special_messages
+    auto_increment 0;*/
