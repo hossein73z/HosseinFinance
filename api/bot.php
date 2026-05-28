@@ -3258,7 +3258,7 @@ function createHoldingDetailText(
         $tree = markdownScape($tree);
 
         $asset_name = beautifulNumber(markdownScape($holding['asset_name']), null);
-        $holding['asset_name'] = "[$asset_name](https://ble.ir/" . BOT_ID . "?start=viewHolding_holdingId{$holding['id']}" . ($holding_mssg_id ? "_holdingsMssgId" . $holding_mssg_id : '') . ($initial_mssg_id ? "_initMssgId" . $initial_mssg_id : '') . ")" . '‏';
+        $holding['asset_name'] = "[$asset_name](https://t.me/" . BOT_ID . "?start=viewHolding_holdingId{$holding['id']}" . ($holding_mssg_id ? "_holdingsMssgId" . $holding_mssg_id : '') . ($initial_mssg_id ? "_initMssgId" . $initial_mssg_id : '') . ")" . '‏';
     }
 
     return $holding['asset_name'] . $tree . "\n";
@@ -3314,7 +3314,7 @@ function createLoansView(array $loans, ?string $loans_mssg_id = null, ?string $i
             $summerized_insts_text = '';
         }
 
-        $deep_link = "https://ble.ir/" . BOT_ID . "?start=showLoan_loanId{$loan['id']}" . ($loans_mssg_id ? "_loansMssgId" . $loans_mssg_id : '') . ($initial_mssg_id ? "_initMssgId" . $initial_mssg_id : '');
+        $deep_link = "https://t.me/" . BOT_ID . "?start=showLoan_loanId{$loan['id']}" . ($loans_mssg_id ? "_loansMssgId" . $loans_mssg_id : '') . ($initial_mssg_id ? "_initMssgId" . $initial_mssg_id : '');
         $loan_name = "\n‏" . "\-* [" . beautifulNumber($loan['name'], null) . "]($deep_link)*";
 
         if (isset($loan['next_installment'])) {
@@ -3376,7 +3376,7 @@ function createLoanDetailText(array $loan, ?string $markdown = null, ?string $ms
             $amount = beautifulNumber($installment['amount']);
 
             if ($markdown) {
-                $link = "https://ble.ir/" . BOT_ID . "?start=toggleInstPayment_instId$installment[id]_mssgId$mssg_id";
+                $link = "https://t.me/" . BOT_ID . "?start=toggleInstPayment_instId$installment[id]_mssgId$mssg_id";
                 $installments_text .= "\n" . '‏' . '    ' . markdownScape($inst_num) . "\) [$payment_emoji]($link)  " . markdownScape($date) . ':  ' . markdownScape($amount);
             } else
                 $installments_text .= "\n" . '‏' . "    $inst_num) $payment_emoji  $date:  $amount";
