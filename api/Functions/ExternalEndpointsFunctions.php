@@ -33,7 +33,7 @@ function sendToTelegram(
     // 1. JSON Parsing Error
     if (json_last_error() !== JSON_ERROR_NONE) {
         // Vercel Log: Appears in "Runtime Logs"
-        error_log("Telegram JSON Error: " . json_last_error_msg());
+//        error_log("Telegram JSON Error: " . json_last_error_msg());
         error_log("Raw Response: " . $response);
         error_log("Sent Request: $method -> " . json_encode($data));
         return false;
