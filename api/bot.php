@@ -309,7 +309,7 @@ function normalButtonHandler(User $user, Button $pressed_button, DatabaseManager
         'reply_markup' => [
             'keyboard' => createKeyboardsArray($pressed_button->getId(), $user->isAdmin(), $db),
             'resize_keyboard' => true,
-            'is_persistent' => true,
+            'is_persistent' => false,
             'input_field_placeholder' => $pressed_button->getText(),
         ]
     ]);
@@ -345,7 +345,7 @@ function nonButtonHandler(User $user, array $message, DatabaseManager $db): void
         'reply_markup' => [
             'keyboard' => createKeyboardsArray($user->getLastBtn(), $user->isAdmin(), $db),
             'resize_keyboard' => true,
-            'is_persistent' => true,
+            'is_persistent' => false,
         ]
     ]);
 
@@ -441,7 +441,7 @@ function level_0(
         'reply_markup' => [
             'keyboard' => $keyboard,
             'resize_keyboard' => true,
-            'is_persistent' => true,
+            'is_persistent' => false,
             'input_field_placeholder' => $level_button->getText()
         ]
     ];
@@ -512,7 +512,7 @@ function level_1(
         'reply_markup' => [
             'keyboard' => $keyboard,
             'resize_keyboard' => true,
-            'is_persistent' => true,
+            'is_persistent' => false,
             'input_field_placeholder' => $level_button->getText()
         ]
     ];
@@ -846,7 +846,7 @@ function level_2(
         'reply_markup' => [
             'keyboard' => $keyboard,
             'resize_keyboard' => true,
-            'is_persistent' => true,
+            'is_persistent' => false,
             'input_field_placeholder' => $level_button->getText()
         ]
     ];
@@ -865,7 +865,7 @@ function level_2(
             $loan = getLoanWithInstallments(user_id: $user->getId(), db: $db, jalali: true, loan_id: $command_data);
             if ($loan) sendLoanDetail($loan, $data, $response['result']['message_id']);
         }
-        sendAllLoans($user, $db, null, $response['result']['message_id'], $user->getDetailedLoan());
+        sendAllLoans($user, $db, null, null, $user->getDetailedLoan());
     }
 
     exit;
@@ -1393,7 +1393,7 @@ function level_5(
         'reply_markup' => [
             'keyboard' => $keyboard,
             'resize_keyboard' => true,
-            'is_persistent' => true,
+            'is_persistent' => false,
             'input_field_placeholder' => $level_button->getText()
         ]
     ];
@@ -1800,7 +1800,7 @@ function level_8(
         'reply_markup' => [
             'keyboard' => $keyboard,
             'resize_keyboard' => true,
-            'is_persistent' => true,
+            'is_persistent' => false,
             'input_field_placeholder' => $level_button->getText()
         ]
     ];
@@ -2092,7 +2092,7 @@ function level_9(
         'reply_markup' => [
             'keyboard' => $keyboard,
             'resize_keyboard' => true,
-            'is_persistent' => true,
+            'is_persistent' => false,
             'input_field_placeholder' => $level_button->getText()
         ]
     ];
@@ -2189,7 +2189,7 @@ function level_10(
         'reply_markup' => [
             'keyboard' => $keyboard,
             'resize_keyboard' => true,
-            'is_persistent' => true,
+            'is_persistent' => false,
             'input_field_placeholder' => $level_button->getText()
         ]
     ];
@@ -2357,7 +2357,7 @@ function level_11(
         'reply_markup' => [
             'keyboard' => $keyboard,
             'resize_keyboard' => true,
-            'is_persistent' => true,
+            'is_persistent' => false,
             'input_field_placeholder' => $level_button->getText()
         ]
     ];
@@ -2577,7 +2577,7 @@ function level_12(
         'reply_markup' => [
             'keyboard' => $keyboard,
             'resize_keyboard' => true,
-            'is_persistent' => true,
+            'is_persistent' => false,
             'input_field_placeholder' => $level_button->getText()
         ]
     ];
@@ -2850,7 +2850,7 @@ function empty_level(
         'reply_markup' => [
             'keyboard' => [&$keyboard],
             'resize_keyboard' => true,
-            'is_persistent' => true
+            'is_persistent' => false
         ]
     ];
 
