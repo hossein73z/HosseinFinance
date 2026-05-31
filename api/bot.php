@@ -2653,34 +2653,50 @@ function addTransactionProgress(User $user, array $data, ?array $message, Databa
             $progress['add_transaction']['amount'] = $amount;
             addTransactionProgress($user->setProgress($progress), $data, null, $db);
         }
-        // Category Todo: Finish this
-//        if (!isset($progress['add_transaction']['category'])) {
-//            if (!$message) askForTransactionCategory($user, $data, $db);
-//            $progress['add_transaction']['category'] = $message['text'];
-//            addTransactionProgress($user->setProgress($progress), $data, null, $db);
-//        }
+        if (!isset($progress['add_transaction']['category'])) {
+            if (!$message) askForTransactionCategory($user, $data, $db);
+            $category = trim($message['text'] ?? '');
+            if ($category === '') {
+                askForTransactionCategory($user, $data, $db, 'دسته‌بندی تراکنش نمی‌تواند خالی باشد. لطفاً یک دسته‌بندی وارد کنید.');
+            }
+            $progress['add_transaction']['category'] = $category;
+            addTransactionProgress($user->setProgress($progress), $data, null, $db);
+        }
         // Date
         if (!isset($progress['add_transaction']['date'])) {
             if (!$message) askForTransactionDate($user, $data, $db);
-            if ($message['text'] == 'امروز') $progress['add_transaction']['date'] = (new DateTime())->format('Y-m-d');
-            elseif ($message['text'] == 'دیروز') $progress['add_transaction']['date'] = (new DateTime())->modify('-1 days')->format('Y-m-d');
-            elseif ($message['text'] == '۲ روز پیش') $progress['add_transaction']['date'] = (new DateTime())->modify('-2 days')->format('Y-m-d');
-            else {
-                // Todo: The `fromString` method should return null on false date
-                $date_j = JalaliDate::fromString('y-m-d');
-                if (!$date_j->jy) askForTransactionDate($user, $data, $db, 'فرمت ارسالی اشتباه است. دوباره تلاش کنید.');
-                else $progress['add_transaction']['date'] = $date_j->toGregorian()->format('Y-m-d');
+            if ($message['text'] == 'امروز') {
+                $progress['add_transaction']['date'] = (new DateTime())->format('Y-m-d');
+            } elseif ($message['text'] == 'دیروز') {
+                $progress['add_transaction']['date'] = (new DateTime())->modify('-1 days')->format('Y-m-d');
+            } elseif ($message['text'] == '۲ روز پیش') {
+                $progress['add_transaction']['date'] = (new DateTime())->modify('-2 days')->format('Y-m-d');
+            } else {
+                $date_text = toEnglishDigits(trim($message['text']));
+                if (!preg_match('/^(\d{4})[\/\.\-](\d{1,2})[\/\.\-](\d{1,2})$/u', $date_text, $date_matches)) {
+                    askForTransactionDate($user, $data, $db, 'فرمت تاریخ صحیح نیست. لطفاً به صورت yyyy/mm/dd یا yyyy-mm-dd وارد کنید.');
+                }
+                $date_j = JalaliDate::fromString($date_text);
+                $normalized_date = JalaliDate::fromGregorian($date_j->toGregorian());
+                $expected = sprintf('%04d-%02d-%02d', intval($date_matches[1]), intval($date_matches[2]), intval($date_matches[3]));
+                if ($normalized_date->format('-') !== $expected) {
+                    askForTransactionDate($user, $data, $db, 'تاریخ وارد شده نامعتبر است. دوباره تلاش کنید.');
+                }
+                $progress['add_transaction']['date'] = $date_j->toGregorian()->format('Y-m-d');
             }
             addTransactionProgress($user->setProgress($progress), $data, null, $db);
         }
         // Time
         if (!isset($progress['add_transaction']['time'])) {
             if (!$message) askForTransactionTime($user, $data, $db);
-            if ($message['text'] == 'اکنون') $progress['add_transaction']['time'] = (new DateTime())->format('H:i');
-            else {
-                $matched = preg_match('/\d\d:\d\d/u', $message['text'], $time);
-                if (!$matched) askForTransactionTime($user, $data, $db, 'فرمت ارسالی اشتباه است. دوباره تلاش کنید.');
-                $progress['add_transaction']['time'] = $time;
+            if ($message['text'] == 'اکنون') {
+                $progress['add_transaction']['time'] = (new DateTime())->format('H:i');
+            } else {
+                $time_text = toEnglishDigits(trim($message['text']));
+                if (!preg_match('/^([01]?\d|2[0-3]):([0-5]\d)$/u', $time_text, $time_matches)) {
+                    askForTransactionTime($user, $data, $db, 'فرمت زمان صحیح نیست. لطفاً به صورت HH:MM وارد کنید.');
+                }
+                $progress['add_transaction']['time'] = sprintf('%02d:%02d', intval($time_matches[1]), intval($time_matches[2]));
             }
             addTransactionProgress($user->setProgress($progress), $data, null, $db);
         }
@@ -2807,7 +2823,18 @@ function askForTransactionTime(User $user, array $data, DatabaseManager $db, ?st
 function addTransaction(User $user, array $transaction, array $data, DatabaseManager $db): void
 {
     try {
+        $account = $db->read('accounts', ['id' => $transaction['account_id'], 'user_id' => $user->getId()], true);
+        if (!$account) {
+            $data['text'] = '❌ حساب انتخاب شده پیدا نشد.';
+            sendToTelegram('sendMessage', $data);
+            level_11($user, $db);
+        }
+
+        $new_balance = $account['current_balance'] + ($transaction['type'] === 'inward' ? $transaction['amount'] : -$transaction['amount']);
+        $transaction['new_balance'] = $new_balance;
+
         $db->create('transactions', $transaction);
+        $db->update('accounts', ['current_balance' => $new_balance], ['id' => $account['id']]);
         $data['text'] = '✅ تراکنش جدید با موفقیت ثبت شد.';
 
     } catch (PDOException $e) {
