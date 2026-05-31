@@ -145,7 +145,7 @@ class User implements JsonSerializable
         return $this;
     }
 
-    public function getDetailedLoan(): ?string
+    public function getDetailedLoan(): ?bool
     {
         $settings = $this->getSettings();
         return $settings['detailed_loan'] ?? false;

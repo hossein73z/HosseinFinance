@@ -105,7 +105,6 @@ function validateWebhookSecurity(string $input): void
 /**
  * Handles normal text messages, commands, and web app data.
  */
-#[NoReturn]
 function handleIncomingMessage(array $message, DatabaseManager $db): void
 {
     $user = getOrCreateUser($message['from'], $db);
@@ -250,7 +249,6 @@ function getOrCreateUser(array $from, DatabaseManager $db): User
     return User::fromDbRow($user);
 }
 
-#[NoReturn]
 function callbackHandler(User $user, array $callback_query, DatabaseManager $db): void
 {
     $message = $callback_query['message'];
@@ -274,7 +272,6 @@ function callbackHandler(User $user, array $callback_query, DatabaseManager $db)
     exit;
 }
 
-#[NoReturn]
 function specialButtonHandler(User $user, Button $pressed_button, DatabaseManager $db): void
 {
     if ($pressed_button->getId() === "s0") backButton($user, $db);
@@ -287,7 +284,6 @@ function specialButtonHandler(User $user, Button $pressed_button, DatabaseManage
     exit;
 }
 
-#[NoReturn]
 function normalButtonHandler(User $user, Button $pressed_button, DatabaseManager $db): void
 {
     // Route the button to corresponding level
@@ -323,7 +319,6 @@ function normalButtonHandler(User $user, Button $pressed_button, DatabaseManager
     exit;
 }
 
-#[NoReturn]
 function nonButtonHandler(User $user, array $message, DatabaseManager $db): void
 {
     if ($user->getLastBtn() == '0') /***/ level_0(user: $user, db: $db, message: $message);
@@ -355,13 +350,12 @@ function nonButtonHandler(User $user, array $message, DatabaseManager $db): void
 /**
  * Routes the flow based on user input or state.
  */
-#[NoReturn]
 function choosePath(
     ?Button         $pressed_button = null,
     ?array          $message = null,
     ?User           $user = null,
     ?array          $callback_query = null,
-    DatabaseManager $db = null): void
+    ?DatabaseManager $db = null): void
 {
     if ($callback_query)
         callbackHandler($user, $callback_query, $db);
@@ -372,7 +366,6 @@ function choosePath(
     nonButtonHandler(user: $user, message: $message, db: $db);
 }
 
-#[NoReturn]
 function backButton(User $user, DatabaseManager $db, int|string|null $parent_btn_id = null): void
 {
     $progress = $user->getProgress();
@@ -409,7 +402,6 @@ function backButton(User $user, DatabaseManager $db, int|string|null $parent_btn
     normalButtonHandler(user: $user->setProgress(null), pressed_button: $last_btn, db: $db);
 }
 
-#[NoReturn]
 function cancelButton(User $user, DatabaseManager $db, int|string|null $parent_btn_id = null): void
 {
     backButton($user->setProgress(null), $db, $parent_btn_id);
@@ -420,7 +412,6 @@ function cancelButton(User $user, DatabaseManager $db, int|string|null $parent_b
 //          LEVEL 0: Main Menu
 // ==========================================
 
-#[NoReturn]
 function level_0(
     User            $user,
     DatabaseManager $db,
@@ -460,7 +451,6 @@ function level_0(
     exit;
 }
 
-#[NoReturn]
 function handleMainMenuCallBack(User $user, array $callback_query, array $message): void
 {
     sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
@@ -474,7 +464,6 @@ function handleMainMenuCallBack(User $user, array $callback_query, array $messag
     exit;
 }
 
-#[NoReturn]
 function handleMainMenuTextMessage(array $data): void
 {
     $data['text'] = 'پیام نامفهوم است!';
@@ -487,7 +476,6 @@ function handleMainMenuTextMessage(array $data): void
 //          LEVEL 1: HOLDINGS
 // ==========================================
 
-#[NoReturn]
 function level_1(
     User            $user,
     DatabaseManager $db,
@@ -539,7 +527,6 @@ function level_1(
     exit;
 }
 
-#[NoReturn]
 function handleHoldingsCallback(User $user, array $callback_query, array $data, array $message, $db): void
 {
     sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
@@ -567,7 +554,6 @@ function handleHoldingsCallback(User $user, array $callback_query, array $data, 
     exit;
 }
 
-#[NoReturn]
 function handleHoldingsWebAppData(User $user, array $data, array $message, DatabaseManager $db): void
 {
     $web_app_data = json_decode($message['web_app_data']['data'], true);
@@ -682,7 +668,6 @@ function handleHoldingsWebAppData(User $user, array $data, array $message, Datab
     exit;
 }
 
-#[NoReturn]
 function handleHoldingsTextMessage(User $user, array $data, array $message, DatabaseManager $db): void
 {
 
@@ -718,7 +703,7 @@ function handleHoldingsTextMessage(User $user, array $data, array $message, Data
     exit;
 }
 
-function sendAllHoldings(User $user, DatabaseManager $db, int|string $initial_mssg_id = null): void
+function sendAllHoldings(User $user, DatabaseManager $db, int|string|null $initial_mssg_id = null): void
 {
     $holdings = getHoldingsWithAssetDetails(['user_id' => $user->getId()], $db);
     if ($holdings) {
@@ -822,7 +807,6 @@ function checkAndAddEditHoldingButton(array $data, User $user, DatabaseManager $
 //          LEVEL 2: LOANS & INSTALLMENTS
 // ==========================================
 
-#[NoReturn]
 function level_2(
     User            $user,
     DatabaseManager $db,
@@ -871,7 +855,6 @@ function level_2(
     exit;
 }
 
-#[NoReturn]
 function handleLoansCallback(User $user, array $callback_query, array $data, array $message, DatabaseManager $db): void
 {
     $query_data = $callback_query['data'];
@@ -925,7 +908,6 @@ function handleLoansCallback(User $user, array $callback_query, array $data, arr
     exit;
 }
 
-#[NoReturn]
 function handleLoansWebAppData(User $user, array $data, array $message, DatabaseManager $db): void
 {
     $web_app_data = json_decode($message['web_app_data']['data'], true);
@@ -1086,7 +1068,6 @@ function handleLoansWebAppData(User $user, array $data, array $message, Database
 
 }
 
-#[NoReturn]
 function handleLoansTextMessage(User $user, array $data, array $message, DatabaseManager $db): void
 {
 
@@ -1296,7 +1277,6 @@ function sendInstallmentsForNextNDays(User $user, DatabaseManager $db, int $n = 
         return false;
 }
 
-#[NoReturn]
 function sendLoanDetail(array $loan, array $data, string|int|null $mssg_id_to_edit = null): void
 {
 
@@ -1316,7 +1296,6 @@ function sendLoanDetail(array $loan, array $data, string|int|null $mssg_id_to_ed
     exit;
 }
 
-#[NoReturn]
 function payInstallmentFromCronJob(User $user, array $callback_query, array $message, DatabaseManager $db): void
 {
     $installment_id = $callback_query['data']['cron_inst_paid'];
@@ -1340,7 +1319,6 @@ function payInstallmentFromCronJob(User $user, array $callback_query, array $mes
     exit();
 }
 
-#[NoReturn]
 function inplaceInstallmentPaymentToggle(User $user, array $callback_query, array $message, DatabaseManager $db): void
 {
 
@@ -1367,7 +1345,6 @@ function inplaceInstallmentPaymentToggle(User $user, array $callback_query, arra
 //          LEVEL 5: PRICES
 // ==========================================
 
-#[NoReturn]
 function level_5(
     User            $user,
     DatabaseManager $db,
@@ -1423,7 +1400,6 @@ function level_5(
     exit;
 }
 
-#[NoReturn]
 function handlePricesCallback(User $user, array $callback_query, array $message, array $asset_types, DatabaseManager $db): void
 {
     $data = [
@@ -1553,7 +1529,6 @@ function handlePricesCallback(User $user, array $callback_query, array $message,
     }
 }
 
-#[NoReturn]
 function handlePricesTextMessage(array $data, array $message, array $asset_types, string $base_currency, DatabaseManager $db): void
 {
     if (in_array($message['text'], $asset_types)) {
@@ -1631,7 +1606,6 @@ function setLiveMessage(int|string $user_id, bool $activate, int|string $message
 //          LEVEL 6: ARTIFICIAL INTELLIGENCE
 // ==========================================
 
-#[NoReturn]
 function level_6(
     User            $user,
     DatabaseManager $db,
@@ -1668,7 +1642,6 @@ function level_6(
 //          Admin
 // ==========================================
 
-#[NoReturn]
 function setBaseCurrency(User $user, array $callback_query, array $message, DatabaseManager $db): void
 {
     $data = [
@@ -1703,7 +1676,6 @@ function setBaseCurrency(User $user, array $callback_query, array $message, Data
     exit;
 }
 
-#[NoReturn]
 function sendSelectBaseCurrencyMessage(User $user, DatabaseManager $db): void
 {
     $base_currencies = $db->read(
@@ -1732,7 +1704,6 @@ function sendSelectBaseCurrencyMessage(User $user, DatabaseManager $db): void
     exit;
 }
 
-#[NoReturn]
 function sendDBInformation(User $user): void
 {
     $data = [
@@ -1748,7 +1719,6 @@ function sendDBInformation(User $user): void
     exit;
 }
 
-#[NoReturn]
 function sendHostInformation(User $user): void
 {
     $data = [
@@ -1774,7 +1744,6 @@ function sendHostInformation(User $user): void
 //          LEVEL 8: Alerts
 // ==========================================
 
-#[NoReturn]
 function level_8(
     User            $user,
     DatabaseManager $db,
@@ -1817,7 +1786,6 @@ function level_8(
     exit;
 }
 
-#[NoReturn]
 function handleAlertsCallback(User $user, array $message): void
 {
     $data = [
@@ -1829,7 +1797,6 @@ function handleAlertsCallback(User $user, array $message): void
     exit;
 }
 
-#[NoReturn]
 function handleAlertsTextMessage(array $data): void
 {
     // Send default message of this level
@@ -1879,7 +1846,6 @@ function sendAllAlerts(User $user, DatabaseManager $db, int|string|null $message
     sendToTelegram('editMessageText', $data);
 }
 
-#[NoReturn]
 function managePriceAlerts(User $user, array $callback_query, array $message, DatabaseManager $db): void
 {
     $data = [
@@ -2066,7 +2032,6 @@ function managePriceAlerts(User $user, array $callback_query, array $message, Da
 //          LEVEL 9: Accounts
 // ==========================================
 
-#[NoReturn]
 function level_9(
     User            $user,
     DatabaseManager $db,
@@ -2109,7 +2074,6 @@ function level_9(
     exit;
 }
 
-#[NoReturn]
 function handleAccountsCallback(User $user, array $message): void
 {
     $data = [
@@ -2121,7 +2085,6 @@ function handleAccountsCallback(User $user, array $message): void
     exit;
 }
 
-#[NoReturn]
 function handleAccountsTextMessage(array $data): void
 {
     // Send default message of this level
@@ -2163,7 +2126,6 @@ function sendAllAccounts(User $user, DatabaseManager $db, int|string|null $messa
 //          LEVEL 10: Add New Account
 // ==========================================
 
-#[NoReturn]
 function level_10(
     User            $user,
     DatabaseManager $db,
@@ -2194,7 +2156,6 @@ function level_10(
     addAccountProgress($user, $data, $message, $db);
 }
 
-#[NoReturn]
 function handleAddAccountsCallback(User $user, array $message): void
 {
     $data = [
@@ -2206,7 +2167,6 @@ function handleAddAccountsCallback(User $user, array $message): void
     exit;
 }
 
-#[NoReturn]
 function addAccountProgress(User $user, array $data, ?array $message, DatabaseManager $db): void
 {
     /**
@@ -2261,7 +2221,6 @@ function addAccountProgress(User $user, array $data, ?array $message, DatabaseMa
     ], $data, $db);
 }
 
-#[NoReturn]
 function askForAccountType(User $user, array $data, DatabaseManager $db): void
 {
     $data['text'] = 'نوع حساب را وارد کنید' . "\n" . 'مثال: بانک، نقد، شخص';
@@ -2276,7 +2235,6 @@ function askForAccountType(User $user, array $data, DatabaseManager $db): void
     exit;
 }
 
-#[NoReturn]
 function askForAccountName(User $user, array $data, DatabaseManager $db): void
 {
     $data['text'] = 'نام حساب را وارد کنید' . "\n" . 'مثال: سپه، ملی، کیف‌پول، علی‌رضا';
@@ -2292,7 +2250,6 @@ function askForAccountName(User $user, array $data, DatabaseManager $db): void
     exit;
 }
 
-#[NoReturn]
 function askForAccountStartingBalance(User $user, array $data, DatabaseManager $db, ?string $text = null): void
 {
     $data['text'] = $text ?? 'موجودی کنونی حساب را وارد کنید';
@@ -2308,7 +2265,6 @@ function askForAccountStartingBalance(User $user, array $data, DatabaseManager $
     exit;
 }
 
-#[NoReturn]
 function addAccount(User $user, array $account, array $data, DatabaseManager $db): void
 {
     try {
@@ -2331,7 +2287,6 @@ function addAccount(User $user, array $account, array $data, DatabaseManager $db
 //          LEVEL 11: Transactions
 // ==========================================
 
-#[NoReturn]
 function level_11(
     User            $user,
     DatabaseManager $db,
@@ -2374,7 +2329,6 @@ function level_11(
     exit;
 }
 
-#[NoReturn]
 function handleTransactionsCallback(User $user, array $message): void
 {
     $data = [
@@ -2386,7 +2340,6 @@ function handleTransactionsCallback(User $user, array $message): void
     exit;
 }
 
-#[NoReturn]
 function handleTransactionsTextMessage(User $user, array $data, array $message, DatabaseManager $db): void
 {
 
@@ -2477,7 +2430,6 @@ function extractTransactionFromText(string $text): ?array
     return $transaction;
 }
 
-#[NoReturn]
 function addTransactionFromMessage(User $user, array $callback_query, array $message, DatabaseManager $db): void
 {
     if ($message) {
@@ -2518,7 +2470,6 @@ function addTransactionFromMessage(User $user, array $callback_query, array $mes
     exit;
 }
 
-#[NoReturn]
 function sendAllTransactions(User $user, DatabaseManager $db): void
 {
     $transactions = $db->read(
@@ -2551,7 +2502,6 @@ function sendAllTransactions(User $user, DatabaseManager $db): void
 //          LEVEL 12: Add New Transaction
 // ==========================================
 
-#[NoReturn]
 function level_12(
     User            $user,
     DatabaseManager $db,
@@ -2582,7 +2532,6 @@ function level_12(
     addTransactionProgress($user, $data, $message, $db);
 }
 
-#[NoReturn]
 function handleAddTransactionCallback(User $user, array $callback_query, array $message): void
 {
     $data = [
@@ -2595,7 +2544,6 @@ function handleAddTransactionCallback(User $user, array $callback_query, array $
     exit;
 }
 
-#[NoReturn]
 function addTransactionProgress(User $user, array $data, ?array $message, DatabaseManager $db): void
 {
     /**
@@ -2677,7 +2625,7 @@ function addTransactionProgress(User $user, array $data, ?array $message, Databa
                     askForTransactionDate($user, $data, $db, 'فرمت تاریخ صحیح نیست. لطفاً به صورت yyyy/mm/dd یا yyyy-mm-dd وارد کنید.');
                 }
                 $date_j = JalaliDate::fromString($date_text);
-                $normalized_date = JalaliDate::fromGregorian($date_j->toGregorian());
+                $normalized_date = JalaliDate::fromGregorianObject($date_j->toGregorian());
                 $expected = sprintf('%04d-%02d-%02d', intval($date_matches[1]), intval($date_matches[2]), intval($date_matches[3]));
                 if ($normalized_date->format('-') !== $expected) {
                     askForTransactionDate($user, $data, $db, 'تاریخ وارد شده نامعتبر است. دوباره تلاش کنید.');
@@ -2714,7 +2662,6 @@ function addTransactionProgress(User $user, array $data, ?array $message, Databa
     addTransaction($user, $transaction, $data, $db);
 }
 
-#[NoReturn]
 function askForTransactionType(User $user, array $data, DatabaseManager $db, ?string $text = null): void
 {
     $data['text'] = $text ?? 'نوع تراکنش را از دکمه‌های زیر انتخاب کنید:';
@@ -2730,7 +2677,6 @@ function askForTransactionType(User $user, array $data, DatabaseManager $db, ?st
     exit;
 }
 
-#[NoReturn]
 function askForTransactionAccount(User $user, string $type, array $data, DatabaseManager $db, ?string $text = null): void
 {
     $type_text = $type == 'inward' ? 'مقصد' : 'مبدأ';
@@ -2750,7 +2696,6 @@ function askForTransactionAccount(User $user, string $type, array $data, Databas
     exit;
 }
 
-#[NoReturn]
 function askForTransactionAmount(User $user, array $data, DatabaseManager $db, ?string $text = null): void
 {
     $data['text'] = $text ?? 'مبلغ تراکنش را بع عدد ارسال کنید.';
@@ -2766,10 +2711,9 @@ function askForTransactionAmount(User $user, array $data, DatabaseManager $db, ?
     exit;
 }
 
-#[NoReturn]
-function askForTransactionCategory(User $user, array $data, DatabaseManager $db): void
+function askForTransactionCategory(User $user, array $data, DatabaseManager $db, ?string  $text = null): void
 {
-    $data['text'] = 'دسته‌بندی تراکنش را وارد کنید' . "\n" . 'مثال: خوراک، حمل‌ونقل، حقوق، تفریح';
+    $data['text'] = $text ?? 'دسته‌بندی تراکنش را وارد کنید' . "\n" . 'مثال: خوراک، حمل‌ونقل، حقوق، تفریح';
     $response = sendToTelegram('sendMessage', $data);
     if ($response) {
         $progress = $user->getProgress();
@@ -2782,7 +2726,6 @@ function askForTransactionCategory(User $user, array $data, DatabaseManager $db)
     exit;
 }
 
-#[NoReturn]
 function askForTransactionDate(User $user, array $data, DatabaseManager $db, ?string $text = null): void
 {
     $data['text'] = $text ?? 'تاریخ تراکنش را با فرمت مثال زده شده ارسال کنید یا از دکمه‌های زیر استفاده کنید. مثال:' . "\n" . JalaliDate::fromGregorian()->format('-');
@@ -2802,7 +2745,6 @@ function askForTransactionDate(User $user, array $data, DatabaseManager $db, ?st
     exit;
 }
 
-#[NoReturn]
 function askForTransactionTime(User $user, array $data, DatabaseManager $db, ?string $text = null): void
 {
     $data['text'] = $text ?? 'زمان تراکنش را با فرمت مثال زده شده ارسال کنید یا از دکمه‌ی زیر برای ساعت کنونی استفاده کنید. مثال:' . "\n" . (new DateTime())->format('H:i');
@@ -2819,7 +2761,6 @@ function askForTransactionTime(User $user, array $data, DatabaseManager $db, ?st
     exit;
 }
 
-#[NoReturn]
 function addTransaction(User $user, array $transaction, array $data, DatabaseManager $db): void
 {
     try {
@@ -2853,7 +2794,6 @@ function addTransaction(User $user, array $transaction, array $data, DatabaseMan
 //          LEVEL S3: EMPTY LEVEL
 // ==========================================
 
-#[NoReturn]
 function empty_level(
     User            $user,
     DatabaseManager $db,
