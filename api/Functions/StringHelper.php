@@ -87,7 +87,7 @@ function beautifulNumber(string $text, string|null $delimiter = ',', bool $persi
     }
 }
 
-function markdownScape(string $text): string
+function markdownScape(?string $text): string
 {
     return !$text ? str_replace(["(", ")", ".", "-", "!"], ["\(", "\)", "\.", "\-", "\!"], $text) : '';
 }
