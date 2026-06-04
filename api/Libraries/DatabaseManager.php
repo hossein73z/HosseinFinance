@@ -51,15 +51,34 @@ class DatabaseManager
         // 3. TiDB Cloud / SSL Configuration
         // TiDB Cloud (Port 4000) requires a secure connection.
         if ($port == 4000 || $host !== 'localhost') {
+            // Resolve PHP 8.5+ driver-specific namespace constants dynamically for backward compatibility
+            $verifyCertConst = defined('Pdo\Mysql::ATTR_SSL_VERIFY_SERVER_CERT')
+                ? Pdo\Mysql::ATTR_SSL_VERIFY_SERVER_CERT
+                : (defined('PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT') ? PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT : null);
+
+            $sslModeConst = defined('Pdo\Mysql::ATTR_SSL_MODE')
+                ? Pdo\Mysql::ATTR_SSL_MODE
+                : (defined('PDO::MYSQL_ATTR_SSL_MODE') ? PDO::MYSQL_ATTR_SSL_MODE : null);
+
+            $sslModeReqConst = defined('Pdo\Mysql::SSL_MODE_REQUIRED')
+                ? Pdo\Mysql::SSL_MODE_REQUIRED
+                : (defined('PDO::MYSQL_ATTR_SSL_MODE_REQUIRED') ? PDO::MYSQL_ATTR_SSL_MODE_REQUIRED : null);
+
+            $sslCaConst = defined('Pdo\Mysql::ATTR_SSL_CA')
+                ? Pdo\Mysql::ATTR_SSL_CA
+                : (defined('PDO::MYSQL_ATTR_SSL_CA') ? PDO::MYSQL_ATTR_SSL_CA : null);
+
             // Disable strict certificate verification to avoid "caching_sha2_password" or "SSL certificate" errors
             // inside serverless environments which might lack specific CA bundles.
-            $options[PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT] = false;
+            if ($verifyCertConst !== null) {
+                $options[$verifyCertConst] = false;
+            }
 
-            // Force SSL Mode.
-            if (defined('PDO::MYSQL_ATTR_SSL_MODE')) {
-                $options[PDO::MYSQL_ATTR_SSL_MODE] = PDO::MYSQL_ATTR_SSL_MODE_REQUIRED;
-            } else {
-                $options[PDO::MYSQL_ATTR_SSL_CA] = ''; // Fallback to trigger SSL negotiation
+            // Force SSL Mode
+            if ($sslModeConst !== null && $sslModeReqConst !== null) {
+                $options[$sslModeConst] = $sslModeReqConst;
+            } elseif ($sslCaConst !== null) {
+                $options[$sslCaConst] = ''; // Fallback to trigger SSL negotiation
             }
         }
 
@@ -90,8 +109,7 @@ class DatabaseManager
         ?string    $user = null,
         ?string    $pass = null,
         int|string $port = 3306
-    ): DatabaseManager
-    {
+    ): DatabaseManager {
         if (self::$instance === null) {
             if (!$host || !$db || !$user) {
                 throw new Exception("DatabaseManager not initialized. Host, Database, and User parameters are required for the first call.");
@@ -104,9 +122,7 @@ class DatabaseManager
         return self::$instance;
     }
 
-    private function __clone()
-    {
-    }
+    private function __clone() {}
 
     public function __wakeup()
     {
@@ -291,8 +307,7 @@ class DatabaseManager
         int          $offset = 0,
         ?int         $chunkSize = null,
         ?string      $chunkByColumn = null
-    ): array|bool
-    {
+    ): array|bool {
         $where = $this->buildWhere($conditions);
         $distinctClause = $distinct ? 'DISTINCT ' : '';
 
@@ -388,7 +403,6 @@ class DatabaseManager
             }
 
             return $data;
-
         } catch (PDOException $e) {
             error_log("READ operation failed: " . $e->getMessage());
             throw $e;
