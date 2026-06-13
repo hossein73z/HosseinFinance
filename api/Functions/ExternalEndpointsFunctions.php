@@ -23,7 +23,7 @@ function sendToTelegram(
     $url = "https://$bot_endpoint/bot$token/$method";
 
     // $proxy = getenv('PROXY_SETTINGS');
-    // $response = stream_request($url, "POST", $data, proxy: $proxy);
+    // $response = stream_request(url: $url, method: "POST", data: $data, proxy: $proxy);
     $response = stream_request(url: $url, method: "POST", data: $data);
 
     $result = json_decode($response, true);
