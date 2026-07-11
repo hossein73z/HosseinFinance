@@ -1126,6 +1126,7 @@ function handleLoansTextMessage(User $user, array $data, array $message, Databas
             // Delete redundant messages
             if (isset($matches[5]))
                 sendToTelegram('deleteMessage', ['chat_id' => $user->getid(), 'message_id' => $matches[5]]); ######## Initial
+            sendToTelegram('deleteMessage', ['chat_id' => $user->getid(), 'message_id' => $matches[3]]); ############ Loans View
             sendToTelegram('deleteMessage', ['chat_id' => $user->getid(), 'message_id' => $message['message_id']]); # Deep-Link
 
             $data['text'] = 'جزئیات وام «' . beautifulNumber($loan['name'], null) . '»';
@@ -1138,7 +1139,7 @@ function handleLoansTextMessage(User $user, array $data, array $message, Databas
                     data: ['progress' => json_encode(['view_loan' => ['loan_id' => $loan['id']]])],
                     conditions: ['id' => $user->getId()]
                 );
-                sendLoanDetail($loan, $data, $matches[3]);
+                sendLoanDetail($loan, $data);
             }
         }
     }
