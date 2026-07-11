@@ -3075,11 +3075,11 @@ function getLoanWithInstallments(int|string $user_id, DatabaseManager $db, bool 
             foreach ($loan['installments'] as &$installment) {
 
                 // Create `due_date` gregorian object just for calculations
-                $due_date = DateTime::createFromFormat('Y-m-d', $installment['due_date']);
+                $due_date = DateTime::createFromFormat('Y-m-d', $installment['due_date'])->setTime(0, 0, 0);
 
                 // Create `is_due` and `is_paid` boolean values
                 $is_paid = boolval($installment['is_paid']);
-                $remaining_days = (new DateTime())->diff($due_date);
+                $remaining_days = (new DateTime('today'))->diff($due_date);
                 $is_due = $remaining_days->days === 0 || $remaining_days->invert;
 
                 // Initialize installments' summary
