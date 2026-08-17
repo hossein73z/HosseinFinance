@@ -1496,8 +1496,8 @@ function handlePricesCallback(User $user, array $callback_query, array $message,
 
             if ($query_key != 'mng_fav_type') {
                 try {
-                    $asset_type = array_key_first($query_data[$query_key]);
-                    $asset_name = $query_data[$query_key][$asset_type];
+                    $asset_name = $query_data[$query_key];
+                    $asset_type = $db->read('assets', ['name' => $asset_name], true, 'asset_type', true)['asset_type'];
                     if ($query_key == 'mng_fav_add') $db->create('favorites', ['user_id' => $user->getId(), 'asset_name' => $asset_name]);
                     if ($query_key == 'mng_fav_del') $db->delete('favorites', ['user_id' => $user->getId(), 'asset_name' => $asset_name], true);
                 } catch (Exception $e) {
@@ -1506,7 +1506,7 @@ function handlePricesCallback(User $user, array $callback_query, array $message,
                 }
             } else $asset_type = $query_data['mng_fav_type'];
 
-            // Read assets excluding the ones already in user's list of favorites
+            // Read assets
             $assets = $db->query(
                 "
                 select
@@ -1524,7 +1524,7 @@ function handlePricesCallback(User $user, array $callback_query, array $message,
 
                 foreach ($assets as $asset) {
                     $asset_name = ($asset['in_favorites'] ? '☑ ' : '☐ ') . beautifulNumber($asset['name'], null);
-                    $callback_data = json_encode([($asset['in_favorites'] ? 'mng_fav_del' : 'mng_fav_add') => [$asset_type => $asset['name']]], JSON_UNESCAPED_UNICODE);
+                    $callback_data = json_encode([($asset['in_favorites'] ? 'mng_fav_del' : 'mng_fav_add') => $asset['name']], JSON_UNESCAPED_UNICODE);
                     array_unshift(
                         $data['reply_markup']['inline_keyboard'],
                         [['text' => $asset_name, 'callback_data' => $callback_data]]
