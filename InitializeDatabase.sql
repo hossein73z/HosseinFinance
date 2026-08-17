@@ -154,7 +154,7 @@ CREATE TABLE IF NOT EXISTS `installments`
     loan_id    INT            NOT NULL,
     amount     NUMERIC(18, 8) NOT NULL,
     due_date   DATE           NOT NULL,
-    alert_date DATE                    DEFAULT NULL,
+    alert_date DATE           NOT NULL,
     is_paid    BOOLEAN        NOT NULL DEFAULT 0,
 
     UNIQUE INDEX idx_unique_installment (loan_id, due_date),

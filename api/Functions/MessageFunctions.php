@@ -21,7 +21,6 @@ function sendLoadingMessage(string $chat_id, string $text): array|false
  * @param int|string|null $message_id ID of the message to be edited. If `null`, a new message is sent and immediately edited
  * @return void
  */
-#[NoReturn]
 function sendAllFavorites(User $user, DatabaseManager $db, int|string|null $message_id = null): void
 {
     $message_id = ($message_id !== null) ?
