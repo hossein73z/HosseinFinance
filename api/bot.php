@@ -1084,8 +1084,9 @@ function handleLoansWebAppData(User $user, array $data, array $message, Database
             }
         }
 
+        array_unshift($data['reply_markup']['keyboard'], [createWebAppBtn('✏ ویرایش وام «' . $loan['name'] . '»', '/assets/loan.html', ['data' => base64_encode(json_encode(prepareLoanForWebApp($loan)))])]);
         sendToTelegram('sendMessage', $data);
-        sendAllLoans($user, $db, summerized: $user->getDetailedLoan());
+        sendLoanDetail($loan, $data);
         exit;
     }
 
