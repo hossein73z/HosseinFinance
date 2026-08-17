@@ -976,12 +976,16 @@ function handleLoansWebAppData(User $user, array $data, array $message, Database
                 try {
 
                     $due_date = JalaliDate::fromString($inst['due_date'])->toGregorian();
+                    $alert_date = clone($due_date);
+                    $alert_date = $alert_date->modify("-" . $new_loan['alert_offset'] . " days");
+
                     $db->create(
                         table: 'installments',
                         data: [
                             'loan_id' => $loan_id,
                             'amount' => $inst['amount'],
                             'due_date' => $due_date->format('Y-m-d'),
+                            'alert_date' => $alert_date->format('Y-m-d'),
                             'is_paid' => $inst['is_paid']
                         ]
                     );
