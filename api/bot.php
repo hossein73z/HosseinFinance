@@ -1019,11 +1019,14 @@ function handleLoansWebAppData(User $user, array $data, array $message, Database
         isset($web_app_data['updates'])
     ) {
 
+        $loan = getLoanWithInstallments(user_id: $user->getId(), db: $db, jalali: true, loan_id: $web_app_data['id']);
+
         $new_insts = $web_app_data['updates']['installments'] ?? null;
         unset($web_app_data['updates']['installments']);
 
         $loan_modified = false;
         $data['text'] = "نتیجه ویرایش وام: ";
+
         if ($web_app_data['updates']) {
             try {
                 $db->update(
@@ -1044,8 +1047,10 @@ function handleLoansWebAppData(User $user, array $data, array $message, Database
         if ($new_insts) {
 
             foreach ($new_insts as &$new_inst) {
+                $alert_offset = $web_app_data['updates']['alert_offset'] ?? $loan['alert_offset'];
                 $new_inst['loan_id'] = $web_app_data['id'];
                 $new_inst['due_date'] = JalaliDate::fromString($new_inst['due_date'])->toGregorian()->format('Y-m-d');
+                $new_inst['alert_date'] = JalaliDate::fromGregorianString($new_inst['due_date'])->toGregorian()->modify("-" . $alert_offset . " days")->format('Y-m-d');
             }
 
             // Update the Existing installments, based on their IDs or dates
