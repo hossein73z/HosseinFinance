@@ -201,7 +201,7 @@ function handleCallbackQuery(array $callback_query, DatabaseManager $db): void
             case 'fav_alert':
             case 'mng_alerts':
             case 'new_alert_type':
-            case 'new_alert_name':
+            case 'new_alert_asset_id':
             case 'del_alert':
             case 'conf_del_alert':
             case 'show_alerts':
@@ -1859,7 +1859,7 @@ function sendAllAlerts(User $user, DatabaseManager $db, int|string|null $message
 {
     $message_id = ($message_id !== null) ?
         $message_id :
-        sendLoadingMessage($user->getid(), 'در حال دریافت اطلاعات لیست علاقه‌مندی‌ها ...')['result']['message_id'];
+        sendLoadingMessage($user->getid(), 'در حال دریافت لیست هشدارها ...')['result']['message_id'];
 
     $alerts = $db->read(
         table: 'alerts',
@@ -1938,7 +1938,7 @@ function managePriceAlerts(User $user, array $callback_query, array $message, Da
                     $asset_types = array_column($asset_types, 'asset_type');
                     foreach ($asset_types as $asset_type) array_unshift(
                         $data['reply_markup']['inline_keyboard'],
-                        [['text' => beautifulNumber($asset_type, null), 'callback_data' => json_encode(['new_alert_type' => $asset_type])]]
+                        [['text' => beautifulNumber($asset_type, null), 'callback_data' => json_encode(['new_alert_type' => $asset_type], JSON_UNESCAPED_UNICODE)]]
                     );
                 } else {
                     sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id'], 'text' => 'دسته‌بندی‌ای در سیستم یافت نشد!']);
@@ -1972,7 +1972,7 @@ function managePriceAlerts(User $user, array $callback_query, array $message, Da
 
                     foreach ($alerts as $alert) array_unshift(
                         $data['reply_markup']['inline_keyboard'],
-                        [['text' => beautifulNumber($alert['asset_name'], null) . ': ' . beautifulNumber($alert['target_price']), 'callback_data' => json_encode(['del_alert' => $alert['id']])]]
+                        [['text' => beautifulNumber($alert['asset_id'], null) . ': ' . beautifulNumber($alert['target_price']), 'callback_data' => json_encode(['del_alert' => $alert['id']])]]
                     );
                 } else {
                     sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id'], 'text' => 'شما هشداری ثبت نکرده‌اید!']);
@@ -2013,7 +2013,7 @@ function managePriceAlerts(User $user, array $callback_query, array $message, Da
 
                 foreach ($assets as $asset) array_unshift(
                     $data['reply_markup']['inline_keyboard'],
-                    [['text' => beautifulNumber($asset['name'], null), 'callback_data' => json_encode(['new_alert_name' => $asset['name']])]]
+                    [['text' => beautifulNumber($asset['name'], null), 'callback_data' => json_encode(['new_alert_asset_id' => $asset['id']], JSON_UNESCAPED_UNICODE)]]
                 );
             } else $data['text'] = 'دسته‌بندی مورد نظر خالی‌ست!';
 
@@ -2021,12 +2021,12 @@ function managePriceAlerts(User $user, array $callback_query, array $message, Da
             sendToTelegram('editMessageText', $data);
             exit;
 
-        case 'new_alert_name':
+        case 'new_alert_asset_id':
 
             sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
             sendToTelegram('deleteMessage', ['chat_id' => $user->getid(), 'message_id' => $message['message_id']]);
 
-            $user = $user->setProgress(['parent_btn' => $user->getLastBtn(), 'data' => ['set_alert' => ['asset_name' => $query_data['new_alert_name']]]]);
+            $user = $user->setProgress(['parent_btn' => $user->getLastBtn(), 'data' => ['set_alert' => ['asset_id' => $query_data['new_alert_asset_id']]]]);
             empty_level($user, $db, $user->getLastBtn());
 
             // Ask user to confirm deleting alert
@@ -2848,7 +2848,7 @@ function addTransaction(User $user, array $transaction, array $data, DatabaseMan
 function empty_level(
     User            $user,
     DatabaseManager $db,
-    string|int      $parent_btn_id = 0, // Seems to be redundant but is required to avoid `null` progress bug
+    string|int      $parent_btn_id = 0, // Required to avoid `null` progress bug
     ?array          $message = null,
 ): void {
     $progress = $user->getProgress();
@@ -2872,7 +2872,7 @@ function empty_level(
     $progress_data = $progress['data'];
 
     ##########################
-    ##   Progress handler   ##
+    ##   Progress Handler   ##
     ##########################
 
     if (array_key_first($progress_data) == 'set_alert') {
@@ -2881,18 +2881,21 @@ function empty_level(
         $button = $db->read('buttons', ['id' => ['s1']], true);
         $keyboard[] = json_decode($button['attrs'], true);
 
-        $asset_name = $progress_data['set_alert']['asset_name'];
+        $asset_id = $progress_data['set_alert']['asset_id'];
 
         // Just entered the level
         // Ask user to give alert's target price
         if (!$message) {
 
-            $asset = $db->read('assets', ['name' => $asset_name], true);
+            $asset = $db->read('assets', ['id' => $asset_id], true);
 
             $text = 'قیمتی که می‌خواهید برای آن هشدار تنظیم کنید را نوشته و ارسال کتید.';
             $text .= "\n";
-            $text .= '*قیمت کنونی «' . markdownScape(beautifulNumber($asset_name, null)) . '»*: ';
-            $text .= markdownScape(beautifulNumber($asset['price'])) . ' ' . markdownScape(beautifulNumber($asset['base_currency'], null));
+            $text .= '*قیمت کنونی «' . beautifulNumber($asset['name'], null) . '»*: ';
+            $text .= beautifulNumber($asset['price']) . ' ' . beautifulNumber($asset['base_currency'], null);
+            $text = markdownScape($text);
+
+            $data['parse_mode'] = 'MarkdownV2';
 
             // Update user last button to current level (s3)
             $db->update('users', $user->setLastBtn('s3')->toDbArray(), ['id' => $user->getId()]);
@@ -2905,12 +2908,12 @@ function empty_level(
             $pressed_button = $db->read('buttons', ['id' => 's1', 'attrs->>"$.text"' => $message['text']]);
             if ($pressed_button) backButton($user, $db, $parent_level);
 
-            // Check if received text is a valid button
+            // Check if received text is a valid number
             $target_price = cleanAndValidateNumber($message['text']);
             if ($target_price) {
 
                 // Read asset from database for price comparison
-                $asset = $db->read('assets', ['name' => $asset_name], true);
+                $asset = $db->read('assets', ['id' => $asset_id], true);
                 $price_diff = floatval($target_price) - floatval($asset['price']);
                 $diff_percent = intval(($price_diff / floatval($asset['price'])) * 100);
 
@@ -2919,7 +2922,7 @@ function empty_level(
 
                     $result = $db->upsert('alerts', [
                         'user_id' => $user->getId(),
-                        'asset_name' => $asset_name,
+                        'asset_name' => $asset['name'],
                         'target_price' => $target_price,
                         'is_active' => true,
                         'created_date' => JalaliDate::fromGregorian()->format(),
@@ -2947,7 +2950,7 @@ function empty_level(
         }
 
         // Send default progress related text and bottom keyboard
-        // NOTE: Entering level or Wrong number format reach here
+        // NOTE: Entering level or Wrong number format reaches here
         sendToTelegram('sendMessage', $data);
         exit;
     }
