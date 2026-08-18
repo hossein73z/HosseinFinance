@@ -157,7 +157,7 @@ if (preg_match_all('/\|[  ].*? ((\d\d?) (.*?) (\d\d\d\d)) -[  ](\d\d:\d\d)/ums
  * @return void
  * @throws Exception
  */
-#[NoReturn]
+
 function addPriceToDatabase(array $new_assets, string $asset_type, string $date, string $time): void
 {
     $db = DatabaseManager::getInstance(
@@ -310,11 +310,10 @@ function getUsersWithLiveMessage(array $assets, DatabaseManager $db): array
             join special_messages sp on u.id = sp.user_id
             join assets a on f2.asset_name = a.name
         where sp.is_active = 1 and f1.asset_name in ('" . implode("','", $asset_names) . "')
-        group by f2.user_id, sp.message_id;
+        group by u.id, sp.message_id;
         ")->fetchAll();
 }
 
-#[NoReturn]
 function updateLiveMessages(array $new_assets, DatabaseManager $db): void
 {
     $users = getUsersWithLiveMessage($new_assets, $db);
