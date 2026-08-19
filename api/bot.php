@@ -370,6 +370,15 @@ function choosePath(
 
 function backButton(User $user, DatabaseManager $db, int|string|null $parent_btn_id = null): void
 {
+
+    /**
+     * TODO:
+     *  If the progress has its own level, when user is at level 1
+     *  The button should redirect the user to parent level, but
+     *  if the progress doesn't have its own level, pushing the
+     *  back button at level 1 should only clear the progress.
+     */
+
     $progress = $user->getProgress();
     $current_level = $db->read(
         table: 'buttons',
