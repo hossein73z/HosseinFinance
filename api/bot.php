@@ -113,28 +113,14 @@ function handleIncomingMessage(array $message, DatabaseManager $db): void
     $text = $message['text'] ?? '';
 
     // Levels' Main Commands
-    if ($text === '/start')
-        /**********/
-        level_0(user: $user, db: $db);
-    if ($text === '/holdings')
-        /*******/
-        level_1(user: $user, db: $db);
-    if ($text === '/loans')
-        /**********/
-        level_2(user: $user, db: $db);
-    if ($text === '/prices')
-        /*********/
-        level_5(user: $user, db: $db);
-    if ($text === '/ai')
-        /*************/
-        level_6(user: $user, db: $db);
-    if ($text === '/accounts')
-        /*******/
-        level_9(user: $user, db: $db);
-    if ($text === '/favorites')
-        /******/
-        sendAllFavorites($user, $db);
-    if ($text === '/base_currency') /**/ sendSelectBaseCurrencyMessage($user, $db);
+    if ($text === '/start') /* ----------- */ level_0(user: $user, db: $db);
+    if ($text === '/holdings') /* -------- */ level_1(user: $user, db: $db);
+    if ($text === '/loans') /* ----------- */ level_2(user: $user, db: $db);
+    if ($text === '/prices') /* ---------- */ level_5(user: $user, db: $db);
+    if ($text === '/ai') /* -------------- */ level_6(user: $user, db: $db);
+    if ($text === '/accounts') /* -------- */ level_9(user: $user, db: $db);
+    if ($text === '/favorites') /* ------- */ sendAllFavorites($user, $db);
+    if ($text === '/base_currency') /* --- */ sendSelectBaseCurrencyMessage($user, $db);
 
     // Levels' Sub Commands
     $matched = preg_match('/\/(.+?)_(\d+?)$/u', $text, $matches);
@@ -270,26 +256,14 @@ function callbackHandler(User $user, array $callback_query, DatabaseManager $db)
 {
     $message = $callback_query['message'];
 
-    if ($user->getLastBtn() == 0)
-        /***/
-        level_0(user: $user, db: $db, message: $message, callback_query: $callback_query);
-    if ($user->getLastBtn() == 1)
-        /***/
-        level_1(user: $user, db: $db, message: $message, callback_query: $callback_query);
-    if ($user->getLastBtn() == 2)
-        /***/
-        level_2(user: $user, db: $db, message: $message, callback_query: $callback_query);
-    if ($user->getLastBtn() == 5)
-        /***/
-        level_5(user: $user, db: $db, message: $message, callback_query: $callback_query);
-    if ($user->getLastBtn() == 6)
-        /***/
-        level_6(user: $user, db: $db, message: $message, callback_query: $callback_query);
-    if ($user->getLastBtn() == 8)
-        /***/
-        level_8(user: $user, db: $db, message: $message, callback_query: $callback_query);
-    if ($user->getLastBtn() == 11) /**/ level_11(user: $user, db: $db, message: $message, callback_query: $callback_query);
-    if ($user->getLastBtn() == 12) /**/ level_12(user: $user, db: $db, message: $message, callback_query: $callback_query);
+    if ($user->getLastBtn() == 0) /* ---- */ level_0(user: $user, db: $db, message: $message, callback_query: $callback_query);
+    if ($user->getLastBtn() == 1) /* ---- */ level_1(user: $user, db: $db, message: $message, callback_query: $callback_query);
+    if ($user->getLastBtn() == 2) /* ---- */ level_2(user: $user, db: $db, message: $message, callback_query: $callback_query);
+    if ($user->getLastBtn() == 5) /* ---- */ level_5(user: $user, db: $db, message: $message, callback_query: $callback_query);
+    if ($user->getLastBtn() == 6) /* ---- */ level_6(user: $user, db: $db, message: $message, callback_query: $callback_query);
+    if ($user->getLastBtn() == 8) /* ---- */ level_8(user: $user, db: $db, message: $message, callback_query: $callback_query);
+    if ($user->getLastBtn() == 11) /* --- */ level_11(user: $user, db: $db, message: $message, callback_query: $callback_query);
+    if ($user->getLastBtn() == 12) /* --- */ level_12(user: $user, db: $db, message: $message, callback_query: $callback_query);
 
     // Fallback if not handled
     sendToTelegram('editMessageText', [
@@ -350,29 +324,16 @@ function normalButtonHandler(User $user, Button $pressed_button, DatabaseManager
 
 function nonButtonHandler(User $user, array $message, DatabaseManager $db): void
 {
-    if ($user->getLastBtn() == '0')
-        /***/
-        level_0(user: $user, db: $db, message: $message);
-    if ($user->getLastBtn() == '1')
-        /***/
-        level_1(user: $user, db: $db, message: $message);
-    if ($user->getLastBtn() == '2')
-        /***/
-        level_2(user: $user, db: $db, message: $message);
-    if ($user->getLastBtn() == '5')
-        /***/
-        level_5(user: $user, db: $db, message: $message);
-    if ($user->getLastBtn() == '6')
-        /***/
-        level_6(user: $user, db: $db, message: $message);
-    if ($user->getLastBtn() == '8')
-        /***/
-        level_8(user: $user, db: $db, message: $message);
-    if ($user->getLastBtn() == '10') /**/ level_10(user: $user, db: $db, message: $message);
-    if ($user->getLastBtn() == '11') /**/ level_11(user: $user, db: $db, message: $message);
-    if ($user->getLastBtn() == '12') /**/ level_12(user: $user, db: $db, message: $message);
-
-    if ($user->getLastBtn() == 's3') /**/ empty_level(user: $user, db: $db, message: $message);
+    if ($user->getLastBtn() == '0') /* ---- */ level_0(user: $user, db: $db, message: $message);
+    if ($user->getLastBtn() == '1') /* ---- */ level_1(user: $user, db: $db, message: $message);
+    if ($user->getLastBtn() == '2') /* ---- */ level_2(user: $user, db: $db, message: $message);
+    if ($user->getLastBtn() == '5') /* ---- */ level_5(user: $user, db: $db, message: $message);
+    if ($user->getLastBtn() == '6') /* ---- */ level_6(user: $user, db: $db, message: $message);
+    if ($user->getLastBtn() == '8') /* ---- */ level_8(user: $user, db: $db, message: $message);
+    if ($user->getLastBtn() == '10') /* --- */ level_10(user: $user, db: $db, message: $message);
+    if ($user->getLastBtn() == '11') /* --- */ level_11(user: $user, db: $db, message: $message);
+    if ($user->getLastBtn() == '12') /* --- */ level_12(user: $user, db: $db, message: $message);
+    if ($user->getLastBtn() == 's3') /* --- */ empty_level(user: $user, db: $db, message: $message);
 
     // Fallback "Unrecognized" message
     sendToTelegram('sendMessage', [
@@ -1465,7 +1426,7 @@ function handlePricesCallback(User $user, array $callback_query, array $message,
     $query_key = array_key_first($query_data);
     switch ($query_key) {
 
-        // Show menu to add/remove a favorite asset
+        /** Show menu to add/remove a favorite asset */
         case 'edit_fav':
 
             $data['text'] = 'یکی از دسته‌بندی‌های زیر را انتخاب کنید:';
@@ -1484,7 +1445,7 @@ function handlePricesCallback(User $user, array $callback_query, array $message,
             sendToTelegram('editMessageText', $data);
             exit;
 
-            // Add/Remove assets to/from user's favorites
+        /** Add/Remove assets to/from user's favorites */
         case 'mng_fav_type':
         case 'mng_fav_add':
         case 'mng_fav_del':
@@ -1536,7 +1497,7 @@ function handlePricesCallback(User $user, array $callback_query, array $message,
             sendToTelegram('editMessageText', $data);
             exit;
 
-            // Add new favorite to the table and send the favorites message to the user
+        /** Add new favorite to the table and send the favorites message to the user */
         case 'new_fav_name': # Old Approach
 
             $asset_name = $query_data['new_fav_name'];
@@ -1558,14 +1519,14 @@ function handlePricesCallback(User $user, array $callback_query, array $message,
             sendToTelegram('editMessageText', $data);
             sendAllFavorites($user, $db);
 
-            // Start showing live price updates on the current message
+        /** Start showing live price updates on the current message */
         case 'set_live':
             sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
             deleteOldActiveLiveMessage($user, $message['message_id'], $db);
             setLiveMessage($user->getId(), $query_data['set_live'], $message['message_id'], $db);
             sendAllFavorites($user, $db, $message['message_id']);
 
-            // Show the main favorites' message
+        /** Show the main favorites' message */
         case 'show_favorites':
             sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
             sendAllFavorites($user, $db, $message['message_id']);
@@ -1909,7 +1870,7 @@ function managePriceAlerts(User $user, array $callback_query, array $message, Da
     $query_key = array_key_first($query_data);
     switch ($query_key) {
 
-        // Add or remove alerts
+        /** Add or remove alerts */
         case 'mng_alerts':
 
             $action = $query_data[$query_key];
@@ -1984,9 +1945,9 @@ function managePriceAlerts(User $user, array $callback_query, array $message, Da
             sendToTelegram('editMessageText', $data);
             exit;
 
-            // Show list of asset to select for new alert
-        case 'fav_alert': // A request from favorites message
-        case 'new_alert_type': // A request from alert manager message
+        /** Show list of asset to select for new alert */
+        case 'fav_alert': // -------- Request from favorites message
+        case 'new_alert_type': // --- Request from alert manager message
 
             if ($query_key == 'fav_alert') {
                 $data['reply_markup']['inline_keyboard'] = [[
@@ -2029,7 +1990,7 @@ function managePriceAlerts(User $user, array $callback_query, array $message, Da
             $user = $user->setProgress(['parent_btn' => $user->getLastBtn(), 'data' => ['set_alert' => ['asset_id' => $query_data['new_alert_asset_id']]]]);
             empty_level($user, $db, $user->getLastBtn());
 
-            // Ask user to confirm deleting alert
+        /** Ask user to confirm deleting alert */
         case 'del_alert':
             $alert_id = $query_data[$query_key];
 
@@ -2043,7 +2004,7 @@ function managePriceAlerts(User $user, array $callback_query, array $message, Da
             sendToTelegram('editMessageText', $data);
             exit;
 
-            // Delete alert and send alerts' message to the user
+        /** Delete alert and send alerts' message to the user */
         case 'conf_del_alert':
 
             $alert_id = $query_data[$query_key];
@@ -2064,7 +2025,7 @@ function managePriceAlerts(User $user, array $callback_query, array $message, Da
             sendAllAlerts($user, $db);
             exit;
 
-            // Show main list of alerts
+        /** Show main list of alerts */
         case 'show_alerts':
             sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
             sendAllAlerts($user, $db, $message['message_id']);
@@ -2613,12 +2574,12 @@ function addTransactionProgress(User $user, array $data, ?array $message, Databa
         askForTransactionType($user->setProgress($progress), $data, $db);
     } else {
 
-        // Hack: Lazy work
+        // HACK: Lazy work
 
         /*
          * Each `if` works with this principle:
-         *  $message == null -> asks for the information.
-         *  $message != null -> saves the received information
+         *  $message == null -> Requests the information.
+         *  $message != null -> Saves the received information.
          */
 
         // Type
