@@ -1431,7 +1431,7 @@ function handlePricesCallback(User $user, array $callback_query, array $message,
 
             $data['text'] = 'یکی از دسته‌بندی‌های زیر را انتخاب کنید:';
             $data['reply_markup']['inline_keyboard'] = [[
-                ['text' => '🔙 برگشت 🔙', 'callback_data' => json_encode(['show_favorites' => null])]
+                ['text' => '🔙 برگشت 🔙', "style" => "primary", 'callback_data' => json_encode(['show_favorites' => null])]
             ]];
 
             foreach ($asset_types as $asset_type) {
@@ -1451,8 +1451,8 @@ function handlePricesCallback(User $user, array $callback_query, array $message,
         case 'mng_fav_del':
 
             $data['reply_markup']['inline_keyboard'] = [[
-                ['text' => '🔙 برگشت 🔙', 'callback_data' => json_encode(['edit_fav' => null])],
-                ['text' => '🔚 پایان 🔚', 'callback_data' => json_encode(['show_favorites' => null])]
+                ['text' => '🔙 برگشت 🔙', "style" => "primary", 'callback_data' => json_encode(['edit_fav' => null])],
+                ['text' => '🔚 پایان 🔚', "style" => "success", 'callback_data' => json_encode(['show_favorites' => null])]
             ]];
 
             if ($query_key != 'mng_fav_type') {
@@ -1484,7 +1484,7 @@ function handlePricesCallback(User $user, array $callback_query, array $message,
                 $data['text'] = 'گزینه‌ی مد نظر خود را از لیست زیر انتخاب کنید:';
 
                 foreach ($assets as $asset) {
-                    $asset_name = ($asset['in_favorites'] ? '☑ ' : '☐ ') . beautifulNumber($asset['name'], null);
+                    $asset_name = ($asset['in_favorites'] ? '🔳 ' : '⬜ ') . beautifulNumber($asset['name'], null);
                     $callback_data = json_encode([($asset['in_favorites'] ? 'mng_fav_del' : 'mng_fav_add') => $asset['name']], JSON_UNESCAPED_UNICODE);
                     array_unshift(
                         $data['reply_markup']['inline_keyboard'],
@@ -1881,7 +1881,7 @@ function managePriceAlerts(User $user, array $callback_query, array $message, Da
                 $data['reply_markup'] = ['inline_keyboard' => [
                     [['text' => 'افزودن هشدار', 'callback_data' => json_encode(['mng_alerts' => 'add_alert'])]],
                     [['text' => 'حذف هشدار', 'callback_data' => json_encode(['mng_alerts' => 'remove_alert'])]],
-                    [['text' => '🔙 برگشت 🔙', 'callback_data' => json_encode(['show_alerts' => null])]],
+                    [['text' => '🔙 برگشت 🔙', "style" => "primary", 'callback_data' => json_encode(['show_alerts' => null])]],
                 ]];
             }
 
@@ -1892,8 +1892,8 @@ function managePriceAlerts(User $user, array $callback_query, array $message, Da
                 if ($asset_types) {
                     $data['text'] = 'یکی از دسته‌بندی‌های زیر را انتخاب کنید:';
                     $data['reply_markup']['inline_keyboard'] = [[
-                        ['text' => '🔙 برگشت 🔙', 'callback_data' => json_encode(['mng_alerts' => null])],
-                        ['text' => '❌ لغو ❌', 'callback_data' => json_encode(['show_alerts' => null])]
+                        ['text' => '🔙 برگشت 🔙', "style" => "primary", 'callback_data' => json_encode(['mng_alerts' => null])],
+                        ['text' => '❌ لغو ❌', "style" => "danger", 'callback_data' => json_encode(['show_alerts' => null])]
                     ]];
 
                     $asset_types = array_column($asset_types, 'asset_type');
@@ -1927,8 +1927,8 @@ function managePriceAlerts(User $user, array $callback_query, array $message, Da
                     $data['text'] = 'کدام مورد را می‌خواهید حذف کنید؟';
 
                     $data['reply_markup']['inline_keyboard'] = [[
-                        ['text' => '🔙 برگشت 🔙', 'callback_data' => json_encode(['mng_alerts' => null])],
-                        ['text' => '❌ لغو ❌', 'callback_data' => json_encode(['show_alerts' => null])]
+                        ['text' => '🔙 برگشت 🔙', "style" => "primary", 'callback_data' => json_encode(['mng_alerts' => null])],
+                        ['text' => '❌ لغو ❌', "style" => "danger", 'callback_data' => json_encode(['show_alerts' => null])]
                     ]];
 
                     foreach ($alerts as $alert) array_unshift(
@@ -1951,7 +1951,7 @@ function managePriceAlerts(User $user, array $callback_query, array $message, Da
 
             if ($query_key == 'fav_alert') {
                 $data['reply_markup']['inline_keyboard'] = [[
-                    ['text' => '🔙 برگشت 🔙', 'callback_data' => json_encode(['show_favorites' => null])]
+                    ['text' => '🔙 برگشت 🔙', "style" => "primary", 'callback_data' => json_encode(['show_favorites' => null])]
                 ]];
 
                 $assets = $db->read(
@@ -1963,8 +1963,8 @@ function managePriceAlerts(User $user, array $callback_query, array $message, Da
                 );
             } else {
                 $data['reply_markup']['inline_keyboard'] = [[
-                    ['text' => '🔙 برگشت 🔙', 'callback_data' => json_encode(['mng_alerts' => 'add_alert'])],
-                    ['text' => '❌ لغو ❌', 'callback_data' => json_encode(['show_alerts' => null])]
+                    ['text' => '🔙 برگشت 🔙', "style" => "primary", 'callback_data' => json_encode(['mng_alerts' => 'add_alert'])],
+                    ['text' => '❌ لغو ❌', "style" => "danger", 'callback_data' => json_encode(['show_alerts' => null])]
                 ]];
                 $assets = $db->read('assets', ['asset_type' => $query_data[$query_key]]);
             }
