@@ -309,7 +309,7 @@ function getUsersWithLiveMessage(array $assets, DatabaseManager $db): array
             join favorites f2 on u.id = f2.user_id
             join special_messages sp on u.id = sp.user_id
             join assets a on f2.asset_name = a.name
-        where sp.is_active = 1 and f1.asset_name in ('" . implode("','", $asset_names) . "')
+        where sp.status = 'active' and f1.asset_name in ('" . implode("','", $asset_names) . "')
         group by u.id, sp.message_id;
         ")->fetchAll();
 }

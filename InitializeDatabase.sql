@@ -164,11 +164,11 @@ CREATE TABLE IF NOT EXISTS `installments`
 CREATE TABLE IF NOT EXISTS `special_messages`
 (
     id         INT AUTO_INCREMENT PRIMARY KEY,
-    user_id    BIGINT      NOT NULL,
-    type       VARCHAR(10) NOT NULL,
-    is_active  BOOLEAN     NOT NULL DEFAULT 0,
-    message_id NUMERIC(6)  NOT NULL,
-    data       text,
+    user_id    BIGINT                              NOT NULL,
+    type       VARCHAR(10)                         NOT NULL,
+    status     ENUM ('active','paused','inactive') NOT NULL DEFAULT 'inactive',
+    message_id NUMERIC(6)                          NOT NULL,
+    data       TEXT,
 
     UNIQUE INDEX idx_unique_installment (user_id, type),
     FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE ON UPDATE CASCADE

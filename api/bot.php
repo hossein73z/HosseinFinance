@@ -1443,12 +1443,16 @@ function handlePricesCallback(User $user, array $callback_query, array $message,
 
             sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
             sendToTelegram('editMessageText', $data);
+            $db->update('special_messages', ['status' => 'paused'], ['user_id' => $user->getId(), 'type' => 'live_price', 'status' => 'active', 'message_id' => $message['message_id']]);
             exit;
 
-        /** Add/Remove assets to/from user's favorites */
-        case 'mng_fav_type':
-        case 'mng_fav_add':
-        case 'mng_fav_del':
+        /**
+         * Show a message to manage favorites under with a specific
+         * type. All the three cases below show the same message.
+         */
+        case 'mng_fav_type': // --- Just show list of assets
+        case 'mng_fav_add': // ---- Show list of assets and add a favorite
+        case 'mng_fav_del': // ---- Show list of assets and delete a favorite
 
             $data['reply_markup']['inline_keyboard'] = [[
                 ['text' => '🔙 برگشت 🔙', "style" => "primary", 'callback_data' => json_encode(['edit_fav' => null])],
@@ -1467,7 +1471,7 @@ function handlePricesCallback(User $user, array $callback_query, array $message,
                 }
             } else $asset_type = $query_data['mng_fav_type'];
 
-            // Read assets
+            // Read assets under $asset_type with added `in_favorites` property
             $assets = $db->query(
                 "
                 select
@@ -1481,8 +1485,10 @@ function handlePricesCallback(User $user, array $callback_query, array $message,
             )->fetchAll();
 
             if ($assets) {
+
                 $data['text'] = 'گزینه‌ی مد نظر خود را از لیست زیر انتخاب کنید:';
 
+                // Create inline buttons for read assets
                 foreach ($assets as $asset) {
                     $asset_name = ($asset['in_favorites'] ? '🔳 ' : '⬜ ') . beautifulNumber($asset['name'], null);
                     $callback_data = json_encode([($asset['in_favorites'] ? 'mng_fav_del' : 'mng_fav_add') => $asset['name']], JSON_UNESCAPED_UNICODE);
@@ -1495,10 +1501,11 @@ function handlePricesCallback(User $user, array $callback_query, array $message,
 
             sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
             sendToTelegram('editMessageText', $data);
+            $db->update('special_messages', ['status' => 'paused'], ['user_id' => $user->getId(), 'type' => 'live_price', 'status' => 'active', 'message_id' => $message['message_id']]);
             exit;
 
         /** Add new favorite to the table and send the favorites message to the user */
-        case 'new_fav_name': # Old Approach
+        case 'new_fav_name': # Old Approach, not used anymore.
 
             $asset_name = $query_data['new_fav_name'];
             try {
@@ -1529,6 +1536,7 @@ function handlePricesCallback(User $user, array $callback_query, array $message,
         /** Show the main favorites' message */
         case 'show_favorites':
             sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
+            $db->update('special_messages', ['status' => 'active'], ['user_id' => $user->getId(), 'type' => 'live_price', 'status' => 'paused', 'message_id' => $message['message_id']]);
             sendAllFavorites($user, $db, $message['message_id']);
 
         default:
@@ -1587,7 +1595,7 @@ function setLiveMessage(int|string $user_id, bool $activate, int|string $message
                 data: [
                     'user_id' => $user_id,
                     'type' => 'live_price',
-                    'is_active' => true,
+                    'status' => 'active',
                     'message_id' => $message_id,
                 ]
             );
@@ -1596,7 +1604,7 @@ function setLiveMessage(int|string $user_id, bool $activate, int|string $message
             $db_result = $db->update(
                 table: 'special_messages',
                 data: [
-                    'is_active' => false,
+                    'status' => 'inactive',
                 ],
                 conditions: [
                     'user_id' => $user_id,
@@ -3132,7 +3140,7 @@ function deleteOldActiveLiveMessage(User $user, int|string $message_id, Database
         conditions: [
             'user_id' => $user->getId(),
             'type' => 'live_price',
-            'is_active' => true,
+            'status' => 'active',
             '!message_id' => $message_id,
         ],
         single: true

@@ -96,7 +96,7 @@ function createFavoritesInlineKeyboard(
         conditions: [
             'user_id' => $user_id,
             'type' => 'live_price',
-            'is_active' => true,
+            'status' => 'active',
             'message_id' => $message_id,
         ],
         single: true
