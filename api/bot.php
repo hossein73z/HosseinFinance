@@ -2998,9 +2998,9 @@ function getHoldingsWithAssetDetails(array $conditions, DatabaseManager $db, boo
  * - Each loan includes:
  *   - `next_payment`: DateTime object of next due date (null if all paid/overdue)
  *   - `insts_summary`: Payment statistics containing:
- *     - Count and sum of paid installments
- *     - Count and sum of overdue installments
- *     - Count and sum of remaining (future) installments
+ *     - Count and sum of paid installments as `paid_count` and `paid_sum`
+ *     - Count and sum of overdue installments as `overdue_count` and `overdue_sum`
+ *     - Count and sum of remaining (future) installments as `remaining_count` and `remaining_sum`
  *
  * Filtering Options:
  * - Can retrieve all user loans (default)
@@ -3058,10 +3058,10 @@ function getLoanWithInstallments(int|string $user_id, DatabaseManager $db, bool 
         if ($loan['installments']) {
             $loan['next_installment'] = null;
             $loan['insts_summary']['paid_count'] = 0;
-            $loan['insts_summary']['overdue_count'] = 0;
-            $loan['insts_summary']['remaining_count'] = 0;
             $loan['insts_summary']['paid_sum'] = 0;
+            $loan['insts_summary']['overdue_count'] = 0;
             $loan['insts_summary']['overdue_sum'] = 0;
+            $loan['insts_summary']['remaining_count'] = 0;
             $loan['insts_summary']['remaining_sum'] = 0;
             foreach ($loan['installments'] as &$installment) {
 
@@ -3257,18 +3257,25 @@ function createHoldingDetailText(
 
 /**
  * Considerations for `$loans` array:
- *  -- Each loan must have all related installments
- *     under `installments` column.
- *  -- All dates (loans' received date and installments' due
- *     and alert date) must be in Jalali string.
- *  -- Installments must be sorted ascending by their due date.
+ *  -- Each loan must have all related
+ *     installments under `installments` column.
+ *  -- All dates (loans' received date and installments'
+ *     due and alert date) must be in Jalali string.
+ *  -- Installments must be sorted ascending by their duedate.
  *  -- Installments must have 'is_due' bool value.
  */
 function createLoansView(array $loans, ?string $loans_mssg_id = null, ?string $initial_mssg_id = null, bool $summerized = true): string
 {
+
     $text = 'وام‌های ثبت شده‌ی شما: ' . "\n";
+
+    $paid_total = 0;
+    $overdue_total = 0;
+    $remaining_total = 0;
+
     foreach ($loans as $loan) {
 
+        // Create installments' view and detail
         $installments = &$loan['installments'];
         if ($installments) {
 
@@ -3308,10 +3315,18 @@ function createLoansView(array $loans, ?string $loans_mssg_id = null, ?string $i
         $loan_name = "\n‏" . "\-* [" . beautifulNumber($loan['name'], null) . "]($deep_link)*";
 
         if (isset($loan['next_installment'])) {
+
+            // Add to total installments' report if the loan is not finished
+            $paid_total += $loan['insts_summary']['paid_sum'];
+            $overdue_total += $loan['insts_summary']['overdue_sum'];
+            $remaining_total += $loan['insts_summary']['remaining_sum'];
+
+            // Create text for the next payment
             $next_installment = $loan['next_installment'];
             $remaining_days = $next_installment['remaining_days'];
             $next_payment_text =
-                $remaining_days == 0 ? beautifulNumber($next_installment['amount']) . ' ریال برای امروز' : ($remaining_days == 1 ? beautifulNumber($next_installment['amount']) . ' ریال برای فردا' :
+                $remaining_days == 0 ?
+                beautifulNumber($next_installment['amount']) . ' ریال برای امروز' : ($remaining_days == 1 ? beautifulNumber($next_installment['amount']) . ' ریال برای فردا' :
                     beautifulNumber($next_installment['amount']) . ' ریال برای ' . $remaining_days . ' روز دیگر');
         } else $next_payment_text = 'پایان یافته';
 
@@ -3328,7 +3343,14 @@ function createLoansView(array $loans, ?string $loans_mssg_id = null, ?string $i
 
         $text .= $loan_name . markdownScape($detail);
     }
-    return $text;
+
+    $total_report_text =
+        "خلاصه وضعیت اقساط وام‌های جاری: " . "\n" .
+        "    - 🟢 " . "جمع اقساط پرداخت شده: " . beautifulNumber($paid_total) . "\n" .
+        "    - 🔴 " . "جمع اقساط معوق: " . beautifulNumber($overdue_total) . "\n" .
+        "    - ⚪ " . "جمع اقساط سررسید نشده: " . beautifulNumber($remaining_total);
+
+    return markdownScape($total_report_text) . "\n\n" . $text;
 }
 
 /**
