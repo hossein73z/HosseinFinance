@@ -3392,27 +3392,20 @@ function createLoanDetailText(array $loan, ?string $markdown = null, ?string $ms
                 $installments_text .= "\n" . '‏' . "    $inst_num) $payment_emoji  $date:  $amount";
         }
 
-        if ($markdown)
-            $text = "‏*" . markdownScape($loan['name']) . "*:\n" .
-                "\n مبلغ وام\: " . markdownScape(beautifulNumber($loan['total_amount'])) .
-                "\n تاریخ دریافت\: " . markdownScape(beautifulNumber($loan['received_date'], null)) .
-                "\n کل بازپرداخت\: " . markdownScape(beautifulNumber(array_sum(array_column($installments, 'amount')))) .
-                "\n " . markdownScape(beautifulNumber($loan['insts_summary']['paid_count']) . " قسط پرداخت‌شده، معادل " . beautifulNumber($loan['insts_summary']['paid_sum'])) .
-                "\n " . markdownScape(beautifulNumber($loan['insts_summary']['remaining_count']) . " قسط باقی مانده، معادل " . beautifulNumber($loan['insts_summary']['remaining_sum'])) .
-                "\n " . markdownScape(beautifulNumber($loan['insts_summary']['overdue_count']) . " قسط معوقه، معادل " . beautifulNumber($loan['insts_summary']['overdue_sum'])) .
-                "\n جزئیات اقساط\: ";
-        else
-            $text = "‏*" . $loan['name'] . "*:\n" .
-                "\n مبلغ وام\: " . beautifulNumber($loan['total_amount']) .
-                "\n تاریخ دریافت\: " . beautifulNumber($loan['received_date'], null) .
-                "\n کل بازپرداخت\: " . beautifulNumber(array_sum(array_column($installments, 'amount'))) .
-                "\n " . beautifulNumber($loan['insts_summary']['paid_count']) . " قسط پرداخت‌شده، معادل " . beautifulNumber($loan['insts_summary']['paid_sum']) .
-                "\n " . beautifulNumber($loan['insts_summary']['remaining_count']) . " قسط باقی مانده، معادل " . beautifulNumber($loan['insts_summary']['remaining_sum']) .
-                "\n " . beautifulNumber($loan['insts_summary']['overdue_count']) . " قسط معوقه، معادل " . beautifulNumber($loan['insts_summary']['overdue_sum']) .
-                "\n جزئیات اقساط\: ";
+        $general_info = "‏*" . $loan['name'] . "*:\n" .
+            "\n" . "مبلغ وام\: " . beautifulNumber($loan['total_amount']) .
+            "\n" . "تاریخ دریافت\: " . beautifulNumber($loan['received_date'], null) .
+            "\n" . "کل بازپرداخت\: " . beautifulNumber(array_sum(array_column($installments, 'amount'))) .
+            "\n" . beautifulNumber($loan['insts_summary']['paid_count']) . " قسط پرداخت‌شده، معادل " . beautifulNumber($loan['insts_summary']['paid_sum']) .
+            "\n" . beautifulNumber($loan['insts_summary']['remaining_count']) . " قسط باقی مانده، معادل " . beautifulNumber($loan['insts_summary']['remaining_sum']) .
+            "\n" . beautifulNumber($loan['insts_summary']['overdue_count']) . " قسط معوقه، معادل " . beautifulNumber($loan['insts_summary']['overdue_sum']) .
+            "\n" . "شروع یادآوری اقساط از " . beautifulNumber($loan['alert_offset']) . " روز قبل از سررسید" .
+            "\n" . "جزئیات اقساط\:";
 
-        $text .= $installments_text;
-    } else $text = 'هیچ قسطی برای این وام ثبت نشده است!';
+        if ($markdown) $general_info = markdownScape($general_info);
+
+        $text = $general_info . $installments_text;
+    } else $text = $markdown ? markdownScape('هیچ قسطی برای این وام ثبت نشده است!') : 'هیچ قسطی برای این وام ثبت نشده است!';
 
     return $text;
 }
