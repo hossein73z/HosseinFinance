@@ -41,3 +41,26 @@ function createPricesTextForSingleAssetType(array $assets, array $base_prices, s
     }
     return $text;
 }
+
+function deleteOldActiveLiveMessage(User $user, int|string $message_id, DatabaseManager $db): bool|array
+{
+    /**
+     * Finds user's **active** live message in the database with `$message_id`
+     * different from the one provided, and sends delete request to telegram.
+     **/
+
+    $live_mssg = $db->read(
+        table: 'special_messages',
+        conditions: [
+            'user_id' => $user->getId(),
+            'type' => 'live_price',
+            'status' => 'active',
+            '!message_id' => $message_id,
+        ],
+        single: true
+    );
+    if ($live_mssg)
+        return sendToTelegram('deleteMessage', ['chat_id' => $user->getid(), 'message_id' => $live_mssg['message_id']]);
+    else
+        return false;
+}
