@@ -36,6 +36,7 @@ require_once 'Helpers/HoldingsHelper.php';
 require_once 'Helpers/LoansHelper.php';
 require_once 'Helpers/PricesHelper.php';
 require_once 'Helpers/TransactionsHelper.php';
+require_once 'Helpers/TelegramUIHelper.php';
 
 // Models
 require_once 'Models/Button.php';
