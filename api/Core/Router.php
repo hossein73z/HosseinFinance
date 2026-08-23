@@ -103,12 +103,15 @@ function handleCallbackQuery(array $callback_query, DatabaseManager $db): void
 
             case 'set_base_currency':
                 setBaseCurrency($user, $callback_query, $message, $db);
+                break;
 
             case 'cron_inst_paid':
                 payInstallmentFromCronJob($user, $callback_query, $message, $db);
+                break;
 
             case 'inplace_inst_pay_toggle':
                 inplaceInstallmentPaymentToggle($user, $callback_query, $message, $db);
+                break;
 
             case 'insts_for_n_days':
                 $has_insts = sendInstallmentsForNextNDays($user, $db, mssg_id_to_edit: $message['message_id']);
@@ -125,6 +128,7 @@ function handleCallbackQuery(array $callback_query, DatabaseManager $db): void
             case 'set_live':
             case 'show_favorites':
                 level_5($user, $db, null, $message, $callback_query);
+                break;
 
             case 'fav_alert':
             case 'mng_alerts':
@@ -134,12 +138,15 @@ function handleCallbackQuery(array $callback_query, DatabaseManager $db): void
             case 'conf_del_alert':
             case 'show_alerts':
                 managePriceAlerts($user, $callback_query, $message, $db);
+                break;
 
             case 'add_mssg_transaction':
                 addTransactionFromMessage($user, $callback_query, $message, $db);
+                break;
 
             default:
                 choosePath(message: $message, user: $user, callback_query: $callback_query, db: $db);
+                break;
         }
     } else {
         sendToTelegram('editMessageText', [

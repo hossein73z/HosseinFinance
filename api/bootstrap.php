@@ -3,45 +3,45 @@
 // ----- LOAD NECESSARY FILES ------ //
 
 // Configuration
-require_once 'config/config.php';
+require_once __DIR__ . '/config/config.php';
 
 // Core
-require_once 'Core/Router.php';
-require_once 'Core/WebhookSecurity.php';
-require_once 'Core/Navigation.php';
+require_once __DIR__ . '/Core/Router.php';
+require_once __DIR__ . '/Core/WebhookSecurity.php';
+require_once __DIR__ . '/Core/Navigation.php';
 
 // Libraries
-require_once 'Libraries/DatabaseManager.php';
+require_once __DIR__ . '/Libraries/DatabaseManager.php';
 
 // Handlers
-require_once 'Handlers/MainMenuHandler.php';
-require_once 'Handlers/HoldingsHandler.php';
-require_once 'Handlers/LoansHandler.php';
-require_once 'Handlers/PricesHandler.php';
-require_once 'Handlers/AIHandler.php';
-require_once 'Handlers/AlertsHandler.php';
-require_once 'Handlers/AccountsHandler.php';
-require_once 'Handlers/TransactionsHandler.php';
-require_once 'Handlers/SettingsHandler.php';
+require_once __DIR__ . '/Handlers/MainMenuHandler.php';
+require_once __DIR__ . '/Handlers/HoldingsHandler.php';
+require_once __DIR__ . '/Handlers/LoansHandler.php';
+require_once __DIR__ . '/Handlers/PricesHandler.php';
+require_once __DIR__ . '/Handlers/AIHandler.php';
+require_once __DIR__ . '/Handlers/AlertsHandler.php';
+require_once __DIR__ . '/Handlers/AccountsHandler.php';
+require_once __DIR__ . '/Handlers/TransactionsHandler.php';
+require_once __DIR__ . '/Handlers/SettingsHandler.php';
 
 // Functions
-require_once 'Functions/ExternalEndpointsFunctions.php';
-require_once 'Functions/KeyboardFunctions.php';
-require_once 'Functions/MessageFunctions.php';
-require_once 'Functions/StringHelper.php';
-require_once 'Functions/AdminFunctions.php';
+require_once __DIR__ . '/Functions/ExternalEndpointsFunctions.php';
+require_once __DIR__ . '/Functions/KeyboardFunctions.php';
+require_once __DIR__ . '/Functions/MessageFunctions.php';
+require_once __DIR__ . '/Functions/StringHelper.php';
+require_once __DIR__ . '/Functions/AdminFunctions.php';
 
 // Helpers
-require_once 'Helpers/HoldingsHelper.php';
-require_once 'Helpers/LoansHelper.php';
-require_once 'Helpers/PricesHelper.php';
-require_once 'Helpers/TransactionsHelper.php';
-require_once 'Helpers/TelegramUIHelper.php';
+require_once __DIR__ . '/Helpers/HoldingsHelper.php';
+require_once __DIR__ . '/Helpers/LoansHelper.php';
+require_once __DIR__ . '/Helpers/PricesHelper.php';
+require_once __DIR__ . '/Helpers/TransactionsHelper.php';
+require_once __DIR__ . '/Helpers/TelegramUIHelper.php';
 
 // Models
-require_once 'Models/Button.php';
-require_once 'Models/User.php';
-require_once 'Models/JalaliDate.php';
+require_once __DIR__ . '/Models/Button.php';
+require_once __DIR__ . '/Models/User.php';
+require_once __DIR__ . '/Models/JalaliDate.php';
 
 // --- SHUTDOWN AND INITIALIZATION --- //
 
@@ -52,7 +52,8 @@ register_shutdown_function(function () {
     }
 });
 
-// Initialize Database connection.
+// Initialize Database connection (singleton).
+// Callers should obtain it via DatabaseManager::getInstance() after bootstrap.
 try {
     $db = DatabaseManager::getInstance(
         host: DB_HOST,

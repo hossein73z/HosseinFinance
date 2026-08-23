@@ -1,6 +1,6 @@
 <?php
 
-require_once 'bootstrap.php';
+require_once __DIR__ . '/bootstrap.php';
 
 // Setup Webhook Response
 header('Content-Type: application/json');
@@ -19,6 +19,9 @@ if (json_last_error() !== JSON_ERROR_NONE) {
     error_log("[ERROR] Invalid JSON received: " . json_last_error_msg());
     exit;
 }
+
+// Database was initialized in bootstrap.php; resolve via singleton explicitly.
+$db = DatabaseManager::getInstance();
 
 // --- MAIN UPDATE ROUTER ---
 
