@@ -6,9 +6,8 @@ function level_1(
     ?Button         $level_button = null,
     ?array          $message = null,
     ?array          $callback_query = null,
-    ?string         $command_data = null
-): void {
-
+    ?string         $command_data = null): void
+{
     // Initialize button object if null is given
     $level_button = $level_button ?? Button::fromDbRow($db->read('buttons', ['id' => 1], true));
 
@@ -50,7 +49,12 @@ function level_1(
     exit;
 }
 
-function handleHoldingsCallback(User $user, array $callback_query, array $data, array $message, DatabaseManager $db): void
+function handleHoldingsCallback(
+    User            $user,
+    array           $callback_query,
+    array           $data,
+    array           $message,
+    DatabaseManager $db): void
 {
     sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
 
@@ -131,7 +135,7 @@ function handleHoldingsWebAppData(User $user, array $data, array $message, Datab
 
             error_log(
                 'Holding: ' . json_encode($new_holding) . "\n" .
-                    'Error: ' . json_encode($e->errorInfo, JSON_PRETTY_PRINT)
+                'Error: ' . json_encode($e->errorInfo, JSON_PRETTY_PRINT)
             );
             $data['text'] = '❌ خطای پایگاه داده در ثبت دارایی جدید: ' . $e->errorInfo[2];
         }
@@ -151,7 +155,7 @@ function handleHoldingsWebAppData(User $user, array $data, array $message, Datab
         } catch (PDOException $e) {
             error_log(
                 'Updates: ' . json_encode($web_app_data['updates']) . "\n" .
-                    'Error: ' . json_encode($e->errorInfo, JSON_PRETTY_PRINT)
+                'Error: ' . json_encode($e->errorInfo, JSON_PRETTY_PRINT)
             );
             $data['text'] = '❌ خطای پایگاه داده در ثبت دارایی جدید: ' . $e->errorInfo[2];
         }
@@ -169,7 +173,7 @@ function handleHoldingsWebAppData(User $user, array $data, array $message, Datab
         } catch (PDOException $e) {
             error_log(
                 'Updates: ' . json_encode($web_app_data['updates']) . "\n" .
-                    'Error: ' . json_encode($e->errorInfo, JSON_PRETTY_PRINT)
+                'Error: ' . json_encode($e->errorInfo, JSON_PRETTY_PRINT)
             );
             $data['text'] = '❌ خطای پایگاه داده درحذف دارایی: ' . $e->errorInfo[2];
         }
@@ -249,8 +253,8 @@ function sendAllHoldings(User $user, DatabaseManager $db, int|string|null $initi
 
             $pro_los_string =
                 ($total_pro_los == 0) ?
-                "🟤 جمع سود/زیان: ۰ " . $user->getBaseCurrency() : (
-                    ($total_pro_los > 0) ?
+                    "🟤 جمع سود/زیان: ۰ " . $user->getBaseCurrency() : (
+                ($total_pro_los > 0) ?
                     "🟢 جمع سود: " . beautifulNumber($total_pro_los) . ' ' . $user->getBaseCurrency() :
                     "🔴 جمع ضرر: " . beautifulNumber($total_pro_los) . ' ' . $user->getBaseCurrency()
                 );

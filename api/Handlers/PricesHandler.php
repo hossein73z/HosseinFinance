@@ -6,8 +6,8 @@ function level_5(
     DatabaseManager $db,
     ?Button         $level_button = null,
     ?array          $message = null,
-    ?array          $callback_query = null
-): void {
+    ?array          $callback_query = null): void
+{
     // Initialize button object if null is given
     $level_button = $level_button ?? Button::fromDbRow($db->read('buttons', ['id' => 5], true));
 
@@ -55,7 +55,12 @@ function level_5(
     exit;
 }
 
-function handlePricesCallback(User $user, array $callback_query, array $message, array $asset_types, DatabaseManager $db): void
+function handlePricesCallback(
+    User            $user,
+    array           $callback_query,
+    array           $message,
+    array           $asset_types,
+    DatabaseManager $db): void
 {
     $data = [
         'chat_id' => $user->getid(),
@@ -68,7 +73,7 @@ function handlePricesCallback(User $user, array $callback_query, array $message,
     $query_key = array_key_first($query_data);
     switch ($query_key) {
 
-        /** Show menu to add/remove a favorite asset */
+        // Show menu to add/remove a favorite asset
         case 'edit_fav':
 
             $data['text'] = 'یکی از دسته‌بندی‌های زیر را انتخاب کنید:';
@@ -146,7 +151,7 @@ function handlePricesCallback(User $user, array $callback_query, array $message,
             $db->update('special_messages', ['status' => 'paused'], ['user_id' => $user->getId(), 'type' => 'live_price', 'status' => 'active', 'message_id' => $message['message_id']]);
             exit;
 
-        /** Add new favorite to the table and send the favorites message to the user */
+        // Add new favorite to the table and send the favorites message to the user
         case 'new_fav_name': # Old Approach, not used anymore.
 
             $asset_name = $query_data['new_fav_name'];
@@ -168,14 +173,14 @@ function handlePricesCallback(User $user, array $callback_query, array $message,
             sendToTelegram('editMessageText', $data);
             sendAllFavorites($user, $db);
 
-        /** Start showing live price updates on the current message */
+        // Start showing live price updates on the current message
         case 'set_live':
             sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
             deleteOldActiveLiveMessage($user, $message['message_id'], $db);
             setLiveMessage($user->getId(), $query_data['set_live'], $message['message_id'], $db);
             sendAllFavorites($user, $db, $message['message_id']);
 
-        /** Show the main favorites' message */
+        // Show the main favorites' message
         case 'show_favorites':
             sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
             $db->update('special_messages', ['status' => 'active'], ['user_id' => $user->getId(), 'type' => 'live_price', 'status' => 'paused', 'message_id' => $message['message_id']]);
@@ -192,7 +197,12 @@ function handlePricesCallback(User $user, array $callback_query, array $message,
     }
 }
 
-function handlePricesTextMessage(array $data, array $message, array $asset_types, string $base_currency, DatabaseManager $db): void
+function handlePricesTextMessage(
+    array           $data,
+    array           $message,
+    array           $asset_types,
+    string          $base_currency,
+    DatabaseManager $db): void
 {
     if (in_array($message['text'], $asset_types)) {
 

@@ -55,14 +55,14 @@ function handleIncomingMessage(array $message, DatabaseManager $db): void
     $text = $message['text'] ?? '';
 
     // Levels' Main Commands
-    if ($text === '/start') /* ----------- */ level_0(user: $user, db: $db);
-    if ($text === '/holdings') /* -------- */ level_1(user: $user, db: $db);
-    if ($text === '/loans') /* ----------- */ level_2(user: $user, db: $db);
-    if ($text === '/prices') /* ---------- */ level_5(user: $user, db: $db);
-    if ($text === '/ai') /* -------------- */ level_6(user: $user, db: $db);
-    if ($text === '/accounts') /* -------- */ level_9(user: $user, db: $db);
-    if ($text === '/favorites') /* ------- */ sendAllFavorites($user, $db);
-    if ($text === '/base_currency') /* --- */ sendSelectBaseCurrencyMessage($user, $db);
+    if ($text === '/start') /**********/ level_0(user: $user, db: $db);
+    if ($text === '/holdings') /*******/ level_1(user: $user, db: $db);
+    if ($text === '/loans') /**********/ level_2(user: $user, db: $db);
+    if ($text === '/prices') /*********/ level_5(user: $user, db: $db);
+    if ($text === '/ai') /*************/ level_6(user: $user, db: $db);
+    if ($text === '/accounts') /*******/ level_9(user: $user, db: $db);
+    if ($text === '/favorites') /******/ sendAllFavorites($user, $db);
+    if ($text === '/base_currency') /**/ sendSelectBaseCurrencyMessage($user, $db);
 
     // Levels' Sub Commands
     $matched = preg_match('/\/(.+?)_(\d+?)$/u', $text, $matches);
@@ -154,12 +154,12 @@ function handleCallbackQuery(array $callback_query, DatabaseManager $db): void
  * Routes the flow based on user input or state.
  */
 function choosePath(
-    ?Button         $pressed_button = null,
-    ?array          $message = null,
-    ?User           $user = null,
-    ?array          $callback_query = null,
-    ?DatabaseManager $db = null
-): void {
+    ?Button          $pressed_button = null,
+    ?array           $message = null,
+    ?User            $user = null,
+    ?array           $callback_query = null,
+    ?DatabaseManager $db = null): void
+{
     if ($callback_query)
         callbackHandler($user, $callback_query, $db);
     if ($pressed_button)
@@ -173,14 +173,14 @@ function callbackHandler(User $user, array $callback_query, DatabaseManager $db)
 {
     $message = $callback_query['message'];
 
-    if ($user->getLastBtn() == 0) /* ---- */ level_0(user: $user, db: $db, message: $message, callback_query: $callback_query);
-    if ($user->getLastBtn() == 1) /* ---- */ level_1(user: $user, db: $db, message: $message, callback_query: $callback_query);
-    if ($user->getLastBtn() == 2) /* ---- */ level_2(user: $user, db: $db, message: $message, callback_query: $callback_query);
-    if ($user->getLastBtn() == 5) /* ---- */ level_5(user: $user, db: $db, message: $message, callback_query: $callback_query);
-    if ($user->getLastBtn() == 6) /* ---- */ level_6(user: $user, db: $db, message: $message, callback_query: $callback_query);
-    if ($user->getLastBtn() == 8) /* ---- */ level_8(user: $user, db: $db, message: $message, callback_query: $callback_query);
-    if ($user->getLastBtn() == 11) /* --- */ level_11(user: $user, db: $db, message: $message, callback_query: $callback_query);
-    if ($user->getLastBtn() == 12) /* --- */ level_12(user: $user, db: $db, message: $message, callback_query: $callback_query);
+    if ($user->getLastBtn() == 0) /***/ level_0(user: $user, db: $db, message: $message, callback_query: $callback_query);
+    if ($user->getLastBtn() == 1) /***/ level_1(user: $user, db: $db, message: $message, callback_query: $callback_query);
+    if ($user->getLastBtn() == 2) /***/ level_2(user: $user, db: $db, message: $message, callback_query: $callback_query);
+    if ($user->getLastBtn() == 5) /***/ level_5(user: $user, db: $db, message: $message, callback_query: $callback_query);
+    if ($user->getLastBtn() == 6) /***/ level_6(user: $user, db: $db, message: $message, callback_query: $callback_query);
+    if ($user->getLastBtn() == 8) /***/ level_8(user: $user, db: $db, message: $message, callback_query: $callback_query);
+    if ($user->getLastBtn() == 11) /**/ level_11(user: $user, db: $db, message: $message, callback_query: $callback_query);
+    if ($user->getLastBtn() == 12) /**/ level_12(user: $user, db: $db, message: $message, callback_query: $callback_query);
 
     // Fallback if not handled
     sendToTelegram('editMessageText', [
@@ -241,16 +241,16 @@ function normalButtonHandler(User $user, Button $pressed_button, DatabaseManager
 
 function nonButtonHandler(User $user, array $message, DatabaseManager $db): void
 {
-    if ($user->getLastBtn() == '0') /* ---- */ level_0(user: $user, db: $db, message: $message);
-    if ($user->getLastBtn() == '1') /* ---- */ level_1(user: $user, db: $db, message: $message);
-    if ($user->getLastBtn() == '2') /* ---- */ level_2(user: $user, db: $db, message: $message);
-    if ($user->getLastBtn() == '5') /* ---- */ level_5(user: $user, db: $db, message: $message);
-    if ($user->getLastBtn() == '6') /* ---- */ level_6(user: $user, db: $db, message: $message);
-    if ($user->getLastBtn() == '8') /* ---- */ level_8(user: $user, db: $db, message: $message);
-    if ($user->getLastBtn() == '10') /* --- */ level_10(user: $user, db: $db, message: $message);
-    if ($user->getLastBtn() == '11') /* --- */ level_11(user: $user, db: $db, message: $message);
-    if ($user->getLastBtn() == '12') /* --- */ level_12(user: $user, db: $db, message: $message);
-    if ($user->getLastBtn() == 's3') /* --- */ empty_level(user: $user, db: $db, message: $message);
+    if ($user->getLastBtn() == '0') /***/ level_0(user: $user, db: $db, message: $message);
+    if ($user->getLastBtn() == '1') /***/ level_1(user: $user, db: $db, message: $message);
+    if ($user->getLastBtn() == '2') /***/ level_2(user: $user, db: $db, message: $message);
+    if ($user->getLastBtn() == '5') /***/ level_5(user: $user, db: $db, message: $message);
+    if ($user->getLastBtn() == '6') /***/ level_6(user: $user, db: $db, message: $message);
+    if ($user->getLastBtn() == '8') /***/ level_8(user: $user, db: $db, message: $message);
+    if ($user->getLastBtn() == '10') /**/ level_10(user: $user, db: $db, message: $message);
+    if ($user->getLastBtn() == '11') /**/ level_11(user: $user, db: $db, message: $message);
+    if ($user->getLastBtn() == '12') /**/ level_12(user: $user, db: $db, message: $message);
+    if ($user->getLastBtn() == 's3') /**/ empty_level(user: $user, db: $db, message: $message);
 
     // Fallback "Unrecognized" message
     sendToTelegram('sendMessage', [

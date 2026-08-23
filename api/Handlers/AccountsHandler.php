@@ -6,8 +6,8 @@ function level_9(
     DatabaseManager $db,
     ?Button         $level_button = null,
     ?array          $message = null,
-    ?array          $callback_query = null
-): void {
+    ?array          $callback_query = null): void
+{
     // Initialize button object if null is given
     $level_button = $level_button ?? Button::fromDbRow($db->read('buttons', ['id' => 9], true));
 
@@ -96,8 +96,8 @@ function level_10(
     DatabaseManager $db,
     ?Button         $level_button = null,
     ?array          $message = null,
-    ?array          $callback_query = null
-): void {
+    ?array          $callback_query = null): void
+{
     // Initialize button object if null is given
     $level_button = $level_button ?? Button::fromDbRow($db->read('buttons', ['id' => 10], true));
 

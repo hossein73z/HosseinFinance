@@ -29,7 +29,6 @@ else error_log("[INFO] Unhandled update type received.");
 DatabaseManager::closeConnection();
 exit;
 
-
 // ==========================================
 //          LEVEL 2: LOANS & INSTALLMENTS
 // ==========================================
@@ -116,7 +115,8 @@ function empty_level(
     DatabaseManager $db,
     string|int      $parent_btn_id = 0, // Required to avoid `null` progress bug
     ?array          $message = null,
-): void {
+): void
+{
     $progress = $user->getProgress();
 
     if (!$progress) backButton($user, $db, $parent_btn_id);
@@ -469,7 +469,8 @@ function createHoldingDetailText(
     ],
     ?string $holding_mssg_id = null,
     ?string $initial_mssg_id = null
-): string {
+): string
+{
     // Create tree view for each presented attribute
     $tree = '';
     foreach ($attributes as $attribute) {
@@ -521,8 +522,8 @@ function createHoldingDetailText(
             $pro_los = calculateProLos($holding['avg_price'], $holding['current_price'], $holding['amount'], $holding['exchange_rate']);
             $pro_los_string =
                 ($pro_los == 0) ?
-                "🟤 سود/زیان: ۰ " . $user_base_currency : (
-                    ($pro_los > 0) ?
+                    "🟤 سود/زیان: ۰ " . $user_base_currency : (
+                ($pro_los > 0) ?
                     "🟢 سود: " . beautifulNumber($pro_los) . ' ' . $user_base_currency :
                     "🔴 ضرر: " . beautifulNumber($pro_los) . ' ' . $user_base_currency
                 );
@@ -614,7 +615,7 @@ function createLoansView(array $loans, ?string $loans_mssg_id = null, ?string $i
             $remaining_days = $next_installment['remaining_days'];
             $next_payment_text =
                 $remaining_days == 0 ?
-                beautifulNumber($next_installment['amount']) . ' ریال برای امروز' : ($remaining_days == 1 ? beautifulNumber($next_installment['amount']) . ' ریال برای فردا' :
+                    beautifulNumber($next_installment['amount']) . ' ریال برای امروز' : ($remaining_days == 1 ? beautifulNumber($next_installment['amount']) . ' ریال برای فردا' :
                     beautifulNumber($next_installment['amount']) . ' ریال برای ' . $remaining_days . ' روز دیگر');
         } else $next_payment_text = 'پایان یافته';
 

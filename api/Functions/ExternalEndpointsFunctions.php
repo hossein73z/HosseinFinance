@@ -12,8 +12,8 @@ function sendToTelegram(
     string $method,
     array  $data = [],
     string $token = '',
-    string $bot_endpoint = ''
-): bool|array {
+    string $bot_endpoint = ''): bool|array
+{
     // Allow token to be passed, or fallback to constant/env
     if (empty($token))
         $token = defined('BOT_TOKEN') ? BOT_TOKEN : getenv('BOT_TOKEN');
@@ -67,8 +67,8 @@ function stream_request(
     array|string|null $data = null,
     ?string           $proxy = null,
     array             $headers = [],
-    int               $timeout = 10
-): string|false {
+    int               $timeout = 10): string|false
+{
     $method = strtoupper($method);
     $content = '';
     $additional_headers = '';

@@ -6,8 +6,8 @@ function level_11(
     DatabaseManager $db,
     ?Button         $level_button = null,
     ?array          $message = null,
-    ?array          $callback_query = null
-): void {
+    ?array          $callback_query = null): void
+{
     // Initialize button object if null is given
     $level_button = $level_button ?? Button::fromDbRow($db->read('buttons', ['id' => 11], true));
 
@@ -161,8 +161,8 @@ function level_12(
     DatabaseManager $db,
     ?Button         $level_button = null,
     ?array          $message = null,
-    ?array          $callback_query = null
-): void {
+    ?array          $callback_query = null): void
+{
     // Initialize button object if null is given
     $level_button = $level_button ?? Button::fromDbRow($db->read('buttons', ['id' => 12], true));
 
@@ -332,7 +332,12 @@ function askForTransactionType(User $user, array $data, DatabaseManager $db, ?st
     exit;
 }
 
-function askForTransactionAccount(User $user, string $type, array $data, DatabaseManager $db, ?string $text = null): void
+function askForTransactionAccount(
+    User            $user,
+    string          $type,
+    array           $data,
+    DatabaseManager $db,
+    ?string         $text = null): void
 {
     $type_text = $type == 'inward' ? 'مقصد' : 'مبدأ';
     $data['text'] = $text ?? 'حساب ' . $type_text . ' را از دکمه‌های زیر انتخاب کنید:';
@@ -352,7 +357,11 @@ function askForTransactionAccount(User $user, string $type, array $data, Databas
     exit;
 }
 
-function askForTransactionAmount(User $user, array $data, DatabaseManager $db, ?string $text = null): void
+function askForTransactionAmount(
+    User            $user,
+    array           $data,
+    DatabaseManager $db,
+    ?string         $text = null): void
 {
     $data['text'] = $text ?? 'مبلغ تراکنش را بع عدد ارسال کنید.';
     $response = sendToTelegram('sendMessage', $data);
@@ -368,7 +377,11 @@ function askForTransactionAmount(User $user, array $data, DatabaseManager $db, ?
     exit;
 }
 
-function askForTransactionCategory(User $user, array $data, DatabaseManager $db, ?string  $text = null): void
+function askForTransactionCategory(
+    User            $user,
+    array           $data,
+    DatabaseManager $db,
+    ?string         $text = null): void
 {
     $data['text'] = $text ?? 'دسته‌بندی تراکنش را وارد کنید' . "\n" . 'مثال: خوراک، حمل‌ونقل، حقوق، تفریح';
     $response = sendToTelegram('sendMessage', $data);
@@ -384,7 +397,11 @@ function askForTransactionCategory(User $user, array $data, DatabaseManager $db,
     exit;
 }
 
-function askForTransactionDate(User $user, array $data, DatabaseManager $db, ?string $text = null): void
+function askForTransactionDate(
+    User            $user,
+    array           $data,
+    DatabaseManager $db,
+    ?string         $text = null): void
 {
     $data['text'] = $text ?? 'تاریخ تراکنش را با فرمت مثال زده شده ارسال کنید یا از دکمه‌های زیر استفاده کنید. مثال:' . "\n" . JalaliDate::fromGregorian()->format('-');
     array_unshift(
@@ -404,7 +421,11 @@ function askForTransactionDate(User $user, array $data, DatabaseManager $db, ?st
     exit;
 }
 
-function askForTransactionTime(User $user, array $data, DatabaseManager $db, ?string $text = null): void
+function askForTransactionTime(
+    User            $user,
+    array           $data,
+    DatabaseManager $db,
+    ?string         $text = null): void
 {
     $data['text'] = $text ?? 'زمان تراکنش را با فرمت مثال زده شده ارسال کنید یا از دکمه‌ی زیر برای ساعت کنونی استفاده کنید. مثال:' . "\n" . (new DateTime())->format('H:i');
     array_unshift($data['reply_markup']['keyboard'], [['text' => 'اکنون']]);

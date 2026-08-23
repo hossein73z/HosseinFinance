@@ -9,7 +9,11 @@
  * @param DatabaseManager $db The database manager instance.
  * @return Button|null The Button instance of the pressed button, or null if not found.
  */
-function getPressedButton(string $text, int|string|null $parent_btn_id, bool $admin, DatabaseManager $db): ?Button
+function getPressedButton(
+    string          $text,
+    int|string|null $parent_btn_id,
+    bool            $admin,
+    DatabaseManager $db): ?Button
 {
     $admin = ($admin) ? [0, 1] : [0];
 

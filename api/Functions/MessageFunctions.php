@@ -129,8 +129,7 @@ function createFavoritesInlineKeyboard(
 function createFavoritesText(
     array   $assets,
     string  $base_currency,
-    ?string $markdown = null
-): string
+    ?string $markdown = null): string
 {
     if ($assets) {
         $text = '';

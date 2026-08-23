@@ -5,8 +5,8 @@ function level_8(
     DatabaseManager $db,
     ?Button         $level_button = null,
     ?array          $message = null,
-    ?array          $callback_query = null
-): void {
+    ?array          $callback_query = null): void
+{
     // Initialize button object if null is given
     $level_button = $level_button ?? Button::fromDbRow($db->read('buttons', ['id' => 8], true));
 
@@ -115,7 +115,7 @@ function managePriceAlerts(User $user, array $callback_query, array $message, Da
     $query_key = array_key_first($query_data);
     switch ($query_key) {
 
-        /** Add or remove alerts */
+        // Add or remove alerts
         case 'mng_alerts':
 
             $action = $query_data[$query_key];
@@ -190,7 +190,7 @@ function managePriceAlerts(User $user, array $callback_query, array $message, Da
             sendToTelegram('editMessageText', $data);
             exit;
 
-        /** Show list of asset to select for new alert */
+        // Show list of asset to select for new alert
         case 'fav_alert': // -------- Request from favorites message
         case 'new_alert_type': // --- Request from alert manager message
 
@@ -235,7 +235,7 @@ function managePriceAlerts(User $user, array $callback_query, array $message, Da
             $user = $user->setProgress(['parent_btn' => $user->getLastBtn(), 'data' => ['set_alert' => ['asset_id' => $query_data['new_alert_asset_id']]]]);
             empty_level($user, $db, $user->getLastBtn());
 
-        /** Ask user to confirm deleting alert */
+        // Ask user to confirm deleting alert
         case 'del_alert':
             $alert_id = $query_data[$query_key];
 
@@ -249,7 +249,7 @@ function managePriceAlerts(User $user, array $callback_query, array $message, Da
             sendToTelegram('editMessageText', $data);
             exit;
 
-        /** Delete alert and send alerts' message to the user */
+        // Delete alert and send alerts' message to the user
         case 'conf_del_alert':
 
             $alert_id = $query_data[$query_key];
@@ -270,7 +270,7 @@ function managePriceAlerts(User $user, array $callback_query, array $message, Da
             sendAllAlerts($user, $db);
             exit;
 
-        /** Show main list of alerts */
+        // Show main list of alerts
         case 'show_alerts':
             sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
             sendAllAlerts($user, $db, $message['message_id']);

@@ -6,8 +6,8 @@ function level_2(
     ?Button         $level_button = null,
     ?array          $message = null,
     ?array          $callback_query = null,
-    ?string         $command_data = null
-): void {
+    ?string         $command_data = null): void
+{
     // Initialize button object if null is given
     $level_button = $level_button ?? Button::fromDbRow($db->read('buttons', ['id' => 2], true));
 
@@ -48,7 +48,12 @@ function level_2(
     exit;
 }
 
-function handleLoansCallback(User $user, array $callback_query, array $data, array $message, DatabaseManager $db): void
+function handleLoansCallback(
+    User            $user,
+    array           $callback_query,
+    array           $data,
+    array           $message,
+    DatabaseManager $db): void
 {
     $query_data = $callback_query['data'];
 
@@ -101,7 +106,11 @@ function handleLoansCallback(User $user, array $callback_query, array $data, arr
     exit;
 }
 
-function handleLoansWebAppData(User $user, array $data, array $message, DatabaseManager $db): void
+function handleLoansWebAppData(
+    User            $user,
+    array           $data,
+    array           $message,
+    DatabaseManager $db): void
 {
     $web_app_data = json_decode($message['web_app_data']['data'], true);
     // Add new loan and installments
@@ -147,7 +156,7 @@ function handleLoansWebAppData(User $user, array $data, array $message, Database
                 } catch (Exception $e) {
                     error_log(
                         'Installment: ' . json_encode($inst) . "\n" .
-                            'Error: ' . $e->getMessage()
+                        'Error: ' . $e->getMessage()
                     );
                 }
             }
@@ -160,7 +169,7 @@ function handleLoansWebAppData(User $user, array $data, array $message, Database
             ]);
             error_log(
                 'Loan: ' . json_encode($new_loan) . "\n" .
-                    'Error: ' . $e->getMessage()
+                'Error: ' . $e->getMessage()
             );
         }
         sendAllLoans($user, $db, summerized: $user->getDetailedLoan());
@@ -192,7 +201,7 @@ function handleLoansWebAppData(User $user, array $data, array $message, Database
             } catch (Exception $e) {
                 error_log(
                     'Loan Updates: ' . json_encode($web_app_data['updates']) . "\n" .
-                        'Error: ' . $e->getMessage()
+                    'Error: ' . $e->getMessage()
                 );
             }
         }
@@ -218,7 +227,7 @@ function handleLoansWebAppData(User $user, array $data, array $message, Database
                 $data['text'] .= "\nویرایش اطلاعات اقساط: ❌";
                 error_log(
                     'New Installments: ' . json_encode($new_insts) . "\n" .
-                        'Error: ' . $e->getMessage()
+                    'Error: ' . $e->getMessage()
                 );
             }
 
@@ -233,7 +242,7 @@ function handleLoansWebAppData(User $user, array $data, array $message, Database
                 $data['text'] .= "\nحذف اقساط با خطا مواجه شد! ";
                 error_log(
                     'delete Installment: ' . json_encode(array_column($new_insts, 'due_date')) . "\n" .
-                        'Error: ' . $e->getMessage()
+                    'Error: ' . $e->getMessage()
                 );
             }
         }
@@ -257,7 +266,7 @@ function handleLoansWebAppData(User $user, array $data, array $message, Database
             $data['text'] = '❌ خطای پایگاه داده در حذف وام!';
             error_log(
                 'Updates: ' . json_encode($web_app_data['updates']) . "\n" .
-                    'Error: ' . $e->getMessage()
+                'Error: ' . $e->getMessage()
             );
         }
 
@@ -275,7 +284,11 @@ function handleLoansWebAppData(User $user, array $data, array $message, Database
     exit;
 }
 
-function handleLoansTextMessage(User $user, array $data, array $message, DatabaseManager $db): void
+function handleLoansTextMessage(
+    User            $user,
+    array           $data,
+    array           $message,
+    DatabaseManager $db): void
 {
 
     // Show loan detail
@@ -284,8 +297,7 @@ function handleLoansTextMessage(User $user, array $data, array $message, Databas
 
         $loan = getLoanWithInstallments(user_id: $user->getId(), db: $db, jalali: true, loan_id: $matches[1]);
 
-        if ($loan) {
-            /** else: Send default Irrelevance message */
+        if ($loan) { // else: Send default Irrelevance message
 
             // Delete redundant messages
             if (isset($matches[5]))
@@ -323,8 +335,7 @@ function handleLoansTextMessage(User $user, array $data, array $message, Databas
             join: 'LEFT JOIN loans l ON i.loan_id = l.id'
         );
 
-        if ($installment) {
-            /** else: Default Irrelevance message will be sent */
+        if ($installment) { // else: Default Irrelevance message will be sent
 
             $db->update(
                 table: 'installments',
@@ -370,7 +381,12 @@ function handleLoansTextMessage(User $user, array $data, array $message, Databas
     exit;
 }
 
-function sendAllLoans(User $user, DatabaseManager $db, ?string $initial_mssg_id = null, ?string $mssg_id_to_edit = null, bool $summerized = true): void
+function sendAllLoans(
+    User            $user,
+    DatabaseManager $db,
+    ?string         $initial_mssg_id = null,
+    ?string         $mssg_id_to_edit = null,
+    bool            $summerized = true): void
 {
 
     $loans = getLoanWithInstallments(user_id: $user->getId(), db: $db, jalali: true);

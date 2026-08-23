@@ -4,8 +4,8 @@ function level_6(
     User            $user,
     DatabaseManager $db,
     ?array          $message = null,
-    ?array          $callback_query = null
-): void {
+    ?array          $callback_query = null): void
+{
     if ($callback_query) {
         sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
         sendToTelegram('editMessageText', [
