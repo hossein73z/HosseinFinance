@@ -1,44 +1,6 @@
 <?php
-// Load core configuration and constants.
-use JetBrains\PhpStorm\NoReturn;
 
-date_default_timezone_set('Asia/Tehran');
-
-// --- VERCEL CONFIGURATION ---
-define('SHARED_SECRET', getenv('SHARED_SECRET'));
-define('BOT_ID', getenv('BOT_ID'));
-define('BOT_TOKEN', getenv('BOT_TOKEN'));
-
-// Database Constants (Required for DatabaseManager)
-define('DB_HOST', getenv('DB_HOST'));
-define('DB_PORT', getenv('DB_PORT'));
-define('DB_NAME', getenv('DB_NAME'));
-define('DB_USER', getenv('DB_USER'));
-define('DB_PASS', getenv('DB_PASS'));
-define('DB_API_SECRET', getenv('DB_API_SECRET'));
-
-// Base URL for Web Apps
-define('BASE_URL', getenv('BASE_URL'));
-// ----------------------------
-
-// Load necessary files
-require_once 'Libraries/DatabaseManager.php';
-require_once 'Functions/ExternalEndpointsFunctions.php';
-require_once 'Functions/KeyboardFunctions.php';
-require_once 'Functions/MessageFunctions.php';
-require_once 'Functions/StringHelper.php';
-require_once 'Models/Button.php';
-require_once 'Models/User.php';
-require_once 'Models/JalaliDate.php';
-
-// --- INITIALIZATION & SHUTDOWN ---
-
-register_shutdown_function(function () {
-    $error = error_get_last();
-    if ($error && in_array($error['type'], [E_ERROR, E_PARSE, E_COMPILE_ERROR, E_CORE_ERROR])) {
-        error_log("CRITICAL SCRIPT CRASH: Type: {$error['type']} | Message: {$error['message']} | File: {$error['file']} | Line: {$error['line']}");
-    }
-});
+require_once 'bootstrap.php';
 
 // Setup Webhook Response
 header('Content-Type: application/json');
@@ -55,21 +17,6 @@ if (empty($input)) {
 $update = json_decode($input, true);
 if (json_last_error() !== JSON_ERROR_NONE) {
     error_log("[ERROR] Invalid JSON received: " . json_last_error_msg());
-    exit;
-}
-
-// Initialize Database connection.
-try {
-    $db = DatabaseManager::getInstance(
-        host: DB_HOST,
-        db: DB_NAME,
-        user: DB_USER,
-        pass: DB_PASS,
-        port: DB_PORT ?: '3306'
-    );
-    $db->query("SET SESSION group_concat_max_len = 10000000;");
-} catch (Exception $e) {
-    error_log($e->getMessage());
     exit;
 }
 

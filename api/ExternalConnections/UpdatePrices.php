@@ -322,7 +322,7 @@ function updateLiveMessages(array $new_assets, DatabaseManager $db): void
         $user['fav_assets'] = json_decode($user['fav_assets'], true);
         sendAllFavorites(User::fromDbRow($user), $db, $user['live_message_id']);
         /*
-         * TODO
+         * TODO:
          *  With telegram, test with deleted message and deleted user
          *  NOTE: On deleted message, inactivate or delete the live message.
          *  NOTE: On deleted chat, remove the user from the database completely.
