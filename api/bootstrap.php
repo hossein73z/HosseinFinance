@@ -2,11 +2,16 @@
 
 // Load necessary files
 require_once 'config/config.php';
+
+require_once 'Core/Router.php';
+
 require_once 'Libraries/DatabaseManager.php';
+
 require_once 'Functions/ExternalEndpointsFunctions.php';
 require_once 'Functions/KeyboardFunctions.php';
 require_once 'Functions/MessageFunctions.php';
 require_once 'Functions/StringHelper.php';
+
 require_once 'Models/Button.php';
 require_once 'Models/User.php';
 require_once 'Models/JalaliDate.php';
