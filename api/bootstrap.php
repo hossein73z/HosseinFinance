@@ -18,6 +18,7 @@ require_once 'Handlers/MainMenuHandler.php';
 require_once 'Handlers/HoldingsHandler.php';
 require_once 'Handlers/LoansHandler.php';
 require_once 'Handlers/PricesHandler.php';
+require_once 'Handlers/AIHandler.php';
 
 // Functions
 require_once 'Functions/ExternalEndpointsFunctions.php';
