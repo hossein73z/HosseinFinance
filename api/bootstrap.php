@@ -21,6 +21,7 @@ require_once 'Handlers/PricesHandler.php';
 require_once 'Handlers/AIHandler.php';
 require_once 'Handlers/AlertsHandler.php';
 require_once 'Handlers/AccountsHandler.php';
+require_once 'Handlers/TransactionsHandler.php';
 
 // Functions
 require_once 'Functions/ExternalEndpointsFunctions.php';
