@@ -33,6 +33,7 @@ require_once 'Functions/AdminFunctions.php';
 
 // Helpers
 require_once 'Helpers/HoldingsHelper.php';
+require_once 'Helpers/LoansHelper.php';
 
 // Models
 require_once 'Models/Button.php';
