@@ -15,6 +15,7 @@ require_once 'Libraries/DatabaseManager.php';
 
 // Handlers
 require_once 'Handlers/MainMenuHandler.php';
+require_once 'Handlers/HoldingsHandler.php';
 
 // Functions
 require_once 'Functions/ExternalEndpointsFunctions.php';
