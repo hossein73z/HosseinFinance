@@ -123,7 +123,7 @@ function empty_level(
 
     // NOTE: Text and keyboard must be initialized within progress handler
     $text = '';
-    $$keyboard = [];
+    $keyboard = [];
     $data = [
         'chat_id' => $user->getid(),
         'text' => &$text,
