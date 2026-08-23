@@ -21,7 +21,12 @@ if (json_last_error() !== JSON_ERROR_NONE) {
 }
 
 // Database was initialized in bootstrap.php; resolve via singleton explicitly.
-$db = DatabaseManager::getInstance();
+try {
+    $db = DatabaseManager::getInstance();
+} catch (Exception $e) {
+    error_log($e->getMessage());
+    exit;
+}
 
 // --- MAIN UPDATE ROUTER ---
 
