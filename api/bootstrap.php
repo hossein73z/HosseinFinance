@@ -1,24 +1,33 @@
 <?php
 
-// Load necessary files
+// ----- LOAD NECESSARY FILES ------ //
+
+// Configuration
 require_once 'config/config.php';
 
+// Core
 require_once 'Core/Router.php';
 require_once 'Core/WebhookSecurity.php';
 require_once 'Core/Navigation.php';
 
+// Libraries
 require_once 'Libraries/DatabaseManager.php';
 
+// Handlers
+require_once 'Handlers/MainMenuHandler.php';
+
+// Functions
 require_once 'Functions/ExternalEndpointsFunctions.php';
 require_once 'Functions/KeyboardFunctions.php';
 require_once 'Functions/MessageFunctions.php';
 require_once 'Functions/StringHelper.php';
 
+// Models
 require_once 'Models/Button.php';
 require_once 'Models/User.php';
 require_once 'Models/JalaliDate.php';
 
-// --- INITIALIZATION & SHUTDOWN ---
+// --- SHUTDOWN AND INITIALIZATION --- //
 
 register_shutdown_function(function () {
     $error = error_get_last();
