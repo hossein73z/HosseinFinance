@@ -4,6 +4,7 @@
 require_once 'config/config.php';
 
 require_once 'Core/Router.php';
+require_once 'Core/WebhookSecurity.php';
 
 require_once 'Libraries/DatabaseManager.php';
 
