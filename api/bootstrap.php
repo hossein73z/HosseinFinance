@@ -31,6 +31,9 @@ require_once 'Functions/MessageFunctions.php';
 require_once 'Functions/StringHelper.php';
 require_once 'Functions/AdminFunctions.php';
 
+// Helpers
+require_once 'Helpers/HoldingsHelper.php';
+
 // Models
 require_once 'Models/Button.php';
 require_once 'Models/User.php';
