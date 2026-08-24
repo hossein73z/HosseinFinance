@@ -59,7 +59,6 @@ function handleIncomingMessage(array $message, DatabaseManager $db): void
     if ($text === '/holdings') /*******/ level_1(user: $user, db: $db);
     if ($text === '/loans') /**********/ level_2(user: $user, db: $db);
     if ($text === '/prices') /*********/ level_5(user: $user, db: $db);
-    if ($text === '/ai') /*************/ level_6(user: $user, db: $db);
     if ($text === '/accounts') /*******/ level_9(user: $user, db: $db);
     if ($text === '/favorites') /******/ sendAllFavorites($user, $db);
     if ($text === '/base_currency') /**/ sendSelectBaseCurrencyMessage($user, $db);
@@ -184,7 +183,6 @@ function callbackHandler(User $user, array $callback_query, DatabaseManager $db)
     if ($user->getLastBtn() == 1) /***/ level_1(user: $user, db: $db, message: $message, callback_query: $callback_query);
     if ($user->getLastBtn() == 2) /***/ level_2(user: $user, db: $db, message: $message, callback_query: $callback_query);
     if ($user->getLastBtn() == 5) /***/ level_5(user: $user, db: $db, message: $message, callback_query: $callback_query);
-    if ($user->getLastBtn() == 6) /***/ level_6(user: $user, db: $db, message: $message, callback_query: $callback_query);
     if ($user->getLastBtn() == 8) /***/ level_8(user: $user, db: $db, message: $message, callback_query: $callback_query);
     if ($user->getLastBtn() == 11) /**/ level_11(user: $user, db: $db, message: $message, callback_query: $callback_query);
     if ($user->getLastBtn() == 12) /**/ level_12(user: $user, db: $db, message: $message, callback_query: $callback_query);
@@ -218,7 +216,6 @@ function normalButtonHandler(User $user, Button $pressed_button, DatabaseManager
     if ($pressed_button->getId() == 1) level_1(user: $user, db: $db, level_button: $pressed_button);
     if ($pressed_button->getId() == 2) level_2(user: $user, db: $db, level_button: $pressed_button);
     if ($pressed_button->getId() == 5) level_5(user: $user, db: $db, level_button: $pressed_button);
-    if ($pressed_button->getId() == 6) level_6(user: $user, db: $db);
     if ($pressed_button->getId() == 8) level_8(user: $user, db: $db, level_button: $pressed_button);
     if ($pressed_button->getId() == 9) level_9(user: $user, db: $db, level_button: $pressed_button);
     if ($pressed_button->getId() == 10) level_10(user: $user, db: $db, level_button: $pressed_button);
@@ -252,7 +249,6 @@ function nonButtonHandler(User $user, array $message, DatabaseManager $db): void
     if ($user->getLastBtn() == '1') /***/ level_1(user: $user, db: $db, message: $message);
     if ($user->getLastBtn() == '2') /***/ level_2(user: $user, db: $db, message: $message);
     if ($user->getLastBtn() == '5') /***/ level_5(user: $user, db: $db, message: $message);
-    if ($user->getLastBtn() == '6') /***/ level_6(user: $user, db: $db, message: $message);
     if ($user->getLastBtn() == '8') /***/ level_8(user: $user, db: $db, message: $message);
     if ($user->getLastBtn() == '10') /**/ level_10(user: $user, db: $db, message: $message);
     if ($user->getLastBtn() == '11') /**/ level_11(user: $user, db: $db, message: $message);

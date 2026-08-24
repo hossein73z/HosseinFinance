@@ -18,7 +18,6 @@ require_once __DIR__ . '/Handlers/MainMenuHandler.php';
 require_once __DIR__ . '/Handlers/HoldingsHandler.php';
 require_once __DIR__ . '/Handlers/LoansHandler.php';
 require_once __DIR__ . '/Handlers/PricesHandler.php';
-require_once __DIR__ . '/Handlers/AIHandler.php';
 require_once __DIR__ . '/Handlers/AlertsHandler.php';
 require_once __DIR__ . '/Handlers/AccountsHandler.php';
 require_once __DIR__ . '/Handlers/TransactionsHandler.php';

@@ -69,9 +69,10 @@ function empty_level(
     $progress_data = $progress['data'];
 
     ##########################
-    ##   Progress Handler   ##
+    #### Progress Handler ####
     ##########################
 
+    # --- Set alert price ---
     if (array_key_first($progress_data) == 'set_alert') {
 
         // Create bottom keyboard with just cancel button

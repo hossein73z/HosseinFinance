@@ -234,6 +234,7 @@ function managePriceAlerts(User $user, array $callback_query, array $message, Da
 
             $user = $user->setProgress(['parent_btn' => $user->getLastBtn(), 'data' => ['set_alert' => ['asset_id' => $query_data['new_alert_asset_id']]]]);
             empty_level($user, $db, $user->getLastBtn());
+            break;
 
         // Ask user to confirm deleting alert
         case 'del_alert':

@@ -275,7 +275,7 @@ function addTransactionProgress(User $user, array $data, ?array $message, Databa
                 $progress['add_transaction']['date'] = (new DateTime())->modify('-2 days')->format('Y-m-d');
             } else {
                 $date_text = toEnglishDigits(trim($message['text']));
-                if (!preg_match('/^(\d{4})[\/\.\-](\d{1,2})[\/\.\-](\d{1,2})$/u', $date_text, $date_matches)) {
+                if (!preg_match('/^(\d{4})[\/.\-](\d{1,2})[\/.\-](\d{1,2})$/u', $date_text, $date_matches)) {
                     askForTransactionDate($user, $data, $db, 'فرمت تاریخ صحیح نیست. لطفاً به صورت yyyy/mm/dd یا yyyy-mm-dd وارد کنید.');
                 }
                 $date_j = JalaliDate::fromString($date_text);

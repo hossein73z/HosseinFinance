@@ -122,7 +122,7 @@ function handlePricesCallback(
             $assets = $db->query(
                 "
                 select
-                    a.*, CASE WHEN f.user_id IS NULL THEN 0 ELSE 1 END AS in_favorites
+                    a.*, IF(f.user_id IS NULL, 0, 1) AS in_favorites
                 from assets a 
                 left join favorites f
                     on f.asset_name = a.name
