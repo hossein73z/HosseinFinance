@@ -20,30 +20,57 @@ function toEnglishDigits(string $text): string
  */
 function cleanAndValidateNumber(string $messageText): ?string
 {
-    // 1. Normalize Persian/Arabic Numerals to English (ASCII) Numerals
-    $cleanedText = str_replace(persian, english, $messageText);
-    $cleanedText = str_replace(arabic, english, $cleanedText);
+    // Persian & Arabic digits mapping to Western Arabic (0-9)
+    $persian = ['۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹', '٫', '٬'];
+    $arabic = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
+    $english = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '.', ','];
 
-    // 2. Normalize Delimiters
-    $cleanedText = str_replace([' ', ','], '.', $cleanedText); // Replace space and comma with dot as a common simplification
+    // 1. Normalize Persian/Arabic numerals and separators
+    $cleaned = str_replace($persian, $english, trim($messageText));
+    $cleaned = str_replace($arabic, array_slice($english, 0, 10), $cleaned);
 
-    // 3. Remove/Normalize potential thousands separators (if they are not the main decimal dot)
-    $sanitized = preg_replace('/[^\d.]/', '', $cleanedText);
+    // Remove any spaces
+    $cleaned = str_replace(' ', '', $cleaned);
 
-    // Remove multiple dots, keeping only the first one (or none if no dot is present)
-    $parts = explode('.', $sanitized, 2);
-    $finalNumberString = $parts[0];
-    if (isset($parts[1])) {
-        $finalNumberString .= '.' . $parts[1];
+    // 2. Determine delimiter roles (thousands separator vs. decimal point)
+    $hasComma = str_contains($cleaned, ',');
+    $hasDot = str_contains($cleaned, '.');
+
+    if ($hasComma && $hasDot) {
+        // Both exist: the last one is the decimal point
+        if (strrpos($cleaned, '.') > strrpos($cleaned, ',')) {
+            // E.g., "1,234.56" -> remove commas
+            $cleaned = str_replace(',', '', $cleaned);
+        } else {
+            // E.g., "1.234,56" -> remove dots, replace comma with dot
+            $cleaned = str_replace('.', '', $cleaned);
+            $cleaned = str_replace(',', '.', $cleaned);
+        }
+    } elseif ($hasComma) {
+        // Only commas exist:
+        // If multiple commas, they are thousands separators (e.g. "1,234,567")
+        if (substr_count($cleaned, ',') > 1) {
+            $cleaned = str_replace(',', '', $cleaned);
+        } else {
+            // Single comma: treat as decimal separator (e.g. "1234,56")
+            $cleaned = str_replace(',', '.', $cleaned);
+        }
+    } elseif ($hasDot) {
+        // Only dots exist:
+        // If multiple dots, treat them as thousands separators (e.g. "1.234.567")
+        if (substr_count($cleaned, '.') > 1) {
+            $cleaned = str_replace('.', '', $cleaned);
+        }
     }
 
-    // Check if the resulting string is a number
-    if (is_numeric($finalNumberString)) {
-        // Ensure it's returned as a string (e.g., "123.45")
-        return floatval($finalNumberString);
+    // 3. Remove any remaining invalid characters (keeping only digits, one dot, and optional leading minus)
+    $cleaned = preg_replace('/[^\d.-]/', '', $cleaned);
+
+    // 4. Validate and return
+    if (is_numeric($cleaned)) {
+        return (string)(float)$cleaned; // Or return (float) $cleaned if you change return type to ?float
     }
 
-    // If validation fails, return null
     return null;
 }
 
