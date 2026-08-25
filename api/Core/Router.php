@@ -59,6 +59,7 @@ function handleIncomingMessage(array $message, DatabaseManager $db): void
     if ($text === '/holdings') /*******/ level_1(user: $user, db: $db);
     if ($text === '/loans') /**********/ level_2(user: $user, db: $db);
     if ($text === '/prices') /*********/ level_5(user: $user, db: $db);
+    if ($text === '/alerts') /*********/ level_8(user: $user, db: $db);
     if ($text === '/accounts') /*******/ level_9(user: $user, db: $db);
     if ($text === '/favorites') /******/ sendAllFavorites($user, $db);
     if ($text === '/base_currency') /**/ sendSelectBaseCurrencyMessage($user, $db);
