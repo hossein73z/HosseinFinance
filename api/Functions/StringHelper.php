@@ -16,9 +16,9 @@ function toEnglishDigits(string $text): string
  * Handles various numeral systems and common delimiters.
  *
  * @param string $messageText The input string containing a potential number.
- * @return string|null The cleaned and validated number string, or null if validation fails.
+ * @return float|null The cleaned and validated number string, or null if validation fails.
  */
-function cleanAndValidateNumber(string $messageText): ?string
+function cleanAndValidateNumber(string $messageText): ?float
 {
     // Persian & Arabic digits mapping to Western Arabic (0-9)
     $persian = ['۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹', '٫', '٬'];
@@ -68,7 +68,7 @@ function cleanAndValidateNumber(string $messageText): ?string
 
     // 4. Validate and return
     if (is_numeric($cleaned)) {
-        return (string)(float)$cleaned; // Or return (float) $cleaned if you change return type to ?float
+        return (float)$cleaned; // Or return (float) $cleaned if you change return type to ?float
     }
 
     return null;
