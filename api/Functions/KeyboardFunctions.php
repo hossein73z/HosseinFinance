@@ -105,8 +105,8 @@ function createButtonTextTree(array $buttons): string
      * @param string $prefix The indentation and structural string from parent levels.
      * @return string The partial tree string for this level and its descendants.
      */
-    function buildTreeRecursively(array $keyboard_ids_array, array $buttons, string $prefix): string
-    {
+    $buildTreeRecursively = null;
+    $buildTreeRecursively = function (array $keyboard_ids_array, array $buttons, string $prefix) use (&$buildTreeRecursively): string {
         $tree = '';
         $rows = count($keyboard_ids_array);
 
@@ -136,17 +136,17 @@ function createButtonTextTree(array $buttons): string
                 // Recurse if the current button itself has nested keyboards.
                 if (isset($button['keyboards']) && $button['keyboards']) {
                     $nested_keyboard_ids = json_decode($button['keyboards'], true);
-                    $tree .= buildTreeRecursively($nested_keyboard_ids, $buttons, $next_prefix);
+                    $tree .= $buildTreeRecursively($nested_keyboard_ids, $buttons, $next_prefix);
                 }
             }
         }
         return $tree;
-    }
+    };
 
     // Get root text
     $root_attrs = json_decode($buttons[0]['attrs'], true);
     $root_text = $root_attrs['text'] ?? 'Root';
 
     // Start the tree with the root button's text, followed by the recursive children.
-    return $root_text . "\n" . buildTreeRecursively($root_keyboard_ids, $buttons, '');
+    return $root_text . "\n" . $buildTreeRecursively($root_keyboard_ids, $buttons, '');
 }
