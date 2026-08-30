@@ -3,20 +3,23 @@
 require_once __DIR__ . '/../Functions/MessageFunctions.php';
 
 /**
- * Edits a message and adds favorites text and inline keyboard.
- * Doesn't send the initial message containing bottom keyboard.
- * Doesn't delete any message or set change live price updates.
+ * Edits a message (or send new one if `$message_id` is null) with
+ * the prices of favorites item and corresponding inline keyboard.
+ * Also, updates the live price message in the database only if
+ * `$message_id` is null.
  *
  * @param User $user
  * @param DatabaseManager $db
- * @param int|string|null $message_id ID of the message to be edited. If `null`, a new message is sent and immediately edited
+ * @param int|string|null $message_id ID of the message to be edited.
  * @return void
  */
 function sendAllFavorites(User $user, DatabaseManager $db, int|string|null $message_id = null): void
 {
-    $message_id = ($message_id !== null) ?
-        $message_id :
-        sendLoadingMessage($user->getid(), 'در حال دریافت اطلاعات لیست علاقه‌مندی‌ها ...')['result']['message_id'];
+
+    if ($message_id == null) {
+        $message_id = sendLoadingMessage($user->getid(), 'در حال دریافت اطلاعات لیست علاقه‌مندی‌ها ...')['result']['message_id'];
+        updateLivePriceMessageInDatabase($user, $message_id, $db);
+    }
 
     $favorites = getFavoriteWithExchangeRate($user->getId(), $db);
 
@@ -33,6 +36,32 @@ function sendAllFavorites(User $user, DatabaseManager $db, int|string|null $mess
         ]
     ]);
     exit();
+}
+
+/**
+ * If user has active or paused live price message registered
+ * in the database, deletes it and updates its `message_id`
+ * to the new `$message_id`.
+ */
+function updateLivePriceMessageInDatabase(User $user, string|int $message_id, DatabaseManager $db): void
+{
+    // Check if user has active or paused live price message
+    $live_message = $db->read(
+        table: 'special_messages',
+        conditions: [
+            'user_id' => $user->getId(),
+            'type' => 'live_price',
+            'status' => ['active', 'paused']],
+        single: true
+    );
+    if ($live_message) {
+
+        // Delete previous live price message
+        sendToTelegram('deleteMessage', ['chat_id' => $user->getid(), 'message_id' => $live_message['message_id']]);
+        // Replace previous life price message in the database
+        $db->upsert('special_messages', ['user_id' => $user->getId(), 'type' => 'live_price', 'status' => 'active', 'message_id' => $message_id]);
+    }
+
 }
 
 function getFavoriteWithExchangeRate(string|int $user_id, DatabaseManager $db): bool|array
