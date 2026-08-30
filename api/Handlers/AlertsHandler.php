@@ -95,7 +95,20 @@ function sendAllAlerts(User $user, DatabaseManager $db, int|string|null $message
     if ($alerts) {
         $text = 'هشدارهای شما:' . "\n";
         foreach ($alerts as $alert) {
-            $text .= "\n  - " . beautifulNumber($alert['asset_name'], null) . ': ' . beautifulNumber($alert['target_price']);
+            $status_emoji = '⚠';
+            switch ($alert['status']) {
+                case 'active':
+                    $status_emoji = '🔁';
+                    break;
+                case 'triggered':
+                    $status_emoji = '✅';
+                    break;
+                case 'inactive':
+                    $status_emoji = '❌';
+                    break;
+            }
+            $text .=
+                "\n  - " . $status_emoji . ' ' . beautifulNumber($alert['asset_name'], null) . ': ' . beautifulNumber($alert['target_price']);
         }
     } else $text = 'شما هشداری ثبت نکرده‌اید!';
 
