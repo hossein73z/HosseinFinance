@@ -1,5 +1,3 @@
-USE test;
-
 CREATE TABLE IF NOT EXISTS `users`
 (
     id         BIGINT      NOT NULL PRIMARY KEY,

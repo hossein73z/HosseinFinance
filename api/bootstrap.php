@@ -34,6 +34,7 @@ require_once __DIR__ . '/Functions/AdminFunctions.php';
 require_once __DIR__ . '/Helpers/HoldingsHelper.php';
 require_once __DIR__ . '/Helpers/LoansHelper.php';
 require_once __DIR__ . '/Helpers/PricesHelper.php';
+require_once __DIR__ . '/Helpers/FavoritesHelper.php';
 require_once __DIR__ . '/Helpers/TransactionsHelper.php';
 require_once __DIR__ . '/Helpers/TelegramUIHelper.php';
 

@@ -5,7 +5,7 @@ use JetBrains\PhpStorm\NoReturn;
 require_once __DIR__ . '/../Libraries/DatabaseManager.php';
 require_once __DIR__ . '/../Functions/ExternalEndpointsFunctions.php';
 require_once __DIR__ . '/../Functions/StringHelper.php';
-require_once __DIR__ . '/../Functions/MessageFunctions.php';
+require_once __DIR__ . '/../Helpers/FavoritesHelper.php';
 require_once __DIR__ . '/../Models/User.php';
 
 // --- CONFIGURATION ---
