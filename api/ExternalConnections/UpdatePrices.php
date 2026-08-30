@@ -215,7 +215,7 @@ function getRelatedAlerts(array $assets, DatabaseManager $db): array|bool
             alerts.asset_name,
             alerts.target_price,
             alerts.trigger_type,
-            alerts.is_active,
+            alerts.status,
             assets.asset_type,
             assets.price as current_price,
             assets.base_currency
@@ -223,7 +223,7 @@ function getRelatedAlerts(array $assets, DatabaseManager $db): array|bool
             join assets on alerts.asset_name=assets.name
         where
             alerts.asset_name in ('" . implode("','", $asset_names) . "') and
-            alerts.is_active is true
+            alerts.status = 'active'
     ;")->fetchAll();
 
     return filterTriggeredAlerts($alerts, $assets);
@@ -260,6 +260,7 @@ function filterTriggeredAlerts(array $alerts, array $assets): array|bool
 
 /**
  * Finds triggered alerts and sends notifications to users
+ * HACK: This must be tested with new prices
  */
 function sendPriceAlerts(array $assets, DatabaseManager $db): void
 {
@@ -274,7 +275,7 @@ function sendPriceAlerts(array $assets, DatabaseManager $db): void
                     "\n" . 'قیمت کنونی: ' . beautifulNumber($alert['new_price']),
             ];
             $response = sendToTelegram('sendMessage', $data);
-            if ($response) $db->update('alerts', ['is_active' => false], ['id' => $alert['id']]);
+            if ($response) $db->update('alerts', ['status' => 'triggered'], ['id' => $alert['id']]);
         }
     }
 }

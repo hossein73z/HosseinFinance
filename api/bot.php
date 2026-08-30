@@ -122,7 +122,7 @@ function empty_level(
                         'user_id' => $user->getId(),
                         'asset_name' => $asset['name'],
                         'target_price' => $target_price,
-                        'is_active' => true,
+                        'status' => 'active',
                         'created_date' => JalaliDate::fromGregorian()->format(),
                         'created_time' => date('H:i')
                     ]);
