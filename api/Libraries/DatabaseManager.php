@@ -109,7 +109,8 @@ class DatabaseManager
         ?string    $user = null,
         ?string    $pass = null,
         int|string $port = 3306
-    ): DatabaseManager {
+    ): DatabaseManager
+    {
         if (self::$instance === null) {
             if (!$host || !$db || !$user) {
                 throw new Exception("DatabaseManager not initialized. Host, Database, and User parameters are required for the first call.");
@@ -122,7 +123,9 @@ class DatabaseManager
         return self::$instance;
     }
 
-    private function __clone() {}
+    private function __clone()
+    {
+    }
 
     public function __wakeup()
     {
@@ -307,7 +310,8 @@ class DatabaseManager
         int          $offset = 0,
         ?int         $chunkSize = null,
         ?string      $chunkByColumn = null
-    ): array|bool {
+    ): array|bool
+    {
         $where = $this->buildWhere($conditions);
         $distinctClause = $distinct ? 'DISTINCT ' : '';
 
@@ -481,8 +485,24 @@ class DatabaseManager
         }
 
         $normalizedDataRows = array_map([$this, 'normalizeDataForDb'], $dataRows);
-        $fields = array_keys($normalizedDataRows[0]);
-        $fieldNames = implode(', ', $fields);
+
+        // Collect the full set of columns that appear in any row
+        $allFields = [];
+        foreach ($normalizedDataRows as $row) {
+            $allFields = array_merge($allFields, array_keys($row));
+        }
+        $fields = array_values(array_unique($allFields));
+
+        // Pad every row so it has exactly the same keys (missing → null)
+        $normalizedDataRows = array_map(function (array $row) use ($fields) {
+            $padded = [];
+            foreach ($fields as $field) {
+                $padded[$field] = $row[$field] ?? null;
+            }
+            return $padded;
+        }, $normalizedDataRows);
+
+        $fieldNames = implode(', ', array_map(fn($f) => "`$f`", $fields));
         $fieldCount = count($fields);
 
         $placeholderTemplate = '(' . implode(', ', array_fill(0, $fieldCount, '?')) . ')';
@@ -500,7 +520,8 @@ class DatabaseManager
 
         $params = [];
         foreach ($normalizedDataRows as $row) {
-            $params = array_merge($params, array_values(array_intersect_key($row, array_flip($fields))));
+            // Now every row has exactly $fields keys in the same order
+            $params = array_merge($params, array_values($row));
         }
 
         try {
