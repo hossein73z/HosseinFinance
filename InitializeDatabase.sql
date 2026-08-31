@@ -86,15 +86,15 @@ CREATE TABLE IF NOT EXISTS favorites
 CREATE TABLE IF NOT EXISTS `alerts`
 (
     id             BIGINT AUTO_INCREMENT PRIMARY KEY,
-    user_id        BIGINT                                   NOT NULL,
-    asset_name     VARCHAR(191)                             NOT NULL,
-    target_price   NUMERIC(18, 8)                           NOT NULL,
-    trigger_type   ENUM ('up', 'down', 'both')              NOT NULL DEFAULT 'both',
-    status         enum ('active', 'triggered', 'inactive') not null default 'inactive',
-    created_date   VARCHAR(10)                                       DEFAULT NULL,
-    created_time   VARCHAR(8)                                        DEFAULT NULL,
-    triggered_date VARCHAR(10)                                       DEFAULT NULL,
-    triggered_time VARCHAR(8)                                        DEFAULT NULL,
+    user_id        BIGINT                                     NOT NULL,
+    asset_name     VARCHAR(191)                               NOT NULL,
+    target_price   NUMERIC(18, 8)                             NOT NULL,
+    trigger_type   ENUM ('up', 'down', 'both') DEFAULT 'both' NOT NULL,
+    status         ENUM ('active', 'triggered', 'inactive')   NOT NULL,
+    created_date   VARCHAR(10)                 DEFAULT NULL,
+    created_time   VARCHAR(8)                  DEFAULT NULL,
+    triggered_date VARCHAR(10)                 DEFAULT NULL,
+    triggered_time VARCHAR(8)                  DEFAULT NULL,
     note           TEXT,
 
     UNIQUE INDEX idx_unique_alert (asset_name, user_id, target_price),
@@ -135,11 +135,11 @@ CREATE TABLE IF NOT EXISTS `transactions`
 CREATE TABLE IF NOT EXISTS `loans`
 (
     id            INT AUTO_INCREMENT PRIMARY KEY,
-    user_id       BIGINT                         NOT NULL,
-    name          VARCHAR(191)                   NOT NULL,
-    total_amount  NUMERIC(18, 8)                 NOT NULL,
-    received_date DATE      DEFAULT CURRENT_DATE NOT NULL,
-    alert_offset  INT       DEFAULT 0            NOT NULL,
+    user_id       BIGINT                           NOT NULL,
+    name          VARCHAR(191)                     NOT NULL,
+    total_amount  NUMERIC(18, 8)                   NOT NULL,
+    received_date DATE      DEFAULT (CURRENT_DATE) NOT NULL,
+    alert_offset  INT       DEFAULT 0              NOT NULL,
     created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
     FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE ON UPDATE CASCADE
