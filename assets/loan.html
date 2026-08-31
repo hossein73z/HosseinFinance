@@ -1508,6 +1508,9 @@
         if (appMode === 'edit') {
             const updates = {};
 
+            // Always send alert_offset when editing a loan
+            updates.alert_offset = currentData.alert_offset;
+
             // Check main fields
             if (currentData.name !== originalLoanData.name) updates.name = currentData.name;
             if (currentData.total_amount !== parseFloat(originalLoanData.total_amount)) updates.total_amount = currentData.total_amount;
@@ -1515,8 +1518,6 @@
             const origDate = originalLoanData.received_date;
             const currDate = currentData.received_date;
             if (origDate !== currDate) updates.received_date = currDate;
-
-            if (currentData.alert_offset !== parseInt(originalLoanData.alert_offset)) updates.alert_offset = currentData.alert_offset;
 
             // Check Installments
             if (hasInstallmentsChanged(originalLoanData.installments, finalInstallments) ||
