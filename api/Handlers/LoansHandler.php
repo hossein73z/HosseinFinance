@@ -113,11 +113,9 @@ function handleLoansWebAppData(
     DatabaseManager $db): void
 {
     $web_app_data = json_decode($message['web_app_data']['data'], true);
+
     // Add new loan and installments
-    if (
-        isset($web_app_data['loan']) &&
-        isset($web_app_data['installments'])
-    ) {
+    if (isset($web_app_data['loan']) && isset($web_app_data['installments'])) {
 
         $new_loan = $web_app_data['loan'];
         try {
@@ -177,12 +175,7 @@ function handleLoansWebAppData(
     }
 
     // Edit existing loan and related installments
-    if (
-        isset($web_app_data['id']) &&
-        isset($web_app_data['updates'])
-    ) {
-
-        $loan = getLoanWithInstallments(user_id: $user->getId(), db: $db, jalali: true, loan_id: $web_app_data['id']);
+    if (isset($web_app_data['id']) && isset($web_app_data['updates'])) {
 
         $new_insts = $web_app_data['updates']['installments'] ?? null;
         unset($web_app_data['updates']['installments']);
@@ -210,10 +203,13 @@ function handleLoansWebAppData(
         if ($new_insts) {
 
             foreach ($new_insts as &$new_inst) {
-                $alert_offset = $web_app_data['updates']['alert_offset'] ?? $loan['alert_offset'];
+                $alert_offset = $web_app_data['updates']['alert_offset'] ?? 3;
+                $due_date = JalaliDate::fromString($new_inst['due_date'])->toGregorian();
+                $alert_date = (clone $due_date)->modify("-" . $alert_offset . " days");
+
                 $new_inst['loan_id'] = $web_app_data['id'];
-                $new_inst['due_date'] = JalaliDate::fromString($new_inst['due_date'])->toGregorian()->format('Y-m-d');
-                $new_inst['alert_date'] = JalaliDate::fromGregorianString($new_inst['due_date'])->toGregorian()->modify("-" . $alert_offset . " days")->format('Y-m-d');
+                $new_inst['due_date'] = $due_date->format('Y-m-d');
+                $new_inst['alert_date'] = $alert_date->format('Y-m-d');
             }
 
             // Update the Existing installments, based on their IDs or dates
@@ -247,7 +243,11 @@ function handleLoansWebAppData(
             }
         }
 
-        array_unshift($data['reply_markup']['keyboard'], [createWebAppBtn('✏ ویرایش وام «' . $loan['name'] . '»', '/assets/loan.html', ['data' => base64_encode(json_encode(prepareLoanForWebApp($loan)))])]);
+        $loan = getLoanWithInstallments(user_id: $user->getId(), db: $db, jalali: true, loan_id: $web_app_data['id']);
+        $encoded_loan = base64_encode(json_encode(prepareLoanForWebApp($loan)));
+        array_unshift(
+            $data['reply_markup']['keyboard'],
+            [createWebAppBtn('✏ ویرایش وام «' . $loan['name'] . '»', '/assets/loan.html', ['data' => $encoded_loan])]);
         sendToTelegram('sendMessage', $data);
         sendLoanDetail($loan, $data);
         exit;
@@ -444,7 +444,7 @@ function sendInstallmentsForNextNDays(User $user, DatabaseManager $db, int $n = 
         where
             l.user_id = " . $user->getId() . " and
             i.due_date between curdate() and date_add(curdate(), interval $n day)
-        order by i.due_date asc
+        order by i.due_date
         ")->fetchAll();
 
     if ($installments) {
