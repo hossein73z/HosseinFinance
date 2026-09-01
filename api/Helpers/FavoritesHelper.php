@@ -32,7 +32,7 @@ function sendAllFavorites(User $user, DatabaseManager $db, int|string|null $mess
             markdown: 'MarkdownV2'),
         'parse_mode' => 'MarkdownV2',
         'reply_markup' => [
-            'inline_keyboard' => createFavoritesInlineKeyboard($user->getId(), $message_id, $db, boolval($favorites))
+            'inline_keyboard' => createFavoritesInlineKeyboard($user->getId(), $message_id, $db, null, boolval($favorites))
         ]
     ]);
     exit();
@@ -56,8 +56,21 @@ function updateLivePriceMessageInDatabase(User $user, string|int $message_id, Da
     );
     if ($live_message) {
 
-        // Delete previous live price message
-        sendToTelegram('deleteMessage', ['chat_id' => $user->getid(), 'message_id' => $live_message['message_id']]);
+        // Stop or delete previous live-price message only if it was active
+        if ($live_message['status'] == 'active') {
+
+            // Try to change last live-price message's keyboard to stop status
+            $response = sendToTelegram('editMessageReplyMarkup', [
+                'chat_id' => $user->getid(),
+                'message_id' => $live_message['message_id'],
+                'reply_markup' => [
+                    'inline_keyboard' => createFavoritesInlineKeyboard($user->getId(), $live_message['message_id'], $db, false, true)
+                ]]);
+
+            // Delete last live-price message if it couldn't be stopped
+            if (!$response) sendToTelegram('deleteMessage', ['chat_id' => $user->getid(), 'message_id' => $live_message['message_id']]);
+        }
+
         // Replace previous life price message in the database
         $db->upsert('special_messages', ['user_id' => $user->getId(), 'type' => 'live_price', 'status' => 'active', 'message_id' => $message_id]);
     }
@@ -97,21 +110,25 @@ function getFavoriteWithExchangeRate(string|int $user_id, DatabaseManager $db): 
 
 /**
  * Creates an array of array of inline buttons for favorites' message.
+ * The `$message_id` and `$db` are only required if `$is_live` is null,
+ * so the function can check the database to see if the message is live.
  *
  * @param int|string $user_id
- * @param int $message_id The ID of current message to be checked for live update
- * @param DatabaseManager $db
+ * @param int|null $message_id The ID of current message to be checked for live update.
+ * @param DatabaseManager|null $db
+ * @param bool|null $is_live Is this message an active life message.
  * @param bool|null $has_favorites If `null`, The function automatically checks the database for any registered favorites
  * @return array[]
  */
 
 function createFavoritesInlineKeyboard(
-    int|string      $user_id,
-    int             $message_id,
-    DatabaseManager $db,
-    ?bool           $has_favorites = null): array
+    int|string       $user_id,
+    ?int             $message_id,
+    ?DatabaseManager $db,
+    ?bool            $is_live,
+    ?bool            $has_favorites = null): array
 {
-    $live_mssg = $db->read(
+    $is_live = $is_live ?? (bool)$db->read(
         table: 'special_messages',
         conditions: [
             'user_id' => $user_id,
@@ -124,18 +141,15 @@ function createFavoritesInlineKeyboard(
 
     $has_favorites = $has_favorites ?? boolval($db->read('favorites', ['favorites.user_id' => $user_id]));
 
-    if ($has_favorites) $inline_keyboard = [
-        ($live_mssg) ?
-            [['text' => 'توقف نمایش زنده ⏸', 'callback_data' => json_encode(['set_live' => false])]] :
-            [['text' => 'نمایش زنده قیمت‌ها ▶', 'callback_data' => json_encode(['set_live' => true])]],
-        [['text' => 'افزودن هشدار قیمت', 'callback_data' => json_encode(['fav_alert' => null])]],
-        [['text' => 'حذف / اضافه', 'callback_data' => json_encode(['edit_fav' => null])]]
-    ];
-    else $inline_keyboard = [
-        [['text' => 'حذف / اضافه', 'callback_data' => json_encode(['edit_fav' => null])]]
-    ];
-
-    return $inline_keyboard;
+    return ($has_favorites)
+        ? [
+            ($is_live) ?
+                [['text' => 'توقف نمایش زنده ⏸', 'callback_data' => json_encode(['set_live' => false])]] :
+                [['text' => 'نمایش زنده قیمت‌ها ▶', 'callback_data' => json_encode(['set_live' => true])]],
+            [['text' => 'افزودن هشدار قیمت', 'callback_data' => json_encode(['fav_alert' => null])]],
+            [['text' => 'حذف / اضافه', 'callback_data' => json_encode(['edit_fav' => null])]]]
+        : [
+            [['text' => 'حذف / اضافه', 'callback_data' => json_encode(['edit_fav' => null])]]];
 }
 
 /**
