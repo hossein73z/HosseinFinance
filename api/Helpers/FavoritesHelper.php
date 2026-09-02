@@ -5,7 +5,7 @@ require_once __DIR__ . '/../Functions/MessageFunctions.php';
 function sendAllFavorites(User $user, DatabaseManager $db, int|string|null $message_id = null): void
 {
 
-    $favorites = getFavoriteWithExchangeRate($user->getId(), $db);
+    $favorites = getFavoriteWithExchangeRateAndAlerts($user->getId(), $db);
 
     // Check if user already has an active or paused live-price message
     $live_message = $db->read(
@@ -22,7 +22,7 @@ function sendAllFavorites(User $user, DatabaseManager $db, int|string|null $mess
 
         $result = sendToTelegram('sendRichMessage', [
             'chat_id' => $user->getid(),
-            'reply_markup' => createFavoritesInlineMarkup($user->getId(), is_live: (bool)$live_message, has_favorites: (bool)$favorites),
+            'reply_markup' => createFavoritesInlineMarkup(is_live: (bool)$live_message, has_favorites: (bool)$favorites),
             'rich_message' => createFavoritesRichMessage($favorites, $user->getBaseCurrency()),
         ]);
 
@@ -46,7 +46,7 @@ function sendAllFavorites(User $user, DatabaseManager $db, int|string|null $mess
                 $response = sendToTelegram('editMessageReplyMarkup', [
                     'chat_id' => $user->getid(),
                     'message_id' => $live_message['message_id'],
-                    'reply_markup' => createFavoritesInlineMarkup($user->getId(), is_live: false, has_favorites: true)
+                    'reply_markup' => createFavoritesInlineMarkup(is_live: false, has_favorites: true)
                 ]);
 
                 // Delete last live-price message if it couldn't be stopped
@@ -61,36 +61,47 @@ function sendAllFavorites(User $user, DatabaseManager $db, int|string|null $mess
         sendToTelegram('editMessageText', [
             'chat_id' => $user->getid(),
             'message_id' => $message_id,
-            'reply_markup' => createFavoritesInlineMarkup($user->getId(), is_live: $is_live, has_favorites: (bool)$favorites),
+            'reply_markup' => createFavoritesInlineMarkup(is_live: $is_live, has_favorites: (bool)$favorites),
             'rich_message' => createFavoritesRichMessage($favorites, $user->getBaseCurrency()),
         ]);
     }
     exit();
 }
 
-function getFavoriteWithExchangeRate(string|int $user_id, DatabaseManager $db): bool|array
+function getFavoriteWithExchangeRateAndAlerts(string|int $user_id, DatabaseManager $db): bool|array
 {
     try {
-        $select_price = "select price from assets where assets.name";
-
-        $asset_base = "a.base_currency";
-        $asset_base_price = "$select_price = $asset_base";
-
-        $user_base = "ifnull(json_unquote(json_extract(u.settings, '$.base_currency')), 'ریال')";
-        $user_base_price = "$select_price = $user_base";
-
-        $favorites = $db->read(
-            table: 'favorites f',
-            conditions: ['f.user_id' => $user_id],
-            selectColumns: "
+        $favorites = $db->query("
+            SELECT
                 a.*,
-                f.id                                     as fav_id,
-                ($asset_base_price) / ($user_base_price) as exchange_rate",
-            join: '
+                f.id as fav_id,
+                (select price from assets where assets.name = a.base_currency)
+                    / (select price from assets where assets.name = ifnull(json_unquote(json_extract(u.settings, '$.base_currency')), 'ریال')) as exchange_rate,
+                CONCAT('[',
+                    GROUP_CONCAT(
+                        JSON_OBJECT(
+                            'id', al.id,
+                            'user_id', al.user_id,
+                            'asset_name', al.asset_name,
+                            'target_price', al.target_price,
+                            'trigger_type', al.trigger_type,
+                            'status', al.status,
+                            'created_date', al.created_date,
+                            'created_time', al.created_time,
+                            'triggered_date', al.triggered_date,
+                            'triggered_time', al.triggered_time,
+                            'note', al.note
+                        )
+                    ),
+                ']') AS alerts
+            FROM favorites f 
                 LEFT JOIN assets a ON f.asset_name = a.name
-                LEFT join users u ON f.user_id = u.id',
-            orderBy: ['asset_type' => 'DESC', 'f.id' => 'ASC']
-        );
+                LEFT JOIN users u ON f.user_id = u.id
+                LEFT JOIN alerts al ON f.asset_name = al.asset_name
+            WHERE f.user_id = $user_id
+            GROUP BY f.id, a.id, asset_type
+            ORDER BY asset_type DESC, f.id;"
+        )->fetchAll();
 
     } catch (Exception $e) {
         error_log('createFavoritesText: ' . $e->getMessage());
@@ -100,24 +111,9 @@ function getFavoriteWithExchangeRate(string|int $user_id, DatabaseManager $db): 
 }
 
 function createFavoritesInlineMarkup(
-    int|string       $user_id,
-    ?int             $message_id = null,
-    ?DatabaseManager $db = null,
-    ?bool            $is_live = null,
-    ?bool            $has_favorites = null): array
+    bool $is_live,
+    bool $has_favorites): array
 {
-    $is_live = $is_live ?? (bool)$db->read(
-        table: 'special_messages',
-        conditions: [
-            'user_id' => $user_id,
-            'type' => 'live_price',
-            'status' => 'active',
-            'message_id' => $message_id,
-        ],
-        single: true
-    );
-
-    $has_favorites = $has_favorites ?? (bool)($db->read('favorites', ['favorites.user_id' => $user_id]));
 
     return ['inline_keyboard' => ($has_favorites)
         ? [
@@ -145,6 +141,9 @@ function createFavoritesRichMessage(
             // Create new header if iterated to new asset type
             if ($asset['asset_type'] != $asset_type) {
 
+                // Close previous list tag and add a divider, only if not the first asset type
+                if ($asset_type) $rich_message['html'] .= "</ul><hr/>";
+
                 $asset_type = $asset['asset_type'];
                 $date = preg_split('/-/u', $asset['date']);
                 $date[1] = str_replace(
@@ -153,8 +152,6 @@ function createFavoritesRichMessage(
                     $date[1]);
                 $date_string = "$date[2] $date[1] $date[0]";
 
-                // Close previous list tag and add a divider, only if not the first asset type
-                if ($asset_type) $rich_message['html'] .= "</ul><hr/>";
                 // Add asset type header
                 $rich_message['html'] .= "<h4>" . beautifulNumber("آخرین قیمت‌های " . "«{$asset_type}»" . " در " . $date_string . " ساعت " . $asset['time'], null) . "</h4><ul>";
             }
@@ -172,8 +169,14 @@ function createFavoritesRichMessage(
                 $asset_line .= $based_price_text;
             }
 
+            $asset_alerts = json_decode($asset['alerts'], true);
+            if ($asset_alerts[0]['id'] != null) {
+                // $alert_button_string = " <tg-button type='callback_data' data='$asset[name]'>🔔 " . beautifulNumber(sizeof($asset_alerts)) . "</tg-button>";
+                $alert_button_string = " <tg-button type='disabled'>🔔 " . beautifulNumber(sizeof($asset_alerts)) . "</tg-button>";
+            } else $alert_button_string = '';
+
             // Add asset detail list item
-            $rich_message['html'] .= "<li>$asset_line</li>";
+            $rich_message['html'] .= "<li>$asset_line$alert_button_string</li>";
         }
     } else $rich_message['html'] = '<p>لیست علاقه‌مندی‌های شما خالیست!</p>';
 
