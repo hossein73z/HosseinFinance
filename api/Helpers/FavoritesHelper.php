@@ -136,13 +136,30 @@ function createFavoritesRichMessage(
     string $base_currency): array
 {
 
-    $rich_message = ['is_rtl' => true, 'blocks' => []];
+    $rich_message = ['is_rtl' => true, 'html' => ""];
     if ($assets) {
 
         $asset_type = '';
         foreach ($assets as $asset) {
 
-            // Create asset line text
+            // Create new header if iterated to new asset type
+            if ($asset['asset_type'] != $asset_type) {
+
+                $asset_type = $asset['asset_type'];
+                $date = preg_split('/-/u', $asset['date']);
+                $date[1] = str_replace(
+                    ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'],
+                    ['فروردین', 'اردیبهشت', 'خرداد', 'تیر', 'مرداد', 'شهریور', 'مهر', 'آبان', 'آذر', 'دی', 'بهمن', 'اسفند'],
+                    $date[1]);
+                $date_string = "$date[2] $date[1] $date[0]";
+
+                // Close previous list tag and add a divider, only if not the first asset type
+                if ($asset_type) $rich_message['html'] .= "</ul><hr/>";
+                // Add asset type header
+                $rich_message['html'] .= "<h4>" . beautifulNumber("آخرین قیمت‌های " . "«{$asset_type}»" . " در " . $date_string . " ساعت " . $asset['time'], null) . "</h4><ul>";
+            }
+
+            // Create asset detail list item text
             $asset_name = beautifulNumber($asset['name'], null);
             $asset_price = beautifulNumber($asset['price']);
             $asset_base = beautifulNumber($asset['base_currency'], null);
@@ -155,37 +172,10 @@ function createFavoritesRichMessage(
                 $asset_line .= $based_price_text;
             }
 
-            $list_block['type'] = 'list';
-            $list_block['items'][] = ['blocks' => [['type' => 'paragraph', 'text' => $asset_line]]];
-
-            // Create new header if iterated to new asset type
-            if ($asset['asset_type'] != $asset_type) {
-
-                // Add a divider before all headers except the first one
-                if ($asset_type) $rich_message['blocks'][] = ['type' => 'divider'];
-
-                $asset_type = $asset['asset_type'];
-                $date = preg_split('/-/u', $asset['date']);
-                $date[1] = str_replace(
-                    ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'],
-                    ['فروردین', 'اردیبهشت', 'خرداد', 'تیر', 'مرداد', 'شهریور', 'مهر', 'آبان', 'آذر', 'دی', 'بهمن', 'اسفند'],
-                    $date[1]);
-                $date_string = "$date[2] $date[1] $date[0]";
-
-                // Add header to the return value
-                $rich_message['blocks'][] = [
-                    'type' => 'heading',
-                    'size' => 4,
-                    'text' => beautifulNumber("آخرین قیمت‌های " . "«{$asset_type}»" . " در " . $date_string . " ساعت " . $asset['time'], null)
-                ];
-
-                if ($asset_type) {
-                    $rich_message['blocks'][] = $list_block;
-                    $list_block = [];
-                }
-            }
+            // Add asset detail list item
+            $rich_message['html'] .= "<li>$asset_line</li>";
         }
-    } else $rich_message['blocks'] = [['type' => 'paragraph', 'text' => 'لیست علاقه‌مندی‌های شما خالیست!']];
+    } else $rich_message['html'] = '<p>لیست علاقه‌مندی‌های شما خالیست!</p>';
 
     return $rich_message;
 }
