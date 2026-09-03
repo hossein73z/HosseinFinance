@@ -63,30 +63,23 @@ function handleAlertsTextMessage(array $data): void
 
 function sendAllAlerts(User $user, DatabaseManager $db, int|string|null $message_id = null): void
 {
-    $message_id = ($message_id !== null) ?
-        $message_id :
-        sendLoadingMessage($user->getid(), 'در حال دریافت لیست هشدارها ...')['result']['message_id'];
-
-    $alerts = $db->read(
-        table: 'alerts',
-        conditions: ['user_id' => $user->getId()],
-        selectColumns: '
+    $alerts = $db->query("
+        SELECT
             alerts.*,
             assets.emoji,
             assets.asset_type,
             assets.price as current_price,
             assets.base_currency,
             assets.date as update_date,
-            assets.time as update_time',
-        join: 'join assets on assets.name = alerts.asset_name',
-        orderBy: ['assets.asset_type' => 'ASC', 'alerts.asset_name' => 'ASC', 'alerts.target_price' => 'ASC']
-    );
+            assets.time as update_time
+        FROM alerts JOIN assets ON assets.name = alerts.asset_name
+        WHERE alerts.user_id = '{$user->getId()}'
+        ORDER BY assets.asset_type, alerts.asset_name, alerts.target_price")->fetchAll();
 
     $text = '';
     $data = [
         'text' => &$text,
         'chat_id' => $user->getid(),
-        'message_id' => $message_id,
         'reply_markup' => ['inline_keyboard' => [
             [['text' => 'مدیریت هشدارها', 'callback_data' => json_encode(['mng_alerts' => null])]]
         ]]
@@ -112,7 +105,12 @@ function sendAllAlerts(User $user, DatabaseManager $db, int|string|null $message
         }
     } else $text = 'شما هشداری ثبت نکرده‌اید!';
 
-    sendToTelegram('editMessageText', $data);
+    if (!$message_id) {
+        sendToTelegram('sendMessage', $data);
+    } else {
+        $data['message_id'] = $message_id;
+        sendToTelegram('editMessageText', $data);
+    }
 }
 
 function managePriceAlerts(User $user, array $callback_query, array $message, DatabaseManager $db): void
@@ -204,8 +202,8 @@ function managePriceAlerts(User $user, array $callback_query, array $message, Da
             exit;
 
         // Show list of asset to select for new alert
-        case 'fav_alert': // -------- Request from favorites message
-        case 'new_alert_type': // --- Request from alert manager message
+        case 'fav_alert': // ---- Request from favorites message
+        case 'new_alert_type': // Request from alert manager message
 
             if ($query_key == 'fav_alert') {
                 $data['reply_markup']['inline_keyboard'] = [[
@@ -284,7 +282,7 @@ function managePriceAlerts(User $user, array $callback_query, array $message, Da
             sendAllAlerts($user, $db);
             exit;
 
-        // Show main list of alerts
+        // Show main list of all alerts
         case 'show_all_alerts':
             sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
             sendAllAlerts($user, $db, $message['message_id']);
