@@ -96,7 +96,7 @@ function handleCallbackQuery(array $callback_query, DatabaseManager $db): void
             exit;
         }
 
-        $query_data = json_decode($callback_query['data'], true);
+        $query_data = json_decode(html_entity_decode($callback_query['data'], ENT_QUOTES, 'UTF-8'), true);
         $query_key = $query_data ? array_key_first($query_data) : $query_data;
 
         switch ($query_key) {
