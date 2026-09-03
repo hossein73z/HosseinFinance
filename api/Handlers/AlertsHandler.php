@@ -66,6 +66,7 @@ function sendAllAlerts(User $user, DatabaseManager $db, int|string|null $message
     $alerts = $db->query("
         SELECT
             alerts.*,
+            assets.id as asset_id,
             assets.emoji,
             assets.asset_type,
             assets.price as current_price,
@@ -105,8 +106,12 @@ function sendAllAlerts(User $user, DatabaseManager $db, int|string|null $message
             $asset_name = beautifulNumber($alert['asset_name'], null);
             $alert_price = beautifulNumber($alert['target_price']);
             $base_currency = beautifulNumber($alert['base_currency'], null);
+
             $edit_button = "<tg-button type='disabled' style='link'>" . "ویرایش" . "</tg-button>";
-            $delete_button = "<tg-button type='disabled' style='danger'>" . "حذف" . "</tg-button>";
+
+            $delete_callback = json_encode(['del_alert' => $alert['id']]);
+            $delete_button = "<tg-button type='callback_data' style='danger' data='$delete_callback'>" . "حذف" . "</tg-button>";
+
             $rich_text .= "<li>$status_emoji $asset_name: $alert_price $base_currency $edit_button $delete_button</li>";
         }
         $rich_text .= '</ul>';
