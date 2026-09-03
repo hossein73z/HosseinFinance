@@ -110,7 +110,7 @@ function sendAllAlerts(User $user, DatabaseManager $db, int|string|null $message
             $edit_callback = json_encode(['edit_alert_price' => $alert['id']]);
             $edit_button = "<tg-button type='callback_data' style='link' data='$edit_callback'>" . "ویرایش" . "</tg-button>";
 
-            $delete_callback = json_encode(['del_alert' => $alert['id']]);
+            $delete_callback = json_encode(['del_alert' => [$alert['id'] => $alert['asset_id']]]);
             $delete_button = "<tg-button type='callback_data' style='danger' data='$delete_callback'>" . "حذف" . "</tg-button>";
 
             $rich_text .= "<li>$status_emoji $asset_name: $alert_price $base_currency $edit_button $delete_button</li>";
@@ -170,7 +170,14 @@ function sendAssetAlerts(User $user, DatabaseManager $db, string|int $asset_id, 
 
             $alert_price = beautifulNumber($alert['target_price']);
             $base_currency = beautifulNumber($alert['base_currency'], null);
-            $rich_text .= "<li>$status_emoji $alert_price $base_currency</li>";
+
+            $edit_callback = json_encode(['edit_alert_price' => $alert['id']]);
+            $edit_button = "<tg-button type='disabled' style='link' data='$edit_callback'>" . "ویرایش" . "</tg-button>";
+
+            $delete_callback = json_encode(['del_asset_alert' => [$alert['id'] => $alert['asset_id']]]);
+            $delete_button = "<tg-button type='callback_data' style='danger' data='$delete_callback'>" . "حذف" . "</tg-button>";
+
+            $rich_text .= "<li>$status_emoji $alert_price $base_currency $edit_button $delete_button</li>";
         }
         $rich_text .= '</ul>';
     } else $rich_text = 'شما هشداری ثبت نکرده‌اید!';
@@ -240,6 +247,7 @@ function managePriceAlerts(User $user, array $callback_query, array $message, Da
                     conditions: ['user_id' => $user->getId()],
                     selectColumns: '
                         alerts.*,
+                        assets.id as asset_id,
                         assets.emoji,
                         assets.asset_type,
                         assets.price as current_price,
@@ -259,7 +267,7 @@ function managePriceAlerts(User $user, array $callback_query, array $message, Da
 
                     foreach ($alerts as $alert) array_unshift(
                         $data['reply_markup']['inline_keyboard'],
-                        [['text' => beautifulNumber($alert['asset_name'], null) . ': ' . beautifulNumber($alert['target_price']), 'callback_data' => json_encode(['del_alert' => $alert['id']])]]
+                        [['text' => beautifulNumber($alert['asset_name'], null) . ': ' . beautifulNumber($alert['target_price']), 'callback_data' => json_encode(['del_alert' => [$alert['id'] => $alert['asset_id']]])]]
                     );
                 } else {
                     sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id'], 'text' => 'شما هشداری ثبت نکرده‌اید!']);
@@ -326,14 +334,23 @@ function managePriceAlerts(User $user, array $callback_query, array $message, Da
             break;
 
         // Ask user to confirm deleting alert
-        case 'del_alert':
-            $alert_id = $query_data[$query_key];
+        case 'del_alert': // ---- Request from main alerts' message
+        case 'del_asset_alert': // Request from favorites message
+
+            // Query structure doo to length limitation: [query_key => [alert_id => asset_id]]
+            $alert_id = array_key_first($query_data[$query_key]);
+            $asset_id = $query_data[$query_key][$alert_id];
 
             $data['text'] = 'آیا از حذف اطمینان دارید؟';
-            $data['reply_markup']['inline_keyboard'] = [[
-                ['text' => 'تایید', "style" => "danger", 'callback_data' => json_encode(['conf_del_alert' => $alert_id])],
-                ['text' => 'لغو', "style" => "success", 'callback_data' => json_encode(['show_all_alerts' => null])],
-            ]];
+            $data['reply_markup']['inline_keyboard'] = [
+                $query_key == 'del_alert' ? [
+                    ['text' => 'تایید', "style" => "danger", 'callback_data' => json_encode(['conf_del_alert' => [$alert_id => $asset_id]])],
+                    ['text' => 'لغو', "style" => "success", 'callback_data' => json_encode(['show_all_alerts' => null])],
+                ] : [
+                    ['text' => 'تایید', "style" => "danger", 'callback_data' => json_encode(['conf_del_asset_alert' => [$alert_id => $asset_id]])],
+                    ['text' => 'لغو', "style" => "success", 'callback_data' => json_encode(['show_asset_alerts' => $asset_id])],
+                ]
+            ];
 
             sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
             sendToTelegram('editMessageText', $data);
@@ -341,8 +358,12 @@ function managePriceAlerts(User $user, array $callback_query, array $message, Da
 
         // Delete alert and send alerts' message to the user
         case 'conf_del_alert':
+        case 'conf_del_asset_alert':
 
-            $alert_id = $query_data[$query_key];
+            // Query structure doo to length limitation: [query_key => [alert_id => asset_id]]
+            $alert_id = array_key_first($query_data[$query_key]);
+            $asset_id = $query_data[$query_key][$alert_id];
+
             try {
                 $db->delete(
                     table: 'alerts',
@@ -357,7 +378,8 @@ function managePriceAlerts(User $user, array $callback_query, array $message, Da
 
             sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
             sendToTelegram('editMessageText', $data);
-            sendAllAlerts($user, $db);
+            if ($query_key == 'conf_del_alert') sendAllAlerts($user, $db);
+            else sendAssetAlerts($user, $db, $asset_id);
             exit;
 
         // Show list of alerts for specific asset
@@ -365,6 +387,7 @@ function managePriceAlerts(User $user, array $callback_query, array $message, Da
         case 'show_asset_alerts':
             $asset_id = $query_data[$query_key];
             sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
+            $db->update('special_messages', ['status' => 'paused'], ['user_id' => $user->getId(), 'type' => 'live_price', 'status' => 'active', 'message_id' => $message['message_id']]);
             sendAssetAlerts($user, $db, $asset_id, $message['message_id']);
             exit;
 
