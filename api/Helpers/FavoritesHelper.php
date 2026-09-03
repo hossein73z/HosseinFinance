@@ -170,11 +170,9 @@ function createFavoritesRichMessage(
             }
 
             $asset_alerts = json_decode($asset['alerts'], true);
-            if ($asset_alerts[0]['id'] != null) {
-                $callback_data = json_encode(['show_asset_alerts' => $asset['id']]);
-                $alerts_count = beautifulNumber(sizeof($asset_alerts));
-                $alert_button_string = "<tg-button type='callback_data' data='$callback_data'>🔔 $alerts_count</tg-button>";
-            } else $alert_button_string = '';
+            $alerts_count = beautifulNumber($asset_alerts[0]['id'] != null ? sizeof($asset_alerts) : 0);
+            $callback_data = json_encode(['show_asset_alerts' => $asset['id']]);
+            $alert_button_string = "<tg-button type='callback_data' data='$callback_data'>🔔 $alerts_count</tg-button>";
 
             // Add asset detail list item
             $rich_message['html'] .= "<li>$asset_line $alert_button_string</li>";
