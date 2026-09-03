@@ -124,6 +124,7 @@ function sendAllAlerts(User $user, DatabaseManager $db, int|string|null $message
         $data['message_id'] = $message_id;
         sendToTelegram('editMessageText', $data);
     }
+    exit();
 }
 
 function sendAssetAlerts(User $user, DatabaseManager $db, string|int $asset_id, int|string|null $message_id = null): void
@@ -147,7 +148,8 @@ function sendAssetAlerts(User $user, DatabaseManager $db, string|int $asset_id, 
         'rich_message' => ['is_rtl' => true, 'html' => &$rich_text],
         'chat_id' => $user->getid(),
         'reply_markup' => ['inline_keyboard' => [
-            [['text' => '🔙 برگشت 🔙', "style" => "primary", 'callback_data' => json_encode(['show_favorites' => null])]]
+            [['text' => '➕ افزودن هشدار جدید ➕', 'callback_data' => json_encode(['new_asset_alert' => $asset_id])]],
+            [['text' => '🔙 برگشت 🔙', "style" => "primary", 'callback_data' => json_encode(['show_favorites' => null])]],
         ]]
     ];
 
@@ -180,7 +182,7 @@ function sendAssetAlerts(User $user, DatabaseManager $db, string|int $asset_id, 
             $rich_text .= "<li>$status_emoji $alert_price $base_currency $edit_button $delete_button</li>";
         }
         $rich_text .= '</ul>';
-    } else $rich_text = 'شما هشداری ثبت نکرده‌اید!';
+    } else $rich_text = 'شما هشداری برای این آیتم ثبت نکرده‌اید!';
 
     if (!$message_id) {
         sendToTelegram('sendRichMessage', $data);
@@ -188,6 +190,7 @@ function sendAssetAlerts(User $user, DatabaseManager $db, string|int $asset_id, 
         $data['message_id'] = $message_id;
         sendToTelegram('editMessageText', $data);
     }
+    exit();
 }
 
 function managePriceAlerts(User $user, array $callback_query, array $message, DatabaseManager $db): void
@@ -280,8 +283,8 @@ function managePriceAlerts(User $user, array $callback_query, array $message, Da
             exit;
 
         // Show list of asset to select for new alert
-        case 'fav_alert': // ---- Request from favorites message
-        case 'new_alert_type': // Request from alert manager message
+        case 'fav_alert': // ------- Request from favorites message
+        case 'new_alert_type': // -- Request from alert manager message
 
             if ($query_key == 'fav_alert') {
                 $data['reply_markup']['inline_keyboard'] = [[
@@ -317,25 +320,25 @@ function managePriceAlerts(User $user, array $callback_query, array $message, Da
             exit;
 
         // Redirect user to empty level to input alert price
-        case 'edit_alert_price':
-        case 'new_alert_asset_id':
+        case 'new_alert_asset_id': // -- Add price for new alert, -- from main alerts manu and favorites' message
+        case 'edit_alert_price': // ---- Edit price of an alert, --- from main alerts menu
+        case 'new_asset_alert': // ----- Add price for new alert, -- from favorites' alert menu
 
             sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
             sendToTelegram('deleteMessage', ['chat_id' => $user->getid(), 'message_id' => $message['message_id']]);
 
-            if ($query_key == 'edit_alert_price') {
-                $alert_id = $query_data[$query_key];
-                $progress_data = ['edit_alert_price' => ['alert_id' => $alert_id]];
-                $user = $user->setProgress(['parent_btn' => $user->getLastBtn(), 'data' => $progress_data]);
-            } else
-                $user = $user->setProgress(['parent_btn' => $user->getLastBtn(), 'data' => ['set_alert_price' => ['asset_id' => $query_data['new_alert_asset_id']]]]);
+            $item_id = $query_data[$query_key];
+            if ($query_key == 'new_alert_asset_id') $progress_data = ['new_alert_price' => ['asset_id' => $item_id]];
+            elseif ($query_key == 'edit_alert_price') $progress_data = ['edit_alert_price' => ['alert_id' => $item_id]];
+            else $progress_data = ['new_asset_alert' => ['asset_id' => $item_id]];
 
+            $user->setProgress(['parent_btn' => $user->getLastBtn(), 'data' => $progress_data]);
             empty_level($user, $db, $user->getLastBtn());
             break;
 
         // Ask user to confirm deleting alert
-        case 'del_alert': // ---- Request from main alerts' message
-        case 'del_asset_alert': // Request from favorites message
+        case 'del_alert': // -------- Request from main alerts' message
+        case 'del_asset_alert': // -- Request from favorites message
 
             // Query structure doo to length limitation: [query_key => [alert_id => asset_id]]
             $alert_id = array_key_first($query_data[$query_key]);
@@ -380,7 +383,7 @@ function managePriceAlerts(User $user, array $callback_query, array $message, Da
             sendToTelegram('editMessageText', $data);
             if ($query_key == 'conf_del_alert') sendAllAlerts($user, $db);
             else sendAssetAlerts($user, $db, $asset_id);
-            exit;
+            break;
 
         // Show list of alerts for specific asset
         // Called from favorites menu
@@ -389,7 +392,7 @@ function managePriceAlerts(User $user, array $callback_query, array $message, Da
             sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
             $db->update('special_messages', ['status' => 'paused'], ['user_id' => $user->getId(), 'type' => 'live_price', 'status' => 'active', 'message_id' => $message['message_id']]);
             sendAssetAlerts($user, $db, $asset_id, $message['message_id']);
-            exit;
+            break;
 
         // Show main list of all alerts
         case 'show_all_alerts':

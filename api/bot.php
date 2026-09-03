@@ -74,8 +74,9 @@ function empty_level(
 
     # --- Set alert price ---
     if (
+        array_key_first($progress_data) == 'new_alert_price' ||
         array_key_first($progress_data) == 'edit_alert_price' ||
-        array_key_first($progress_data) == 'set_alert_price'
+        array_key_first($progress_data) == 'new_asset_alert'
     ) {
 
         // Check if Received text is cancel button
@@ -89,16 +90,17 @@ function empty_level(
         $keyboard[] = json_decode($button['attrs'], true);
 
         // Read asset from database
-        if (array_key_first($progress_data) == 'edit_alert_price') {
-            $alert_id = $progress_data[array_key_first($progress_data)]['alert_id'];
+        if (array_key_first($progress_data) == 'new_alert_price') {
+            $asset_id = $progress_data['new_alert_price']['asset_id'];
+            $asset = $db->read('assets', ['id' => $asset_id], true);
+        } elseif (array_key_first($progress_data) == 'edit_alert_price') {
+            $alert_id = $progress_data['edit_alert_price']['alert_id'];
             $asset = $db->query("
-                SELECT
-                    assets.*
+                SELECT assets.*
                 FROM assets JOIN alerts ON alerts.asset_name = assets.name
                 WHERE alerts.user_id = '{$user->getId()}' AND alerts.id = '$alert_id'")->fetch();
-
         } else {
-            $asset_id = $progress_data[array_key_first($progress_data)]['asset_id'];
+            $asset_id = $progress_data['new_asset_alert']['asset_id'];
             $asset = $db->read('assets', ['id' => $asset_id], true);
         }
 
@@ -126,7 +128,6 @@ function empty_level(
             if ($target_price) {
 
                 // Read asset from database for price comparison
-                $asset = $db->read('assets', ['id' => $asset['id']], true);
                 $price_diff = $target_price - (float)$asset['price'];
                 $diff_percent = intval(($price_diff / floatval($asset['price'])) * 100);
 
@@ -156,7 +157,7 @@ function empty_level(
 
                     // Send success/failure message and go back to parent level
                     sendToTelegram('sendMessage', $data);
-                    level_8($user->setProgress(null), $db);
+                    cancelButton($user, $db, $parent_level);
                 } else // Send warning: Received number is the same as current price
                     $text = "قیمت هشدار نمی‌تواند با قیمت کنونی برابر باشد." . "\n" .
                         "قیمت دیگری بنویسید یا در صورت انصراف از دکمه لغو استفاده کنید.";
