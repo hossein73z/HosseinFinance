@@ -102,7 +102,66 @@ function sendAllAlerts(User $user, DatabaseManager $db, int|string|null $message
                     break;
             }
 
-            $rich_text .= '<li>' . $status_emoji . ' ' . beautifulNumber($alert['asset_name'], null) . ': ' . beautifulNumber($alert['target_price']) . '</li>';
+            $asset_name = beautifulNumber($alert['asset_name'], null);
+            $alert_price = beautifulNumber($alert['target_price']);
+            $base_currency = beautifulNumber($alert['base_currency'], null);
+            $rich_text .= "<li>$status_emoji $asset_name: $alert_price $base_currency</li>";
+        }
+        $rich_text .= '</ul>';
+    } else $rich_text = 'شما هشداری ثبت نکرده‌اید!';
+
+    if (!$message_id) {
+        sendToTelegram('sendRichMessage', $data);
+    } else {
+        $data['message_id'] = $message_id;
+        sendToTelegram('editMessageText', $data);
+    }
+}
+
+function sendAssetAlerts(User $user, DatabaseManager $db, string|int $asset_id, int|string|null $message_id = null): void
+{
+    $alerts = $db->query("
+        SELECT 
+            alerts.*,
+            assets.emoji,
+            assets.asset_type,
+            assets.price as current_price,
+            assets.base_currency,
+            assets.date as update_date,
+            assets.time as update_time
+        FROM alerts JOIN assets ON assets.name = alerts.asset_name
+        WHERE alerts.user_id = '{$user->getId()}' AND assets.id = '$asset_id'
+        ORDER BY alerts.target_price")->fetchAll();
+
+    $rich_text = '';
+    $data = [
+        'rich_message' => ['is_rtl' => true, 'html' => &$rich_text],
+        'chat_id' => $user->getid(),
+        'reply_markup' => ['inline_keyboard' => [
+            [['text' => '🔙 برگشت 🔙', "style" => "primary", 'callback_data' => json_encode(['show_favorites' => null])]]
+        ]]
+    ];
+
+    if ($alerts) {
+        $rich_text = '<p>هشدارهای <b>' . beautifulNumber($alerts[0]['asset_name'], null) . '</b></p>';
+        $rich_text .= '<ul>';
+        foreach ($alerts as $alert) {
+            $status_emoji = '⚠';
+            switch ($alert['status']) {
+                case 'active':
+                    $status_emoji = '🔁';
+                    break;
+                case 'triggered':
+                    $status_emoji = '✅';
+                    break;
+                case 'inactive':
+                    $status_emoji = '❌';
+                    break;
+            }
+
+            $alert_price = beautifulNumber($alert['target_price']);
+            $base_currency = beautifulNumber($alert['base_currency'], null);
+            $rich_text .= "<li>$status_emoji $alert_price $base_currency</li>";
         }
         $rich_text .= '</ul>';
     } else $rich_text = 'شما هشداری ثبت نکرده‌اید!';
@@ -282,6 +341,14 @@ function managePriceAlerts(User $user, array $callback_query, array $message, Da
             sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
             sendToTelegram('editMessageText', $data);
             sendAllAlerts($user, $db);
+            exit;
+
+        // Show list of alerts for specific asset
+        // Called from favorites menu
+        case 'show_asset_alerts':
+            $asset_id = $query_data[$query_key];
+            sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
+            sendAssetAlerts($user, $db, $asset_id, $message['message_id']);
             exit;
 
         // Show main list of all alerts

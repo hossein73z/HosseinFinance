@@ -171,12 +171,13 @@ function createFavoritesRichMessage(
 
             $asset_alerts = json_decode($asset['alerts'], true);
             if ($asset_alerts[0]['id'] != null) {
-                // $alert_button_string = " <tg-button type='callback_data' data='$asset[name]'>🔔 " . beautifulNumber(sizeof($asset_alerts)) . "</tg-button>";
-                $alert_button_string = " <tg-button type='disabled'>🔔 " . beautifulNumber(sizeof($asset_alerts)) . "</tg-button>";
+                $callback_data = json_encode(['show_asset_alerts' => $asset['id']]);
+                $alerts_count = beautifulNumber(sizeof($asset_alerts));
+                $alert_button_string = "<tg-button type='callback_data' data='$callback_data'>🔔 $alerts_count</tg-button>";
             } else $alert_button_string = '';
 
             // Add asset detail list item
-            $rich_message['html'] .= "<li>$asset_line$alert_button_string</li>";
+            $rich_message['html'] .= "<li>$asset_line $alert_button_string</li>";
         }
     } else $rich_message['html'] = '<p>لیست علاقه‌مندی‌های شما خالیست!</p>';
 
