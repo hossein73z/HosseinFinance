@@ -107,7 +107,8 @@ function sendAllAlerts(User $user, DatabaseManager $db, int|string|null $message
             $alert_price = beautifulNumber($alert['target_price']);
             $base_currency = beautifulNumber($alert['base_currency'], null);
 
-            $edit_button = "<tg-button type='disabled' style='link'>" . "ویرایش" . "</tg-button>";
+            $edit_callback = json_encode(['edit_alert_price' => $alert['id']]);
+            $edit_button = "<tg-button type='callback_data' style='link' data='$edit_callback'>" . "ویرایش" . "</tg-button>";
 
             $delete_callback = json_encode(['del_alert' => $alert['id']]);
             $delete_button = "<tg-button type='callback_data' style='danger' data='$delete_callback'>" . "حذف" . "</tg-button>";
@@ -130,6 +131,7 @@ function sendAssetAlerts(User $user, DatabaseManager $db, string|int $asset_id, 
     $alerts = $db->query("
         SELECT 
             alerts.*,
+            assets.id as asset_id,
             assets.emoji,
             assets.asset_type,
             assets.price as current_price,
@@ -306,12 +308,20 @@ function managePriceAlerts(User $user, array $callback_query, array $message, Da
             sendToTelegram('editMessageText', $data);
             exit;
 
+        // Redirect user to empty level to input alert price
+        case 'edit_alert_price':
         case 'new_alert_asset_id':
 
             sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
             sendToTelegram('deleteMessage', ['chat_id' => $user->getid(), 'message_id' => $message['message_id']]);
 
-            $user = $user->setProgress(['parent_btn' => $user->getLastBtn(), 'data' => ['set_alert' => ['asset_id' => $query_data['new_alert_asset_id']]]]);
+            if ($query_key == 'edit_alert_price') {
+                $alert_id = $query_data[$query_key];
+                $progress_data = ['edit_alert_price' => ['alert_id' => $alert_id]];
+                $user = $user->setProgress(['parent_btn' => $user->getLastBtn(), 'data' => $progress_data]);
+            } else
+                $user = $user->setProgress(['parent_btn' => $user->getLastBtn(), 'data' => ['set_alert_price' => ['asset_id' => $query_data['new_alert_asset_id']]]]);
+
             empty_level($user, $db, $user->getLastBtn());
             break;
 

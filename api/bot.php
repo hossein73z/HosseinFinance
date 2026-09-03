@@ -73,19 +73,38 @@ function empty_level(
     ##########################
 
     # --- Set alert price ---
-    if (array_key_first($progress_data) == 'set_alert') {
+    if (
+        array_key_first($progress_data) == 'edit_alert_price' ||
+        array_key_first($progress_data) == 'set_alert_price'
+    ) {
+
+        // Check if Received text is cancel button
+        if ($message) {
+            $pressed_button = $db->read('buttons', ['id' => 's1', 'attrs->>"$.text"' => $message['text']]);
+            if ($pressed_button) cancelButton($user, $db, $parent_level);
+        }
 
         // Create bottom keyboard with just cancel button
         $button = $db->read('buttons', ['id' => ['s1']], true);
         $keyboard[] = json_decode($button['attrs'], true);
 
-        $asset_id = $progress_data['set_alert']['asset_id'];
+        // Read asset from database
+        if (array_key_first($progress_data) == 'edit_alert_price') {
+            $alert_id = $progress_data[array_key_first($progress_data)]['alert_id'];
+            $asset = $db->query("
+                SELECT
+                    assets.*
+                FROM assets JOIN alerts ON alerts.asset_name = assets.name
+                WHERE alerts.user_id = '{$user->getId()}' AND alerts.id = '$alert_id'")->fetch();
+
+        } else {
+            $asset_id = $progress_data[array_key_first($progress_data)]['asset_id'];
+            $asset = $db->read('assets', ['id' => $asset_id], true);
+        }
 
         // Just entered the level
         // Ask user to give alert's target price
         if (!$message) {
-
-            $asset = $db->read('assets', ['id' => $asset_id], true);
 
             $text = 'قیمتی که می‌خواهید برای آن هشدار تنظیم کنید را نوشته و ارسال کتید.';
             $text .= "\n";
@@ -102,30 +121,29 @@ function empty_level(
         // Received message (Supposed to be alert's target price)
         if ($message) {
 
-            // Check if Received text is cancel button
-            $pressed_button = $db->read('buttons', ['id' => 's1', 'attrs->>"$.text"' => $message['text']]);
-            if ($pressed_button) backButton($user, $db, $parent_level);
-
             // Check if received text is a valid number
             $target_price = cleanAndValidateNumber($message['text']);
             if ($target_price) {
 
                 // Read asset from database for price comparison
-                $asset = $db->read('assets', ['id' => $asset_id], true);
-                $price_diff = floatval($target_price) - floatval($asset['price']);
+                $asset = $db->read('assets', ['id' => $asset['id']], true);
+                $price_diff = $target_price - (float)$asset['price'];
                 $diff_percent = intval(($price_diff / floatval($asset['price'])) * 100);
 
                 // Check if received price different from current price
                 if ($price_diff != 0) {
 
-                    $result = $db->upsert('alerts', [
+                    $new_alert = [
                         'user_id' => $user->getId(),
                         'asset_name' => $asset['name'],
                         'target_price' => $target_price,
                         'status' => 'active',
                         'created_date' => JalaliDate::fromGregorian()->format(),
                         'created_time' => date('H:i')
-                    ]);
+                    ];
+                    if (isset($alert_id)) $new_alert['id'] = $alert_id;
+
+                    $result = $db->upsert('alerts', $new_alert);
                     if ($result) {
 
                         $text = '✅ هشدار قیمت برای «' . beautifulNumber($asset['name'], null) . '» با موفقیت ثبت شد!';
@@ -138,7 +156,7 @@ function empty_level(
 
                     // Send success/failure message and go back to parent level
                     sendToTelegram('sendMessage', $data);
-                    backButton($user, $db, $parent_level);
+                    level_8($user->setProgress(null), $db);
                 } else // Send warning: Received number is the same as current price
                     $text = "قیمت هشدار نمی‌تواند با قیمت کنونی برابر باشد." . "\n" .
                         "قیمت دیگری بنویسید یا در صورت انصراف از دکمه لغو استفاده کنید.";
