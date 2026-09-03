@@ -76,9 +76,9 @@ function sendAllAlerts(User $user, DatabaseManager $db, int|string|null $message
         WHERE alerts.user_id = '{$user->getId()}'
         ORDER BY assets.asset_type, alerts.asset_name, alerts.target_price")->fetchAll();
 
-    $text = '';
+    $rich_text = '';
     $data = [
-        'text' => &$text,
+        'rich_message' => ['is_rtl' => true, 'html' => &$rich_text],
         'chat_id' => $user->getid(),
         'reply_markup' => ['inline_keyboard' => [
             [['text' => 'مدیریت هشدارها', 'callback_data' => json_encode(['mng_alerts' => null])]]
@@ -86,7 +86,8 @@ function sendAllAlerts(User $user, DatabaseManager $db, int|string|null $message
     ];
 
     if ($alerts) {
-        $text = 'هشدارهای شما:' . "\n";
+        $rich_text = '<h4>هشدارهای شما:</h4>';
+        $rich_text .= '<ul>';
         foreach ($alerts as $alert) {
             $status_emoji = '⚠';
             switch ($alert['status']) {
@@ -100,13 +101,14 @@ function sendAllAlerts(User $user, DatabaseManager $db, int|string|null $message
                     $status_emoji = '❌';
                     break;
             }
-            $text .=
-                "\n  - " . $status_emoji . ' ' . beautifulNumber($alert['asset_name'], null) . ': ' . beautifulNumber($alert['target_price']);
+
+            $rich_text .= '<li>' . $status_emoji . ' ' . beautifulNumber($alert['asset_name'], null) . ': ' . beautifulNumber($alert['target_price']) . '</li>';
         }
-    } else $text = 'شما هشداری ثبت نکرده‌اید!';
+        $rich_text .= '</ul>';
+    } else $rich_text = 'شما هشداری ثبت نکرده‌اید!';
 
     if (!$message_id) {
-        sendToTelegram('sendMessage', $data);
+        sendToTelegram('sendRichMessage', $data);
     } else {
         $data['message_id'] = $message_id;
         sendToTelegram('editMessageText', $data);
