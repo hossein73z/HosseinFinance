@@ -136,7 +136,7 @@ function handleCallbackQuery(array $callback_query, DatabaseManager $db): void
             case 'new_alert_asset_id':
             case 'del_alert':
             case 'conf_del_alert':
-            case 'show_alerts':
+            case 'show_all_alerts':
                 managePriceAlerts($user, $callback_query, $message, $db);
                 break;
 

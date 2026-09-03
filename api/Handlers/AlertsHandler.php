@@ -139,7 +139,7 @@ function managePriceAlerts(User $user, array $callback_query, array $message, Da
                 $data['reply_markup'] = ['inline_keyboard' => [
                     [['text' => 'افزودن هشدار', 'callback_data' => json_encode(['mng_alerts' => 'add_alert'])]],
                     [['text' => 'حذف هشدار', 'callback_data' => json_encode(['mng_alerts' => 'remove_alert'])]],
-                    [['text' => '🔙 برگشت 🔙', "style" => "primary", 'callback_data' => json_encode(['show_alerts' => null])]],
+                    [['text' => '🔙 برگشت 🔙', "style" => "primary", 'callback_data' => json_encode(['show_all_alerts' => null])]],
                 ]];
             }
 
@@ -151,7 +151,7 @@ function managePriceAlerts(User $user, array $callback_query, array $message, Da
                     $data['text'] = 'یکی از دسته‌بندی‌های زیر را انتخاب کنید:';
                     $data['reply_markup']['inline_keyboard'] = [[
                         ['text' => '🔙 برگشت 🔙', "style" => "primary", 'callback_data' => json_encode(['mng_alerts' => null])],
-                        ['text' => '❌ لغو ❌', "style" => "danger", 'callback_data' => json_encode(['show_alerts' => null])]
+                        ['text' => '❌ لغو ❌', "style" => "danger", 'callback_data' => json_encode(['show_all_alerts' => null])]
                     ]];
 
                     $asset_types = array_column($asset_types, 'asset_type');
@@ -186,7 +186,7 @@ function managePriceAlerts(User $user, array $callback_query, array $message, Da
 
                     $data['reply_markup']['inline_keyboard'] = [[
                         ['text' => '🔙 برگشت 🔙', "style" => "primary", 'callback_data' => json_encode(['mng_alerts' => null])],
-                        ['text' => '❌ لغو ❌', "style" => "danger", 'callback_data' => json_encode(['show_alerts' => null])]
+                        ['text' => '❌ لغو ❌', "style" => "danger", 'callback_data' => json_encode(['show_all_alerts' => null])]
                     ]];
 
                     foreach ($alerts as $alert) array_unshift(
@@ -222,7 +222,7 @@ function managePriceAlerts(User $user, array $callback_query, array $message, Da
             } else {
                 $data['reply_markup']['inline_keyboard'] = [[
                     ['text' => '🔙 برگشت 🔙', "style" => "primary", 'callback_data' => json_encode(['mng_alerts' => 'add_alert'])],
-                    ['text' => '❌ لغو ❌', "style" => "danger", 'callback_data' => json_encode(['show_alerts' => null])]
+                    ['text' => '❌ لغو ❌', "style" => "danger", 'callback_data' => json_encode(['show_all_alerts' => null])]
                 ]];
                 $assets = $db->read('assets', ['asset_type' => $query_data[$query_key]]);
             }
@@ -256,7 +256,7 @@ function managePriceAlerts(User $user, array $callback_query, array $message, Da
             $data['text'] = 'آیا از حذف اطمینان دارید؟';
             $data['reply_markup']['inline_keyboard'] = [[
                 ['text' => 'تایید', "style" => "danger", 'callback_data' => json_encode(['conf_del_alert' => $alert_id])],
-                ['text' => 'لغو', "style" => "success", 'callback_data' => json_encode(['show_alerts' => null])],
+                ['text' => 'لغو', "style" => "success", 'callback_data' => json_encode(['show_all_alerts' => null])],
             ]];
 
             sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
@@ -285,7 +285,7 @@ function managePriceAlerts(User $user, array $callback_query, array $message, Da
             exit;
 
         // Show main list of alerts
-        case 'show_alerts':
+        case 'show_all_alerts':
             sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
             sendAllAlerts($user, $db, $message['message_id']);
             exit;
