@@ -105,7 +105,9 @@ function sendAllAlerts(User $user, DatabaseManager $db, int|string|null $message
             $asset_name = beautifulNumber($alert['asset_name'], null);
             $alert_price = beautifulNumber($alert['target_price']);
             $base_currency = beautifulNumber($alert['base_currency'], null);
-            $rich_text .= "<li>$status_emoji $asset_name: $alert_price $base_currency</li>";
+            $edit_button = "<tg-button type='disabled' style='link'>" . "ویرایش" . "</tg-button>";
+            $delete_button = "<tg-button type='disabled' style='danger'>" . "حذف" . "</tg-button>";
+            $rich_text .= "<li>$status_emoji $asset_name: $alert_price $base_currency $edit_button $delete_button</li>";
         }
         $rich_text .= '</ul>';
     } else $rich_text = 'شما هشداری ثبت نکرده‌اید!';
