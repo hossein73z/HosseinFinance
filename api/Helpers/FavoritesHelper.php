@@ -97,7 +97,7 @@ function getFavoriteWithExchangeRateAndAlerts(string|int $user_id, DatabaseManag
             FROM favorites f 
                 LEFT JOIN assets a ON f.asset_name = a.name
                 LEFT JOIN users u ON f.user_id = u.id
-                LEFT JOIN alerts al ON f.asset_name = al.asset_name
+                LEFT JOIN alerts al ON f.asset_name = al.asset_name AND al.user_id = u.id 
             WHERE f.user_id = $user_id
             GROUP BY f.id, a.id, asset_type
             ORDER BY asset_type DESC, f.id;"
