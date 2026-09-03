@@ -70,7 +70,11 @@ function handlePricesCallback(
 
     $query_data = $callback_query['data'];
 
-    $query_key = array_key_first($query_data);
+    try {
+        $query_key = array_key_first($query_data);
+    } catch (TypeError $e) {
+        exit('Wrong query data: ' . $e->getMessage());
+    }
     switch ($query_key) {
 
         // Show menu to add/remove a favorite asset
