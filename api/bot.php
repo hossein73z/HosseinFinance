@@ -76,7 +76,8 @@ function empty_level(
     if (
         array_key_first($progress_data) == 'new_alert_price' ||
         array_key_first($progress_data) == 'edit_alert_price' ||
-        array_key_first($progress_data) == 'new_asset_alert'
+        array_key_first($progress_data) == 'new_asset_alert' ||
+        array_key_first($progress_data) == 'edit_asset_alert'
     ) {
 
         // Check if Received text is cancel button
@@ -99,9 +100,15 @@ function empty_level(
                 SELECT assets.*
                 FROM assets JOIN alerts ON alerts.asset_name = assets.name
                 WHERE alerts.user_id = '{$user->getId()}' AND alerts.id = '$alert_id'")->fetch();
-        } else {
+        } elseif (array_key_first($progress_data) == 'new_asset_alert') {
             $asset_id = $progress_data['new_asset_alert']['asset_id'];
             $asset = $db->read('assets', ['id' => $asset_id], true);
+        } else {
+            $alert_id = $progress_data['edit_asset_alert']['alert_id'];
+            $asset = $db->query("
+                SELECT assets.*
+                FROM assets JOIN alerts ON alerts.asset_name = assets.name
+                WHERE alerts.user_id = '{$user->getId()}' AND alerts.id = '$alert_id'")->fetch();
         }
 
         // Just entered the level

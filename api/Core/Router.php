@@ -135,6 +135,7 @@ function handleCallbackQuery(array $callback_query, DatabaseManager $db): void
             case 'new_alert_type':
             case 'new_alert_asset_id':
             case 'new_asset_alert':
+            case 'edit_asset_alert':
             case 'edit_alert_price':
             case 'del_alert':
             case 'del_asset_alert':

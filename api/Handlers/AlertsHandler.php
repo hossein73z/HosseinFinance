@@ -173,8 +173,8 @@ function sendAssetAlerts(User $user, DatabaseManager $db, string|int $asset_id, 
             $alert_price = beautifulNumber($alert['target_price']);
             $base_currency = beautifulNumber($alert['base_currency'], null);
 
-            $edit_callback = json_encode(['edit_alert_price' => $alert['id']]);
-            $edit_button = "<tg-button type='disabled' style='link' data='$edit_callback'>" . "ویرایش" . "</tg-button>";
+            $edit_callback = json_encode(['edit_asset_alert' => $alert['id']]);
+            $edit_button = "<tg-button type='callback_data' style='link' data='$edit_callback'>" . "ویرایش" . "</tg-button>";
 
             $delete_callback = json_encode(['del_asset_alert' => [$alert['id'] => $alert['asset_id']]]);
             $delete_button = "<tg-button type='callback_data' style='danger' data='$delete_callback'>" . "حذف" . "</tg-button>";
@@ -323,6 +323,7 @@ function managePriceAlerts(User $user, array $callback_query, array $message, Da
         case 'new_alert_asset_id': // -- Add price for new alert, -- from main alerts manu and favorites' message
         case 'edit_alert_price': // ---- Edit price of an alert, --- from main alerts menu
         case 'new_asset_alert': // ----- Add price for new alert, -- from favorites' alert menu
+        case 'edit_asset_alert': // ---- Edit price of an alert, --- from favorites' alert menu
 
             sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
             sendToTelegram('deleteMessage', ['chat_id' => $user->getid(), 'message_id' => $message['message_id']]);
@@ -330,7 +331,8 @@ function managePriceAlerts(User $user, array $callback_query, array $message, Da
             $item_id = $query_data[$query_key];
             if ($query_key == 'new_alert_asset_id') $progress_data = ['new_alert_price' => ['asset_id' => $item_id]];
             elseif ($query_key == 'edit_alert_price') $progress_data = ['edit_alert_price' => ['alert_id' => $item_id]];
-            else $progress_data = ['new_asset_alert' => ['asset_id' => $item_id]];
+            elseif ($query_key == 'new_asset_alert') $progress_data = ['new_asset_alert' => ['asset_id' => $item_id]];
+            else $progress_data = ['edit_asset_alert' => ['alert_id' => $item_id]];
 
             $user->setProgress(['parent_btn' => $user->getLastBtn(), 'data' => $progress_data]);
             empty_level($user, $db, $user->getLastBtn());
