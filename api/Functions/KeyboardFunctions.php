@@ -1,5 +1,56 @@
 <?php
 
+function getPressedButtonFromUserKeyboard(string $text, User $user): ?Button
+{
+    $admin = ($user->isAdmin()) ? [false, true] : [false];
+
+    foreach ($user->getKeyboard() as $keyboard) {
+        foreach ($keyboard as $button) {
+            $button = Button::fromDbRow($button);
+            $attrs = $button->getAttrs();
+            if ($attrs['text'] === $text && in_array($button->isAdminKey(), $admin)) return $button;
+        }
+    }
+
+    return null;
+}
+
+function getArrayOfArrayOfSubButtons(int|string $button_id, DatabaseManager $db): ?array
+{
+    $keyboards_array = $db->query("
+        SELECT 
+            p.id,
+            CAST(p.attrs AS JSON) AS attrs,
+            p.admin_key,
+            p.messages,
+            COALESCE(
+                (
+                    -- Reconstruct the 2D array of button objects
+                    SELECT JSON_ARRAYAGG(row_data.row_buttons)
+                    FROM (
+                        SELECT 
+                            kl.row_idx,
+                            JSON_ARRAYAGG(
+                                JSON_OBJECT(
+                                    'id', child.id,
+                                    'attrs', CAST(child.attrs AS JSON),
+                                    'admin_key', child.admin_key
+                                )
+                            ) AS row_buttons
+                        FROM `keyboard_layout` kl
+                        JOIN `buttons` child ON child.id = kl.button_id
+                        WHERE kl.parent_id = p.id
+                        GROUP BY kl.row_idx
+                    ) AS row_data
+                ),
+                JSON_ARRAY()
+            ) AS keyboard
+        FROM `buttons` p
+        WHERE p.id = '$button_id';")->fetch();
+
+    return json_decode($keyboards_array['keyboard'], true);
+}
+
 /**
  * Finds the button that was pressed based on its text and the parent's ID.
  *
@@ -9,11 +60,7 @@
  * @param DatabaseManager $db The database manager instance.
  * @return Button|null The Button instance of the pressed button, or null if not found.
  */
-function getPressedButton(
-    string          $text,
-    int|string|null $parent_btn_id,
-    bool            $admin,
-    DatabaseManager $db): ?Button
+function getPressedButton(string $text, int|string|null $parent_btn_id, bool $admin, DatabaseManager $db): ?Button
 {
     $admin = ($admin) ? [0, 1] : [0];
 
