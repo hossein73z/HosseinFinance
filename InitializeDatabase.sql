@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS `users`
     username   TEXT                 DEFAULT NULL,
     settings   TEXT                 DEFAULT NULL,
     progress   TEXT                 DEFAULT NULL,
+    keyboard   TEXT                 DEFAULT NULL,
     is_admin   BOOLEAN     NOT NULL DEFAULT 0,
     last_btn   VARCHAR(10) NOT NULL DEFAULT '0'
 ) DEFAULT CHARSET = utf8mb4;

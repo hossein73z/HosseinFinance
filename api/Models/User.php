@@ -5,10 +5,11 @@ class User implements JsonSerializable
     public function __construct(
         private ?int    $id,
         private string  $firstName,
-        private ?string $lastName,
-        private ?string $username,
-        private ?string $settings,
-        private ?string $progress,
+        private ?string $lastName = null,
+        private ?string $username = null,
+        private ?string $settings = null,
+        private ?string $progress = null,
+        private ?string $keyboard = null,
         private bool    $isAdmin = false,
         private string  $lastBtn = '0'
     )
@@ -27,6 +28,7 @@ class User implements JsonSerializable
             $row['username'] ?? null,
             $row['settings'] ?? null,
             $row['progress'] ?? null,
+            $row['keyboard'] ?? null,
             (bool)($row['is_admin'] ?? false),
             $row['last_btn'] ?? '0'
         );
@@ -77,6 +79,12 @@ class User implements JsonSerializable
         else return null;
     }
 
+    public function getKeyboard(): ?array
+    {
+        if ($this->keyboard) return json_decode($this->keyboard, true);
+        else return null;
+    }
+
     public function isAdmin(): bool
     {
         return $this->isAdmin;
@@ -116,6 +124,12 @@ class User implements JsonSerializable
     public function setProgress(?array $progress): self
     {
         $this->progress = ($progress === null) ? null : json_encode($progress);
+        return $this;
+    }
+
+    public function setKeyboard(?array $keyboard): self
+    {
+        $this->keyboard = ($keyboard === null) ? null : json_encode($keyboard);
         return $this;
     }
 
@@ -180,6 +194,7 @@ class User implements JsonSerializable
             'username' => $this->username,
             'settings' => $this->settings,
             'progress' => $this->progress,
+            'keyboard' => $this->keyboard,
             'is_admin' => (int)$this->isAdmin,
             'last_btn' => $this->lastBtn,
         ];
@@ -195,6 +210,7 @@ class User implements JsonSerializable
             'username' => $this->username,
             'settings' => $this->getSettings(),
             'progress' => $this->progress,
+            'keyboard' => $this->keyboard,
             'is_admin' => $this->isAdmin,
             'last_btn' => $this->lastBtn,
             'base_currency' => $this->getBaseCurrency(),
