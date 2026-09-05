@@ -25,12 +25,13 @@ function getOrCreateUser(array $from, DatabaseManager $db): User
                 'username' => $from['username'] ?? null,
                 'settings' => json_encode(['base_currency' => 'ریال']),
                 'progress' => null,
-                'is_admin' => ($admins) ? 0 : 1, // First user is admin
+                'keyboard' => json_encode(createKeyboardsArray(0, !$admins, $db, false)),
+                'is_admin' => !$admins, // First user is admin
                 'last_btn' => 0
             ]
         );
 
-        if ($new_user_id) {
+        if ($new_user_id || $new_user_id == 0) {
             $user = $db->read(
                 table: 'users',
                 conditions: ['id' => $from['id']],
@@ -69,13 +70,13 @@ function handleIncomingMessage(array $message, DatabaseManager $db): void
     if ($matched && $matches[1] == 'holding') level_1(user: $user, db: $db, command_data: $matches[2]);
     if ($matched && $matches[1] == 'loan') level_2(user: $user, db: $db, command_data: $matches[2]);
 
-    $pressed_button = getPressedButton(text: $text, parent_btn_id: $user->getLastBtn(), admin: $user->isAdmin(), db: $db);
+    $pressed_button = getPressedButton($text, $user, $db);
 
     choosePath(pressed_button: $pressed_button, message: $message, user: $user, db: $db);
 }
 
 /**
- * Handles inline button presses.
+ * Handles inline and rich button callback data.
  */
 function handleCallbackQuery(array $callback_query, DatabaseManager $db): void
 {
