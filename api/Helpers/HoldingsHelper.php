@@ -38,11 +38,10 @@ function getHoldingsWithAssetDetails(array $conditions, DatabaseManager $db, boo
     return $holdings;
 }
 
-function createHoldingDetailText(
-    array   $holding,
-    ?string $markdown = null,
-    string  $user_base_currency = 'ریال',
-    array   $attributes = [
+function createHoldingDetailRichHTML(
+    array  $holding,
+    string $user_base_currency = 'ریال',
+    array  $attributes = [
         'space',
         'date',
         'org_amount',
@@ -52,54 +51,54 @@ function createHoldingDetailText(
         'new_total_price',
         'space',
         'profit'
-    ],
-    ?string $holding_mssg_id = null,
-    ?string $initial_mssg_id = null
+    ]
 ): string
 {
-    // Create tree view for each presented attribute
-    $tree = '';
+    $html = '<h4>' . beautifulNumber($holding['asset_name'], null) . ' ';
+    $html .= '<tg-button type="disabled" style="link">' . 'جزئیات و ویرایش' . '</tg-button></tg-button-row>';
+    $html .= '</h4><ul>';
     foreach ($attributes as $attribute) {
 
         if ($attribute == 'space') {
-            $tree .= "\n   │ " . "‏";
+            $html .= '<li>';
+            $html .= '</li>';
         }
 
         if ($attribute == 'date' && isset($holding['date'])) {
             $date = JalaliDate::fromString($holding['date'])->toPersianMonths();
-            $tree .=
-                "\n   ┤── تاریخ خرید: " .
-                beautifulNumber("$date[day] $date[month] $date[year]", null);
+            $html .= '<li>';
+            $html .= "تاریخ خرید: " . beautifulNumber("$date[day] $date[month] $date[year]", null);
+            $html .= '</li>';
         }
 
         if ($attribute == 'org_amount') {
-            $tree .=
-                "\n   ┤── مقدار / تعداد: " .
-                beautifulNumber(floatval($holding['amount']));
+            $html .= '<li>';
+            $html .= "مقدار / تعداد: " . beautifulNumber(floatval($holding['amount']));
+            $html .= '</li>';
         }
 
         if ($attribute == 'org_price') {
-            $tree .=
-                "\n   ┤── قیمت خرید هر واحد: " .
-                beautifulNumber(floatval($holding['avg_price'])) . " " . $holding['base_currency'];
+            $html .= '<li>';
+            $html .= "قیمت خرید هر واحد: " . beautifulNumber(floatval($holding['avg_price'])) . " " . $holding['base_currency'];
+            $html .= '</li>';
         }
 
         if ($attribute == 'new_price') {
-            $tree .=
-                "\n   ┤── قیمت لحظه‌ای هر واحد: " .
-                beautifulNumber($holding['current_price']) . " " . $holding['base_currency'];
+            $html .= '<li>';
+            $html .= "قیمت لحظه‌ای هر واحد: " . beautifulNumber($holding['current_price']) . " " . $holding['base_currency'];
+            $html .= '</li>';
         }
 
         if ($attribute == 'org_total_price') {
-            $tree .=
-                "\n   ┤── قیمت خرید کل دارایی: " .
-                beautifulNumber($holding['avg_price'] * $holding['amount']) . " " . $holding['base_currency'];
+            $html .= '<li>';
+            $html .= "قیمت خرید کل دارایی: " . beautifulNumber($holding['avg_price'] * $holding['amount']) . " " . $holding['base_currency'];
+            $html .= '</li>';
         }
 
         if ($attribute == 'new_total_price') {
-            $tree .=
-                "\n   ┤── قیمت لحظه‌ای کل دارایی: " .
-                beautifulNumber($holding['current_price'] * $holding['amount']) . " " . $holding['base_currency'];
+            $html .= '<li>';
+            $html .= "قیمت لحظه‌ای کل دارایی: " . beautifulNumber($holding['current_price'] * $holding['amount']) . " " . $holding['base_currency'];
+            $html .= '</li>';
         }
 
         if ($attribute == 'profit') {
@@ -113,21 +112,13 @@ function createHoldingDetailText(
                     "🟢 سود: " . beautifulNumber($pro_los) . ' ' . $user_base_currency :
                     "🔴 ضرر: " . beautifulNumber($pro_los) . ' ' . $user_base_currency
                 );
-
-            $tree .= "\n   ┘── " . $pro_los_string;
+            $html .= '<li>';
+            $html .= $pro_los_string;
+            $html .= '</li>';
         }
     }
 
-    // Manage deep-link and Markdown escaping
-    if ($markdown === 'MarkdownV2') {
-
-        $tree = markdownScape($tree);
-
-        $asset_name = beautifulNumber(markdownScape($holding['asset_name']), null);
-        $holding['asset_name'] = "[$asset_name](https://t.me/" . BOT_ID . "?start=viewHolding_holdingId{$holding['id']}" . ($holding_mssg_id ? "_holdingsMssgId" . $holding_mssg_id : '') . ($initial_mssg_id ? "_initMssgId" . $initial_mssg_id : '') . ")" . '‏';
-    } else $holding['asset_name'] = beautifulNumber($holding['asset_name'], null);
-
-    return $holding['asset_name'] . $tree . "\n";
+    return $html;
 }
 
 function calculateProLos(float $p1, float $p2, float $amount = 1, float $conversion_rate = 1): float

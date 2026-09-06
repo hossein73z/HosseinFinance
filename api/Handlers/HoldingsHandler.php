@@ -30,19 +30,14 @@ function level_1(
     if ($message && isset($message['web_app_data'])) handleHoldingsWebAppData($user, $data, $message, $db);
     if ($message && !isset($message['web_app_data'])) handleHoldingsTextMessage($user, $data, $message, $db);
 
-    // Send initial message
-    $response = sendToTelegram('sendMessage', $data);
-
     // Update user's level and progress
-    if ($response) {
-        $db->update('users', ['button' => json_encode($level_button), 'progress' => null], ['id' => $user->getId()]);
+    $db->update('users', ['button' => json_encode($level_button), 'progress' => null], ['id' => $user->getId()]);
 
-        if ($command_data) {
-            $holding = getHoldingsWithAssetDetails(['h.id' => $command_data, 'h.user_id' => $user->getId()], $db, true);
-            if ($holding) sendHoldingDetail($holding, $data, $user->getBaseCurrency());
-            else sendAllHoldings($user, $db, $response['result']['message_id']);
-        } else sendAllHoldings($user, $db, $response['result']['message_id']);
-    }
+    if ($command_data) {
+        $holding = getHoldingsWithAssetDetails(['h.id' => $command_data, 'h.user_id' => $user->getId()], $db, true);
+        if ($holding) sendHoldingDetail($holding, $data, $user->getBaseCurrency());
+        else sendAllHoldings($user, $db, $data);
+    } else sendAllHoldings($user, $db, $data);
 
     exit;
 }
@@ -64,8 +59,8 @@ function handleHoldingsCallback(
     switch ($query_key) {
         case 'holdings_list':
             sendToTelegram('deleteMessage', ['chat_id' => $user->getid(), 'message_id' => $message['message_id']]);
-            $response = sendToTelegram('sendMessage', $data);
-            sendAllHoldings($user, $db, $response['result']['message_id']);
+            sendToTelegram('sendMessage', $data);
+            sendAllHoldings($user, $db, $data);
             break;
 
         default:
@@ -184,7 +179,7 @@ function handleHoldingsWebAppData(User $user, array $data, array $message, Datab
 
         // Clear user progress and show all holdings
         $db->update('users', ['progress' => null], ['id' => $user->getId()]);
-        sendAllHoldings($user, $db);
+        sendAllHoldings($user, $db, $data);
     } else {
         $data['text'] = 'داده‌های ارسالی قابل پردازش نیستند!';
         $data = checkAndAddEditHoldingButton($data, $user, $db);
@@ -227,44 +222,34 @@ function handleHoldingsTextMessage(User $user, array $data, array $message, Data
     exit;
 }
 
-function sendAllHoldings(User $user, DatabaseManager $db, int|string|null $initial_mssg_id = null): void
+function sendAllHoldings(User $user, DatabaseManager $db, array $data): void
 {
     $holdings = getHoldingsWithAssetDetails(['user_id' => $user->getId()], $db);
     if ($holdings) {
-        $temp_mssg = sendLoadingMessage($user->getid(), 'در حال دریافت اطلاعات دارایی‌ها ...');
-        if ($temp_mssg) {
-
-            $text = "دارایی‌های ثبت شده‌ی شما:\n";
-            $total_pro_los = 0;
-            foreach ($holdings as $holding) {
-                $total_pro_los += $holding['amount'] * ($holding['current_price'] - $holding['avg_price']) * $holding['exchange_rate'];
-                $text .= "\n";
-                $text .= createHoldingDetailText(
-                    holding: $holding,
-                    markdown: 'MarkdownV2',
-                    user_base_currency: $user->getBaseCurrency(),
-                    attributes: ['org_amount', 'org_total_price', 'profit'],
-                    holding_mssg_id: $temp_mssg['result']['message_id'],
-                    initial_mssg_id: $initial_mssg_id
-                );
-            }
-
-            $pro_los_string =
-                ($total_pro_los == 0) ?
-                    "🟤 جمع سود/زیان: ۰ " . $user->getBaseCurrency() : (
-                ($total_pro_los > 0) ?
-                    "🟢 جمع سود: " . beautifulNumber($total_pro_los) . ' ' . $user->getBaseCurrency() :
-                    "🔴 جمع ضرر: " . beautifulNumber($total_pro_los) . ' ' . $user->getBaseCurrency()
-                );
-            $text .= "\n" . markdownScape($pro_los_string);
-
-            sendToTelegram('editMessageText', [
-                'chat_id' => $user->getid(),
-                'message_id' => $temp_mssg['result']['message_id'],
-                'text' => $text,
-                'parse_mode' => 'MarkdownV2'
-            ]);
+        $html = "<h2>دارایی‌های ثبت شده‌ی شما:</h2>";
+        $html .= '<p><br></p>';
+        $total_pro_los = 0;
+        foreach ($holdings as $holding) {
+            $total_pro_los += $holding['amount'] * ($holding['current_price'] - $holding['avg_price']) * $holding['exchange_rate'];
+            $html .= createHoldingDetailRichHTML(
+                holding: $holding,
+                user_base_currency: $user->getBaseCurrency(),
+                attributes: ['org_amount', 'org_total_price', 'profit']
+            );
+            $html .= '<hr>';
         }
+
+        $pro_los_html =
+            ($total_pro_los == 0) ?
+                "<p>🟤 جمع سود/زیان: ۰ " . $user->getBaseCurrency() . '</p>' : (
+            ($total_pro_los > 0) ?
+                "<p>🟢 جمع سود: " . beautifulNumber($total_pro_los) . ' ' . $user->getBaseCurrency() . '</p>' :
+                "<p>🔴 جمع ضرر: " . beautifulNumber($total_pro_los) . ' ' . $user->getBaseCurrency() . '</p>'
+            );
+        $html .= '<p><br></p>' . $pro_los_html;
+
+        $data['rich_message'] = ['is_rtl' => true, 'html' => $html];
+        sendToTelegram('sendRichMessage', $data);
     } else {
         sendToTelegram('sendMessage', ['chat_id' => $user->getid(), 'text' => 'شما هیچ دارایی‌ای ثبت نکرده‌اید.']);
     }
@@ -298,7 +283,7 @@ function sendHoldingDetail(array $holding, array $data, string $user_base_curren
     if ($temp_mssg) {
 
         $data['message_id'] = $temp_mssg['result']['message_id'];
-        $data['text'] = createHoldingDetailText($holding, user_base_currency: $user_base_currency);
+        $data['text'] = createHoldingDetailRichHTML($holding, user_base_currency: $user_base_currency);
         //        $data['parse_mode'] = 'MarkdownV2';
         $data['reply_markup'] = ['inline_keyboard' => [[['text' => 'برگشت به لیست دارایی‌ها', 'callback_data' => json_encode(['holdings_list' => null])]]]];
 
