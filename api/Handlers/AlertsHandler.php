@@ -191,6 +191,160 @@ function sendAssetAlerts(User $user, DatabaseManager $db, string|int $asset_id, 
     exit();
 }
 
+/**
+ * Returns true when the user's progress indicates we are waiting for an alert target price.
+ */
+function isAlertPriceProgress(?array $progress): bool
+{
+    if (!$progress || !isset($progress['data']) || !is_array($progress['data'])) {
+        return false;
+    }
+
+    $key = array_key_first($progress['data']);
+    return in_array($key, ['new_alert_price', 'edit_alert_price', 'new_asset_alert', 'edit_asset_alert'], true);
+}
+
+/**
+ * Ask the user for the alert target price using ForceReply (keeps current reply keyboard).
+ */
+function askForAlertPrice(User $user, DatabaseManager $db, array $asset): void
+{
+    $text = 'قیمتی که می‌خواهید برای آن هشدار تنظیم کنید را نوشته و ارسال کنید.';
+    $text .= "\n";
+    $text .= '*قیمت کنونی «' . beautifulNumber($asset['name'], null) . '»*: ';
+    $text .= beautifulNumber($asset['price']) . ' ' . beautifulNumber($asset['base_currency'], null);
+    $text = markdownScape($text);
+
+    sendToTelegram('sendMessage', [
+        'chat_id'      => $user->getId(),
+        'text'         => $text,
+        'parse_mode'   => 'MarkdownV2',
+        'reply_markup' => [
+            'force_reply'             => true,
+            'input_field_placeholder' => 'قیمت هشدار را وارد کنید',
+            'selective'               => true,
+        ],
+    ]);
+}
+
+/**
+ * Process a text message that is expected to be an alert target price.
+ * Called from nonButtonHandler when isAlertPriceProgress() is true.
+ */
+function handleAlertPriceInput(User $user, array $message, DatabaseManager $db): void
+{
+    $progress = $user->getProgress();
+    if (!$progress || !isAlertPriceProgress($progress)) {
+        return;
+    }
+
+    $parent_btn_id = $progress['parent_btn'] ?? $user->getButtonId();
+    $progress_data = $progress['data'];
+    $progress_key  = array_key_first($progress_data);
+
+    // Allow user to cancel via the Cancel reply button (s1)
+    $pressed_button = $db->read('buttons', ['id' => 's1', 'attrs->>"$.text"' => $message['text'] ?? '']);
+    if ($pressed_button) {
+        cancelButton($user, $db, $parent_btn_id);
+        return;
+    }
+
+    // Resolve the related asset (and alert_id when editing)
+    $alert_id = null;
+    if ($progress_key === 'new_alert_price') {
+        $asset_id = $progress_data['new_alert_price']['asset_id'];
+        $asset = $db->read('assets', ['id' => $asset_id], true);
+    } elseif ($progress_key === 'edit_alert_price') {
+        $alert_id = $progress_data['edit_alert_price']['alert_id'];
+        $asset = $db->query("
+            SELECT assets.*
+            FROM assets JOIN alerts ON alerts.asset_name = assets.name
+            WHERE alerts.user_id = '{$user->getId()}' AND alerts.id = '$alert_id'")->fetch();
+    } elseif ($progress_key === 'new_asset_alert') {
+        $asset_id = $progress_data['new_asset_alert']['asset_id'];
+        $asset = $db->read('assets', ['id' => $asset_id], true);
+    } else { // edit_asset_alert
+        $alert_id = $progress_data['edit_asset_alert']['alert_id'];
+        $asset = $db->query("
+            SELECT assets.*
+            FROM assets JOIN alerts ON alerts.asset_name = assets.name
+            WHERE alerts.user_id = '{$user->getId()}' AND alerts.id = '$alert_id'")->fetch();
+    }
+
+    if (!$asset) {
+        sendToTelegram('sendMessage', [
+            'chat_id' => $user->getId(),
+            'text'    => '❌ دارایی مورد نظر یافت نشد.',
+        ]);
+        cancelButton($user, $db, $parent_btn_id);
+        return;
+    }
+
+    $target_price = cleanAndValidateNumber($message['text'] ?? '');
+
+    if ($target_price === null) {
+        sendToTelegram('sendMessage', [
+            'chat_id'      => $user->getId(),
+            'text'         => "پیام نامفهوم بود.\nقیمت را به عدد بنویسید یا در صورت انصراف از دکمه لغو استفاده کنید.",
+            'reply_markup' => [
+                'force_reply'             => true,
+                'input_field_placeholder' => 'قیمت هشدار را وارد کنید',
+                'selective'               => true,
+            ],
+        ]);
+        exit;
+    }
+
+    $price_diff   = $target_price - (float)$asset['price'];
+    $diff_percent = intval(($price_diff / floatval($asset['price'])) * 100);
+
+    if ($price_diff == 0) {
+        sendToTelegram('sendMessage', [
+            'chat_id'      => $user->getId(),
+            'text'         => "قیمت هشدار نمی‌تواند با قیمت کنونی برابر باشد.\nقیمت دیگری بنویسید یا در صورت انصراف از دکمه لغو استفاده کنید.",
+            'reply_markup' => [
+                'force_reply'             => true,
+                'input_field_placeholder' => 'قیمت هشدار را وارد کنید',
+                'selective'               => true,
+            ],
+        ]);
+        exit;
+    }
+
+    $new_alert = [
+        'user_id'      => $user->getId(),
+        'asset_name'   => $asset['name'],
+        'target_price' => $target_price,
+        'status'       => 'active',
+        'created_date' => JalaliDate::fromGregorian()->format(),
+        'created_time' => date('H:i'),
+    ];
+    if ($alert_id !== null) {
+        $new_alert['id'] = $alert_id;
+    }
+
+    $result = $db->upsert('alerts', $new_alert);
+
+    if ($result) {
+        $text = '✅ هشدار قیمت برای «' . beautifulNumber($asset['name'], null) . '» با موفقیت ثبت شد!';
+        $text .= "\n" . 'قیمت کنونی: ' . beautifulNumber($asset['price']);
+        $text .= "\n" . 'قیمت هشدار: ' . beautifulNumber($target_price);
+        $text .= "\n" . 'اختلاف قیمت: ' . ($price_diff > 0 ? '➕' : '➖');
+        $text .= ' ' . beautifulNumber(abs($price_diff));
+        $text .= ' (' . beautifulNumber($diff_percent) . '%)';
+    } else {
+        $text = '❌ خطای پایگاه داده!';
+    }
+
+    sendToTelegram('sendMessage', [
+        'chat_id' => $user->getId(),
+        'text'    => $text,
+    ]);
+
+    // Clear progress and return to the parent view
+    cancelButton($user, $db, $parent_btn_id);
+}
+
 function managePriceAlerts(User $user, array $callback_query, array $message, DatabaseManager $db): void
 {
     $data = [
@@ -317,8 +471,8 @@ function managePriceAlerts(User $user, array $callback_query, array $message, Da
             sendToTelegram('editMessageText', $data);
             exit;
 
-        // Redirect user to empty level to input alert price
-        case 'new_alert_asset_id': // -- Add price for new alert, -- from main alerts manu and favorites' message
+        // Ask for alert price via ForceReply (no empty level / s3)
+        case 'new_alert_asset_id': // -- Add price for new alert, -- from main alerts menu and favorites' message
         case 'edit_alert_price': // ---- Edit price of an alert, --- from main alerts menu
         case 'new_asset_alert': // ----- Add price for new alert, -- from favorites' alert menu
         case 'edit_asset_alert': // ---- Edit price of an alert, --- from favorites' alert menu
@@ -327,20 +481,49 @@ function managePriceAlerts(User $user, array $callback_query, array $message, Da
             sendToTelegram('deleteMessage', ['chat_id' => $user->getid(), 'message_id' => $message['message_id']]);
 
             $item_id = $query_data[$query_key];
-            if ($query_key == 'new_alert_asset_id') $progress_data = ['new_alert_price' => ['asset_id' => $item_id]];
-            elseif ($query_key == 'edit_alert_price') $progress_data = ['edit_alert_price' => ['alert_id' => $item_id]];
-            elseif ($query_key == 'new_asset_alert') $progress_data = ['new_asset_alert' => ['asset_id' => $item_id]];
-            else $progress_data = ['edit_asset_alert' => ['alert_id' => $item_id]];
+            if ($query_key == 'new_alert_asset_id') {
+                $progress_data = ['new_alert_price' => ['asset_id' => $item_id]];
+                $asset = $db->read('assets', ['id' => $item_id], true);
+            } elseif ($query_key == 'edit_alert_price') {
+                $progress_data = ['edit_alert_price' => ['alert_id' => $item_id]];
+                $asset = $db->query("
+                    SELECT assets.*
+                    FROM assets JOIN alerts ON alerts.asset_name = assets.name
+                    WHERE alerts.user_id = '{$user->getId()}' AND alerts.id = '$item_id'")->fetch();
+            } elseif ($query_key == 'new_asset_alert') {
+                $progress_data = ['new_asset_alert' => ['asset_id' => $item_id]];
+                $asset = $db->read('assets', ['id' => $item_id], true);
+            } else {
+                $progress_data = ['edit_asset_alert' => ['alert_id' => $item_id]];
+                $asset = $db->query("
+                    SELECT assets.*
+                    FROM assets JOIN alerts ON alerts.asset_name = assets.name
+                    WHERE alerts.user_id = '{$user->getId()}' AND alerts.id = '$item_id'")->fetch();
+            }
 
-            $user->setProgress(['parent_btn' => $user->getButtonId(), 'data' => $progress_data]);
-            empty_level($user, $db, $user->getButtonId());
-            break;
+            if (!$asset) {
+                sendToTelegram('sendMessage', [
+                    'chat_id' => $user->getId(),
+                    'text'    => '❌ دارایی مورد نظر یافت نشد.',
+                ]);
+                exit;
+            }
+
+            $progress = [
+                'parent_btn' => $user->getButtonId(),
+                'data'       => $progress_data,
+            ];
+            $user->setProgress($progress);
+            $db->update('users', ['progress' => json_encode($progress)], ['id' => $user->getId()]);
+
+            askForAlertPrice($user, $db, $asset);
+            exit;
 
         // Ask user to confirm deleting alert
         case 'del_alert': // -------- Request from main alerts' message
         case 'del_asset_alert': // -- Request from favorites message
 
-            // Query structure doo to length limitation: [query_key => [alert_id => asset_id]]
+            // Query structure due to length limitation: [query_key => [alert_id => asset_id]]
             $alert_id = array_key_first($query_data[$query_key]);
             $asset_id = $query_data[$query_key][$alert_id];
 
@@ -363,7 +546,7 @@ function managePriceAlerts(User $user, array $callback_query, array $message, Da
         case 'conf_del_alert':
         case 'conf_del_asset_alert':
 
-            // Query structure doo to length limitation: [query_key => [alert_id => asset_id]]
+            // Query structure due to length limitation: [query_key => [alert_id => asset_id]]
             $alert_id = array_key_first($query_data[$query_key]);
             $asset_id = $query_data[$query_key][$alert_id];
 

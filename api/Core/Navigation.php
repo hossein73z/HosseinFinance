@@ -12,7 +12,7 @@ function backButton(User $user, DatabaseManager $db, int|string|null $parent_btn
      */
 
     $progress = $user->getProgress();
-    $current_btn = $parent_btn_id ?: $user->getButton();
+    $current_btn = $parent_btn_id ? getStructuredButton($parent_btn_id, $user->isAdmin(), $db) : $user->getButton();
 
     if ($progress) {
 

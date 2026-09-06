@@ -235,6 +235,12 @@ function normalButtonHandler(User $user, Button $pressed_button, DatabaseManager
 
 function nonButtonHandler(User $user, array $message, DatabaseManager $db): void
 {
+    // Priority: if we are waiting for an alert price, handle it first
+    if (isAlertPriceProgress($user->getProgress())) {
+        handleAlertPriceInput($user, $message, $db);
+        return;
+    }
+
     if ($user->getButtonId() == '1') /***/ level_1(user: $user, db: $db, message: $message);
     if ($user->getButtonId() == '2') /***/ level_2(user: $user, db: $db, message: $message);
     if ($user->getButtonId() == '5') /***/ level_5(user: $user, db: $db, message: $message);
@@ -242,7 +248,6 @@ function nonButtonHandler(User $user, array $message, DatabaseManager $db): void
     if ($user->getButtonId() == '10') /**/ level_10(user: $user, db: $db, message: $message);
     if ($user->getButtonId() == '11') /**/ level_11(user: $user, db: $db, message: $message);
     if ($user->getButtonId() == '12') /**/ level_12(user: $user, db: $db, message: $message);
-    if ($user->getButtonId() == 's3') /**/ empty_level(user: $user, db: $db, message: $message);
 
     // Fallback "Unrecognized" message
     sendToTelegram('sendMessage', [
