@@ -6,9 +6,8 @@ class Button implements JsonSerializable
         private string  $id,
         private array   $attrs,
         private bool    $adminKey,
-        private ?string $messages,
         private ?string $belongTo,
-        private ?array  $keyboards
+        private ?array  $keyboard
     )
     {
     }
@@ -20,11 +19,18 @@ class Button implements JsonSerializable
     {
         return new self(
             $row['id'],
-            isset($row['attrs']) ? json_decode($row['attrs'], true) : [],
+            !isset($row['attrs']) ?
+                [] :
+                (is_string($row['attrs']) ?
+                    json_decode($row['attrs'], true) :
+                    $row['attrs']),
             (bool)$row['admin_key'],
-            $row['messages'] ?? null,
             $row['belong_to'] ?? null,
-            isset($row['keyboards']) ? json_decode($row['keyboards'], true) : null
+            !isset($row['keyboard']) ?
+                null :
+                (is_string($row['keyboard']) ?
+                    json_decode($row['keyboard'], true) :
+                    $row['keyboard'])
         );
     }
 
@@ -45,19 +51,14 @@ class Button implements JsonSerializable
         return $this->adminKey;
     }
 
-    public function getMessages(): ?string
-    {
-        return $this->messages;
-    }
-
     public function getBelongTo(): ?string
     {
         return $this->belongTo;
     }
 
-    public function getKeyboards(): ?array
+    public function getKeyboard(): ?array
     {
-        return $this->keyboards;
+        return $this->keyboard;
     }
 
     // --- Setters ---
@@ -80,21 +81,15 @@ class Button implements JsonSerializable
         return $this;
     }
 
-    public function setMessages(?string $messages): self
-    {
-        $this->messages = $messages;
-        return $this;
-    }
-
     public function setBelongTo(?string $belongTo): self
     {
         $this->belongTo = $belongTo;
         return $this;
     }
 
-    public function setKeyboards(?array $keyboards): self
+    public function setKeyboard(?array $keyboard): self
     {
-        $this->keyboards = $keyboards;
+        $this->keyboard = $keyboard;
         return $this;
     }
 
@@ -105,9 +100,9 @@ class Button implements JsonSerializable
         return $this->attrs['text'] ?? 'Unknown Button';
     }
 
-    public function hasKeyboards(): bool
+    public function hasKeyboard(): bool
     {
-        return !empty($this->keyboards);
+        return !empty($this->keyboard);
     }
 
     public function toDbArray(): array
@@ -116,24 +111,22 @@ class Button implements JsonSerializable
             'id' => $this->id,
             'attrs' => json_encode($this->attrs, JSON_UNESCAPED_UNICODE),
             'admin_key' => (int)$this->adminKey,
-            'messages' => $this->messages,
             'belong_to' => $this->belongTo,
-            'keyboards' => $this->keyboards ? json_encode($this->keyboards) : null,
+            'keyboard' => $this->keyboard ? json_encode($this->keyboard) : null,
         ];
     }
 
     // --- JsonSerializable Implementation ---
 
-    public function jsonSerialize(): mixed
+    public function jsonSerialize(): array
     {
         return [
             'id' => $this->id,
             'attrs' => $this->attrs,
             'text' => $this->getText(),
             'admin_key' => $this->adminKey,
-            'messages' => $this->messages,
             'belong_to' => $this->belongTo,
-            'keyboards' => $this->keyboards,
+            'keyboard' => $this->keyboard,
         ];
     }
 }

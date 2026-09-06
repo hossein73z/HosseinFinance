@@ -8,11 +8,9 @@ function level_1(
     ?array          $callback_query = null,
     ?string         $command_data = null): void
 {
-    // Initialize button object if null is given
-    $level_button = $level_button ?? Button::fromDbRow($db->read('buttons', ['id' => 1], true));
-
     // Create keyboards
-    $keyboard = createKeyboardsArray(parent_btn_id: $level_button->getId(), admin: $user->isAdmin(), db: $db);
+    $level_button = $level_button ?: $user->getButton();
+    $keyboard = refineKeyboardForTelegram($level_button->getKeyboard());
 
     // Add '➕ افزودن دارایی جدید' button to the keyboard
     array_unshift($keyboard, [createWebAppBtn('➕ افزودن دارایی جدید', '/assets/holding.html', add_api: true)]);
@@ -37,7 +35,7 @@ function level_1(
 
     // Update user's level and progress
     if ($response) {
-        $db->update('users', ['last_btn' => $level_button->getId(), 'progress' => null], ['id' => $user->getId()]);
+        $db->update('users', ['button' => json_encode($level_button), 'progress' => null], ['id' => $user->getId()]);
 
         if ($command_data) {
             $holding = getHoldingsWithAssetDetails(['h.id' => $command_data, 'h.user_id' => $user->getId()], $db, true);

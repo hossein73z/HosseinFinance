@@ -8,11 +8,9 @@ function level_9(
     ?array          $message = null,
     ?array          $callback_query = null): void
 {
-    // Initialize button object if null is given
-    $level_button = $level_button ?? Button::fromDbRow($db->read('buttons', ['id' => 9], true));
-
     // Create keyboards
-    $keyboard = createKeyboardsArray(parent_btn_id: $level_button->getId(), admin: $user->isAdmin(), db: $db);
+    $level_button = $level_button ?: $user->getButton();
+    $keyboard = refineKeyboardForTelegram($level_button->getKeyboard());
 
     $data = [
         'chat_id' => $user->getid(),
@@ -33,7 +31,7 @@ function level_9(
 
     // Update user's level and progress
     if ($response) {
-        $db->update('users', ['last_btn' => $level_button->getId(), 'progress' => null], ['id' => $user->getId()]);
+        $db->update('users', ['button' => json_encode($level_button), 'progress' => null], ['id' => $user->getId()]);
 
         // Send Informative message
         sendAllAccounts($user, $db);
@@ -98,11 +96,9 @@ function level_10(
     ?array          $message = null,
     ?array          $callback_query = null): void
 {
-    // Initialize button object if null is given
-    $level_button = $level_button ?? Button::fromDbRow($db->read('buttons', ['id' => 10], true));
-
     // Create keyboards
-    $keyboard = createKeyboardsArray(parent_btn_id: $level_button->getId(), admin: $user->isAdmin(), db: $db);
+    $level_button = $level_button ?: $user->getButton();
+    $keyboard = refineKeyboardForTelegram($level_button->getKeyboard());
 
     $data = [
         'chat_id' => $user->getid(),
@@ -147,7 +143,9 @@ function addAccountProgress(User $user, array $data, ?array $message, DatabaseMa
     if (!$progress || !isset($progress['add_account'])) {
         // Start adding account process
         $progress = ['add_account' => ['type' => null]];
-        $db->update('users', ['last_btn' => 10, 'progress' => json_encode($progress)], ['id' => $user->getId()]);
+        // TODO: Make 'last_btn' dynamic
+        $db->update('users', ['button' => getStructuredButton(10, $user->isAdmin(), $db), 'progress' => json_encode($progress)], ['id' => $user->getId()]);
+
         askForAccountType($user->setProgress($progress), $data, $db);
     } else {
         /*
@@ -191,11 +189,7 @@ function askForAccountType(User $user, array $data, DatabaseManager $db): void
     $response = sendToTelegram('sendMessage', $data);
     if ($response) {
         $progress = ['add_account' => ['type' => null]];
-        $db->update(
-            'users',
-            ['progress' => json_encode($progress)],
-            ['id' => $user->getId()]
-        );
+        $db->update('users', ['progress' => json_encode($progress)], ['id' => $user->getId()]);
     }
     exit;
 }
@@ -207,11 +201,7 @@ function askForAccountName(User $user, array $data, DatabaseManager $db): void
     if ($response) {
         $progress = $user->getProgress();
         $progress['add_account']['name'] = null;
-        $db->update(
-            'users',
-            ['progress' => json_encode($progress)],
-            ['id' => $user->getId()]
-        );
+        $db->update('users', ['progress' => json_encode($progress)], ['id' => $user->getId()]);
     }
     exit;
 }
@@ -223,11 +213,7 @@ function askForAccountStartingBalance(User $user, array $data, DatabaseManager $
     if ($response) {
         $progress = $user->getProgress();
         $progress['add_account']['starting_balance'] = null;
-        $db->update(
-            'users',
-            ['progress' => json_encode($progress)],
-            ['id' => $user->getId()]
-        );
+        $db->update('users', ['progress' => json_encode($progress)], ['id' => $user->getId()]);
     }
     exit;
 }

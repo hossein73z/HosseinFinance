@@ -8,11 +8,9 @@ function level_2(
     ?array          $callback_query = null,
     ?string         $command_data = null): void
 {
-    // Initialize button object if null is given
-    $level_button = $level_button ?? Button::fromDbRow($db->read('buttons', ['id' => 2], true));
-
     // Create keyboards
-    $keyboard = createKeyboardsArray(parent_btn_id: $level_button->getId(), admin: $user->isAdmin(), db: $db);
+    $level_button = $level_button ?: $user->getButton();
+    $keyboard = refineKeyboardForTelegram($level_button->getKeyboard());
 
     // Add '➕ افزودن وام جدید' button to the keyboard
     array_unshift($keyboard, [createWebAppBtn('➕ افزودن وام جدید', '/assets/loan.html')]);
@@ -37,7 +35,8 @@ function level_2(
 
     // Update user's level and progress
     if ($response) {
-        $db->update('users', ['last_btn' => $level_button->getId(), 'progress' => null], ['id' => $user->getId()]);
+        $db->update('users', ['button' => json_encode($level_button), 'progress' => null], ['id' => $user->getId()]);
+
         if ($command_data) {
             $loan = getLoanWithInstallments(user_id: $user->getId(), db: $db, jalali: true, loan_id: $command_data);
             if ($loan) sendLoanDetail($loan, $data, $response['result']['message_id']);

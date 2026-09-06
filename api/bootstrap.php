@@ -14,7 +14,6 @@ require_once __DIR__ . '/Core/Navigation.php';
 require_once __DIR__ . '/Libraries/DatabaseManager.php';
 
 // Handlers
-require_once __DIR__ . '/Handlers/MainMenuHandler.php';
 require_once __DIR__ . '/Handlers/HoldingsHandler.php';
 require_once __DIR__ . '/Handlers/LoansHandler.php';
 require_once __DIR__ . '/Handlers/PricesHandler.php';

@@ -7,11 +7,9 @@ function level_8(
     ?array          $message = null,
     ?array          $callback_query = null): void
 {
-    // Initialize button object if null is given
-    $level_button = $level_button ?? Button::fromDbRow($db->read('buttons', ['id' => 8], true));
-
     // Create keyboards
-    $keyboard = createKeyboardsArray(parent_btn_id: $level_button->getId(), admin: $user->isAdmin(), db: $db);
+    $level_button = $level_button ?: $user->getButton();
+    $keyboard = refineKeyboardForTelegram($level_button->getKeyboard());
 
     $data = [
         'chat_id' => $user->getid(),
@@ -32,7 +30,7 @@ function level_8(
 
     // Update user's level and progress
     if ($response) {
-        $db->update('users', ['last_btn' => $level_button->getId(), 'progress' => null], ['id' => $user->getId()]);
+        $db->update('users', ['button' => json_encode($level_button), 'progress' => null], ['id' => $user->getId()]);
 
         // Send Informative message
         sendAllAlerts($user, $db);
@@ -334,8 +332,8 @@ function managePriceAlerts(User $user, array $callback_query, array $message, Da
             elseif ($query_key == 'new_asset_alert') $progress_data = ['new_asset_alert' => ['asset_id' => $item_id]];
             else $progress_data = ['edit_asset_alert' => ['alert_id' => $item_id]];
 
-            $user->setProgress(['parent_btn' => $user->getLastBtn(), 'data' => $progress_data]);
-            empty_level($user, $db, $user->getLastBtn());
+            $user->setProgress(['parent_btn' => $user->getButtonId(), 'data' => $progress_data]);
+            empty_level($user, $db, $user->getButtonId());
             break;
 
         // Ask user to confirm deleting alert

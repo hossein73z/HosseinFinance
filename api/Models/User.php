@@ -3,14 +3,14 @@
 class User implements JsonSerializable
 {
     public function __construct(
-        private ?int    $id,
-        private string  $firstName,
-        private ?string $lastName,
-        private ?string $username,
-        private ?string $settings,
-        private ?string $progress,
-        private bool    $isAdmin = false,
-        private string  $lastBtn = '0'
+        private int                $id,
+        private string             $firstName,
+        private ?string            $lastName = null,
+        private ?string            $username = null,
+        private ?string            $settings = null,
+        private ?string            $progress = null,
+        private Button|string|null $button = null,
+        private bool               $isAdmin = false
     )
     {
     }
@@ -20,15 +20,21 @@ class User implements JsonSerializable
      */
     public static function fromDbRow(array $row): self
     {
+        $button = null;
+        if (isset($row['button'])) {
+            if (is_string($row['button'])) $button = Button::fromDbRow(json_decode($row['button'], true));
+            elseif (is_array($row['button'])) $button = Button::fromDbRow($row['button']);
+            elseif ($row['button'] instanceof Button) $button = $row['button'];
+        }
         return new self(
-            isset($row['id']) ? (int)$row['id'] : null,
-            $row['first_name'],
-            $row['last_name'] ?? null,
-            $row['username'] ?? null,
-            $row['settings'] ?? null,
-            $row['progress'] ?? null,
-            (bool)($row['is_admin'] ?? false),
-            $row['last_btn'] ?? '0'
+            id: (int)$row['id'],
+            firstName: $row['first_name'],
+            lastName: $row['last_name'] ?? null,
+            username: $row['username'] ?? null,
+            settings: $row['settings'] ?? null,
+            progress: $row['progress'] ?? null,
+            button: $button,
+            isAdmin: (bool)($row['is_admin'] ?? false),
         );
     }
 
@@ -77,14 +83,26 @@ class User implements JsonSerializable
         else return null;
     }
 
+    public function getButton(): ?Button
+    {
+        return $this->button;
+    }
+
+    public function getButtonId(): ?int
+    {
+        if (!$this->button) return null;
+        else return $this->button->getId();
+    }
+
+    public function getKeyboard(): ?array
+    {
+        if ($this->button) return $this?->button->getKeyboard();
+        else return null;
+    }
+
     public function isAdmin(): bool
     {
         return $this->isAdmin;
-    }
-
-    public function getLastBtn(): string
-    {
-        return $this->lastBtn;
     }
 
     // --- Setters ---
@@ -119,15 +137,15 @@ class User implements JsonSerializable
         return $this;
     }
 
-    public function setIsAdmin(bool $isAdmin): self
+    public function setButton(?Button $button): self
     {
-        $this->isAdmin = $isAdmin;
+        $this->button = ($button === null) ? null : $button;
         return $this;
     }
 
-    public function setLastBtn(string $lastBtn): self
+    public function setIsAdmin(bool $isAdmin): self
     {
-        $this->lastBtn = $lastBtn;
+        $this->isAdmin = $isAdmin;
         return $this;
     }
 
@@ -180,8 +198,8 @@ class User implements JsonSerializable
             'username' => $this->username,
             'settings' => $this->settings,
             'progress' => $this->progress,
+            'button' => $this->button,
             'is_admin' => (int)$this->isAdmin,
-            'last_btn' => $this->lastBtn,
         ];
     }
 
@@ -195,8 +213,8 @@ class User implements JsonSerializable
             'username' => $this->username,
             'settings' => $this->getSettings(),
             'progress' => $this->progress,
+            'button' => $this->button,
             'is_admin' => $this->isAdmin,
-            'last_btn' => $this->lastBtn,
             'base_currency' => $this->getBaseCurrency(),
             'detailed_loan' => $this->getDetailedLoan(),
         ];

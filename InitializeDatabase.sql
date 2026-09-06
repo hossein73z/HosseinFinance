@@ -1,45 +1,52 @@
 CREATE TABLE IF NOT EXISTS `users`
 (
-    id         BIGINT      NOT NULL PRIMARY KEY,
-    first_name TEXT        NOT NULL,
-    last_name  TEXT                 DEFAULT NULL,
-    username   TEXT                 DEFAULT NULL,
-    settings   TEXT                 DEFAULT NULL,
-    progress   TEXT                 DEFAULT NULL,
-    is_admin   BOOLEAN     NOT NULL DEFAULT 0,
-    last_btn   VARCHAR(10) NOT NULL DEFAULT '0'
+    id         BIGINT  NOT NULL PRIMARY KEY,
+    first_name TEXT    NOT NULL,
+    last_name  TEXT             DEFAULT NULL,
+    username   TEXT             DEFAULT NULL,
+    settings   TEXT             DEFAULT NULL,
+    button     JSON    NOT NULL,
+    progress   JSON             DEFAULT NULL,
+    is_admin   BOOLEAN NOT NULL DEFAULT 0
 ) DEFAULT CHARSET = utf8mb4;
 
 CREATE TABLE IF NOT EXISTS `buttons`
 (
     id        VARCHAR(36) PRIMARY KEY,
-    attrs     TEXT    NOT NULL,
-    admin_key BOOLEAN NOT NULL DEFAULT 0,
-    messages  TEXT             DEFAULT NULL,
-    belong_to VARCHAR(36)      DEFAULT NULL,
-    keyboards TEXT             DEFAULT NULL
+    attrs     JSON    NOT NULL,
+    admin_key BOOLEAN NOT NULL DEFAULT 0
 ) DEFAULT CHARSET = utf8mb4;
-INSERT INTO `buttons` (`id`, `attrs`, `admin_key`, `messages`, `belong_to`, `keyboards`)
-VALUES ('0', '{\"text\": \"🏠 صفحه اصلی\"}', 0, NULL, NULL,
-        '[[\"1\", \"2\"], [\"9\", \"11\"], [\"3\"], [\"4\", \"7\"]]'),
-       ('1', '{\"text\": \"💼 دارایی‌ها\"}', 0, NULL, '0', '[[\"s0\"]]'),
-       ('2', '{\"text\": \"🏦 وام و اقساط\"}', 0, NULL, '0', '[[\"s0\"]]'),
-       ('3', '{\"text\": \"🛠 ابزارها\"}', 0, NULL, '0', '[[\"5\", \"8\"], [\"s0\"]]'),
-       ('4', '{\"text\": \"👑 بخش مدیریت\"}', 1, NULL, '0', '[[\"s5\", \"s6\"], [\"s0\"]]'),
-       ('5', '{\"text\": \"💰 قیمت‌ها\"}', 0, NULL, '3', '[[\"s2\"], [\"s0\"]]'),
-       ('7', '{\"text\": \"⚙ تنظیمات\"}', 0, NULL, '0', '[[\"s4\"], [\"s0\"]]'),
-       ('8', '{\"text\": \"🔔 هشدارها\"}', 0, NULL, '3', '[[\"s0\"]]'),
-       ('9', '{\"text\": \"🧾 حساب‌ها\"}', 0, NULL, '0', '[[\"10\"], [\"s0\"]]'),
-       ('10', '{\"text\": \"➕ افزودن حساب جدید\"}', 0, NULL, '9', '[[\"s0\", \"s1\"]]'),
-       ('11', '{\"text\": \"🔃 تراکنش‌ها\"}', 0, NULL, '0', '[[\"12\"], [\"s0\"]]'),
-       ('12', '{\"text\": \"➕ افزودن تراکنش جدید\"}', 0, NULL, '11', '[[\"s0\", \"s1\"]]'),
-       ('s0', '{\"text\": \"🔙 برگشت 🔙\"}', 0, NULL, NULL, NULL),
-       ('s1', '{\"text\": \"❌ لغو ❌\"}', 0, NULL, NULL, NULL),
-       ('s2', '{\"text\": \"❤ علاقه‌مندی‌ها ❤\"}', 0, NULL, NULL, NULL),
-       ('s3', '{\"text\": \"Empty Button\"}', 0, NULL, NULL, NULL),
-       ('s4', '{\"text\": \"💲 ارز پایه\"}', 0, NULL, '7', null),
-       ('s5', '{\"text\": \"مشخصات دیتابیس\"}', 0, NULL, '4', null),
-       ('s6', '{\"text\": \"مشخصات هاست\"}', 0, NULL, '4', null);
+INSERT INTO `buttons` (`id`, `attrs`, `admin_key`)
+VALUES ('0', '{\"text\": \"🏠 صفحه اصلی\"}', 0),
+       ('1', '{\"text\": \"💼 دارایی‌ها\"}', 0),
+       ('2', '{\"text\": \"🏦 وام و اقساط\"}', 0),
+       ('3', '{\"text\": \"🛠 ابزارها\"}', 0),
+       ('4', '{\"text\": \"👑 بخش مدیریت\"}', 1),
+       ('5', '{\"text\": \"💰 قیمت‌ها\"}', 0),
+       ('7', '{\"text\": \"⚙ تنظیمات\"}', 0),
+       ('8', '{\"text\": \"🔔 هشدارها\"}', 0),
+       ('9', '{\"text\": \"🧾 حساب‌ها\"}', 0),
+       ('10', '{\"text\": \"➕ افزودن حساب جدید\"}', 0),
+       ('11', '{\"text\": \"🔃 تراکنش‌ها\"}', 0),
+       ('12', '{\"text\": \"➕ افزودن تراکنش جدید\"}', 0),
+       ('s0', '{\"text\": \"🔙 برگشت 🔙\"}', 0),
+       ('s1', '{\"text\": \"❌ لغو ❌\"}', 0),
+       ('s2', '{\"text\": \"❤ علاقه‌مندی‌ها ❤\"}', 0),
+       ('s3', '{\"text\": \"Empty Button\"}', 0),
+       ('s4', '{\"text\": \"💲 ارز پایه\"}', 0),
+       ('s5', '{\"text\": \"مشخصات دیتابیس\"}', 0),
+       ('s6', '{\"text\": \"مشخصات هاست\"}', 0);
+
+CREATE TABLE IF NOT EXISTS `keyboard_layout`
+(
+    `parent_id` VARCHAR(36) NOT NULL,
+    `row_idx`   INT         NOT NULL,
+    `col_idx`   INT         NOT NULL,
+    `button_id` VARCHAR(36) NOT NULL,
+    PRIMARY KEY (`parent_id`, `row_idx`, `col_idx`),
+    FOREIGN KEY (`parent_id`) REFERENCES `buttons` (`id`) ON DELETE CASCADE,
+    FOREIGN KEY (`button_id`) REFERENCES `buttons` (`id`) ON DELETE CASCADE
+) DEFAULT CHARSET = utf8mb4;
 
 CREATE TABLE IF NOT EXISTS `assets`
 (

@@ -1,82 +1,105 @@
 <?php
 
-/**
- * Finds the button that was pressed based on its text and the parent's ID.
- *
- * @param string $text The text of the button that was pressed.
- * @param int|string|null $parent_btn_id The ID of the parent button whose keyboard contained the pressed button.
- * @param bool $admin Whether the user is an admin.
- * @param DatabaseManager $db The database manager instance.
- * @return Button|null The Button instance of the pressed button, or null if not found.
- */
-function getPressedButton(
-    string          $text,
-    int|string|null $parent_btn_id,
-    bool            $admin,
-    DatabaseManager $db): ?Button
+function createKeyboardsArray(int|string $button_id, bool $is_admin, DatabaseManager $db, bool $telegram_ready = true): ?array
 {
-    $admin = ($admin) ? [0, 1] : [0];
+    $admin = ($is_admin) ? [false, true] : [false];
 
-    $pressed_button = $db->query("
-        select
-            b2.*
-        from buttons b1
-        join buttons b2 on json_search(b1.keyboards, 'all', b2.id) is not null
-        where
-            b1.id = '$parent_btn_id' and
-            b2.attrs->>'$.text' = '$text' and
-            b1.admin_key in ('" . implode("','", $admin) . "') and
-            b2.admin_key in ('" . implode("','", $admin) . "')
-    ;")->fetch();
+    if ($telegram_ready) $json_array_agg = "JSON_SET(CAST(child.attrs AS JSON), '$.id', child.id)";
+    else $json_array_agg = "JSON_OBJECT('id', child.id, 'attrs', CAST(child.attrs AS JSON), 'admin_key', child.admin_key)";
 
-    if ($pressed_button) return Button::fromDbRow($pressed_button);
-    else return null;
+    $keyboards_array = $db->query("
+        SELECT 
+            p.id,
+            CAST(p.attrs AS JSON) AS attrs,
+            p.admin_key,
+            COALESCE(
+                (
+                    SELECT JSON_ARRAYAGG(row_data.row_buttons)
+                    FROM (
+                        SELECT 
+                            JSON_ARRAYAGG(
+                                $json_array_agg
+                            ) AS row_buttons
+                        FROM `keyboard_layout` kl
+                        JOIN `buttons` child ON child.id = kl.button_id
+                        WHERE
+                            kl.parent_id = p.id AND
+                            child.admin_key IN ('" . implode("','", $admin) . "')
+                        GROUP BY kl.row_idx
+                    ) AS row_data
+                ),
+                JSON_ARRAY()
+            ) AS keyboard
+        FROM `buttons` p
+        WHERE 
+            p.id = '$button_id';")->fetch();
+    return json_decode($keyboards_array['keyboard'], true);
 }
 
-/**
- * Creates a Telegram-ready keyboard array structure from a parent button's ID.
- *
- * @param int|string $parent_btn_id The ID of the parent button whose keyboard should be created.
- * @param bool $admin Whether the user is an admin.
- * @param DatabaseManager $db The database manager instance.
- * @return array|null The array formatted for a Telegram keyboard, or null if no buttons are found.
- */
-function createKeyboardsArray(int|string $parent_btn_id, bool $admin, DatabaseManager $db): ?array
+function getStructuredButton($button_id, bool $is_admin, DatabaseManager $db): ?Button
 {
-    $admin = ($admin) ? [0, 1] : [0];
+    $admin = $is_admin ? [false, true] : [false];
 
-    $buttons = $db->query("
-        select
-            json_objectagg(
-                b2.id,
-                json_object(
-                    'attrs', b2.attrs,
-                    'main_ids', b1.keyboards
-                )
-            ) as buttons
-        from buttons b1
-        join buttons b2 on json_search(b1.keyboards, 'all', b2.id) is not null
-        where
-            b1.id = '$parent_btn_id' and
-            b1.admin_key in ('" . implode("','", $admin) . "') and
-            b2.admin_key in ('" . implode("','", $admin) . "')
-    ;")->fetch();
+    $pressed_button = $db->query("
+        SELECT
+            p.id,
+            (
+                SELECT kl_parent.parent_id 
+                FROM `keyboard_layout` kl_parent 
+                WHERE kl_parent.button_id = p.id 
+                LIMIT 1
+            ) AS belong_to,
+            CAST(p.attrs AS JSON) AS attrs,
+            p.admin_key,
+            COALESCE(
+                (
+                    SELECT JSON_ARRAYAGG(row_data.row_buttons)
+                    FROM (
+                        SELECT 
+                            JSON_ARRAYAGG(
+                                JSON_OBJECT(
+                                    'id', child.id,
+                                    'attrs', CAST(child.attrs AS JSON),
+                                    'admin_key', child.admin_key
+                                )
+                            ) AS row_buttons
+                        FROM `keyboard_layout` kl
+                        JOIN `buttons` child ON child.id = kl.button_id
+                        WHERE kl.parent_id = p.id AND child.admin_key IN ('" . implode("','", $admin) . "')
+                        GROUP BY kl.row_idx
+                    ) AS row_data
+                ),
+                JSON_ARRAY()
+            ) AS keyboard
+        FROM `buttons` p
+        WHERE p.id = '$button_id';")->fetch();
 
-    if (!$buttons) return null;
-    else $buttons = json_decode($buttons['buttons'], true);
+    return $pressed_button == null ? null : Button::fromDbRow($pressed_button);
 
-    $id_structure = json_decode(array_values($buttons)[0]['main_ids']);
+}
 
-    $keyboard = [];
-    foreach ($id_structure as $row => $id_row) {
-        foreach ($id_row as $id) {
+function getPressedButton(string $text, User $user, DatabaseManager $db): ?Button
+{
 
-            // Check if button exists in fetched data
-            // Crucial for excluding not-admin buttons
-            if (isset($buttons[$id])) {
-                $attrs = json_decode($buttons[$id]['attrs'], true);
-                $keyboard[$row][] = $attrs;
-            }
+    $keyboard = $user->getKeyboard();
+    if (!$keyboard) return null;
+
+    $pressed_button_id = null;
+    foreach ($keyboard as $buttons) {
+        foreach ($buttons as $button) {
+            if ($button['attrs']['text'] === $text)
+                $pressed_button_id = $button['id'];
+        }
+    }
+
+    return $pressed_button_id == null ? null : getStructuredButton($pressed_button_id, $user->isAdmin(), $db);
+}
+
+function refineKeyboardForTelegram(array $keyboard): array
+{
+    foreach ($keyboard as &$buttons) {
+        foreach ($buttons as &$button) {
+            $button = $button['attrs'];
         }
     }
     return $keyboard;

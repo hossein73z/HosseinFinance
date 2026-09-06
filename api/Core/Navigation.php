@@ -12,12 +12,7 @@ function backButton(User $user, DatabaseManager $db, int|string|null $parent_btn
      */
 
     $progress = $user->getProgress();
-    $current_level = $db->read(
-        table: 'buttons',
-        conditions: ['id' => $parent_btn_id ?? $user->getLastBtn()],
-        single: true
-    );
-    $current_btn = Button::fromDbRow($current_level);
+    $current_btn = $parent_btn_id ?: $user->getButton();
 
     if ($progress) {
 
@@ -34,15 +29,10 @@ function backButton(User $user, DatabaseManager $db, int|string|null $parent_btn
         }
     }
 
-    // If user has no progress (Or is at level 1) redirect back to the parent level.
-    $parent_level = $db->read(
-        table: 'buttons',
-        conditions: ['id' => $current_btn->getBelongTo()],
-        single: true
-    );
+    // If user has no progress (Or is at level 1 of a progress) redirect back to the parent level.
+    $parent_btn = getStructuredButton($current_btn->getBelongTo(), $user->isAdmin(), $db);
 
-    $last_btn = Button::fromDbRow($parent_level);
-    normalButtonHandler(user: $user->setProgress(null), pressed_button: $last_btn, db: $db);
+    normalButtonHandler(user: $user->setProgress(null), pressed_button: $parent_btn, db: $db);
 }
 
 function cancelButton(User $user, DatabaseManager $db, int|string|null $parent_btn_id = null): void

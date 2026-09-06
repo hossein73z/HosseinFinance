@@ -8,11 +8,9 @@ function level_11(
     ?array          $message = null,
     ?array          $callback_query = null): void
 {
-    // Initialize button object if null is given
-    $level_button = $level_button ?? Button::fromDbRow($db->read('buttons', ['id' => 11], true));
-
     // Create keyboards
-    $keyboard = createKeyboardsArray(parent_btn_id: $level_button->getId(), admin: $user->isAdmin(), db: $db);
+    $level_button = $level_button ?: $user->getButton();
+    $keyboard = refineKeyboardForTelegram($level_button->getKeyboard());
 
     $data = [
         'chat_id' => $user->getid(),
@@ -33,7 +31,7 @@ function level_11(
 
     // Update user's level and progress
     if ($response) {
-        $db->update('users', ['last_btn' => $level_button->getId(), 'progress' => null], ['id' => $user->getId()]);
+        $db->update('users', ['button' => json_encode($level_button), 'progress' => null], ['id' => $user->getId()]);
 
         // Send Informative message
         sendAllTransactions($user, $db);
@@ -163,11 +161,9 @@ function level_12(
     ?array          $message = null,
     ?array          $callback_query = null): void
 {
-    // Initialize button object if null is given
-    $level_button = $level_button ?? Button::fromDbRow($db->read('buttons', ['id' => 12], true));
-
     // Create keyboards
-    $keyboard = createKeyboardsArray(parent_btn_id: $level_button->getId(), admin: $user->isAdmin(), db: $db);
+    $level_button = $level_button ?: $user->getButton();
+    $keyboard = refineKeyboardForTelegram($level_button->getKeyboard());
 
     $data = [
         'chat_id' => $user->getid(),
@@ -217,7 +213,8 @@ function addTransactionProgress(User $user, array $data, ?array $message, Databa
     if (!$progress || !isset($progress['add_transaction'])) {
         // Start adding transaction process
         $progress = ['add_transaction' => ['type' => null]];
-        $db->update('users', ['last_btn' => 12, 'progress' => json_encode($progress)], ['id' => $user->getId()]);
+        // TODO: Make 'last_btn' dynamic
+        $db->update('users', ['button' => getStructuredButton(12, $user->isAdmin(), $db), 'progress' => json_encode($progress)], ['id' => $user->getId()]);
         askForTransactionType($user->setProgress($progress), $data, $db);
     } else {
 
@@ -268,11 +265,11 @@ function addTransactionProgress(User $user, array $data, ?array $message, Databa
         if (!isset($progress['add_transaction']['date'])) {
             if (!$message) askForTransactionDate($user, $data, $db);
             if ($message['text'] == 'امروز') {
-                $progress['add_transaction']['date'] = (new DateTime())->format('Y-m-d');
+                $progress['add_transaction']['date'] = new DateTime()->format('Y-m-d');
             } elseif ($message['text'] == 'دیروز') {
-                $progress['add_transaction']['date'] = (new DateTime())->modify('-1 days')->format('Y-m-d');
+                $progress['add_transaction']['date'] = new DateTime()->modify('-1 days')->format('Y-m-d');
             } elseif ($message['text'] == '۲ روز پیش') {
-                $progress['add_transaction']['date'] = (new DateTime())->modify('-2 days')->format('Y-m-d');
+                $progress['add_transaction']['date'] = new DateTime()->modify('-2 days')->format('Y-m-d');
             } else {
                 $date_text = toEnglishDigits(trim($message['text']));
                 if (!preg_match('/^(\d{4})[\/.\-](\d{1,2})[\/.\-](\d{1,2})$/u', $date_text, $date_matches)) {
@@ -292,7 +289,7 @@ function addTransactionProgress(User $user, array $data, ?array $message, Databa
         if (!isset($progress['add_transaction']['time'])) {
             if (!$message) askForTransactionTime($user, $data, $db);
             if ($message['text'] == 'اکنون') {
-                $progress['add_transaction']['time'] = (new DateTime())->format('H:i');
+                $progress['add_transaction']['time'] = new DateTime()->format('H:i');
             } else {
                 $time_text = toEnglishDigits(trim($message['text']));
                 if (!preg_match('/^([01]?\d|2[0-3]):([0-5]\d)$/u', $time_text, $time_matches)) {
@@ -323,11 +320,7 @@ function askForTransactionType(User $user, array $data, DatabaseManager $db, ?st
     $response = sendToTelegram('sendMessage', $data);
     if ($response) {
         $progress = ['add_transaction' => ['type' => null]];
-        $db->update(
-            'users',
-            ['progress' => json_encode($progress)],
-            ['id' => $user->getId()]
-        );
+        $db->update(            'users',            ['progress' => json_encode($progress)],            ['id' => $user->getId()]        );
     }
     exit;
 }
@@ -348,11 +341,7 @@ function askForTransactionAccount(
     if ($response) {
         $progress = $user->getProgress();
         $progress['add_transaction']['account_id'] = null;
-        $db->update(
-            'users',
-            ['progress' => json_encode($progress)],
-            ['id' => $user->getId()]
-        );
+        $db->update(            'users',            ['progress' => json_encode($progress)],            ['id' => $user->getId()]        );
     }
     exit;
 }
@@ -368,11 +357,7 @@ function askForTransactionAmount(
     if ($response) {
         $progress = $user->getProgress();
         $progress['add_transaction']['amount'] = null;
-        $db->update(
-            'users',
-            ['progress' => json_encode($progress)],
-            ['id' => $user->getId()]
-        );
+        $db->update(            'users',            ['progress' => json_encode($progress)],            ['id' => $user->getId()]        );
     }
     exit;
 }
@@ -388,11 +373,7 @@ function askForTransactionCategory(
     if ($response) {
         $progress = $user->getProgress();
         $progress['add_transaction']['category'] = null;
-        $db->update(
-            'users',
-            ['progress' => json_encode($progress)],
-            ['id' => $user->getId()]
-        );
+        $db->update(            'users',            ['progress' => json_encode($progress)],            ['id' => $user->getId()]        );
     }
     exit;
 }
@@ -413,10 +394,7 @@ function askForTransactionDate(
         $progress = $user->getProgress();
         $progress['add_transaction']['date'] = null;
         $db->update(
-            'users',
-            ['progress' => json_encode($progress)],
-            ['id' => $user->getId()]
-        );
+            'users',            ['progress' => json_encode($progress)],            ['id' => $user->getId()]        );
     }
     exit;
 }
@@ -427,17 +405,13 @@ function askForTransactionTime(
     DatabaseManager $db,
     ?string         $text = null): void
 {
-    $data['text'] = $text ?? 'زمان تراکنش را با فرمت مثال زده شده ارسال کنید یا از دکمه‌ی زیر برای ساعت کنونی استفاده کنید. مثال:' . "\n" . (new DateTime())->format('H:i');
+    $data['text'] = $text ?? 'زمان تراکنش را با فرمت مثال زده شده ارسال کنید یا از دکمه‌ی زیر برای ساعت کنونی استفاده کنید. مثال:' . "\n" . new DateTime()->format('H:i');
     array_unshift($data['reply_markup']['keyboard'], [['text' => 'اکنون']]);
     $response = sendToTelegram('sendMessage', $data);
     if ($response) {
         $progress = $user->getProgress();
         $progress['add_transaction']['time'] = null;
-        $db->update(
-            'users',
-            ['progress' => json_encode($progress)],
-            ['id' => $user->getId()]
-        );
+        $db->update(            'users',            ['progress' => json_encode($progress)],            ['id' => $user->getId()]        );
     }
     exit;
 }

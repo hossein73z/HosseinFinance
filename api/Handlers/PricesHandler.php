@@ -1,6 +1,5 @@
 <?php
 
-
 function level_5(
     User            $user,
     DatabaseManager $db,
@@ -8,11 +7,9 @@ function level_5(
     ?array          $message = null,
     ?array          $callback_query = null): void
 {
-    // Initialize button object if null is given
-    $level_button = $level_button ?? Button::fromDbRow($db->read('buttons', ['id' => 5], true));
-
     // Create keyboards
-    $keyboard = createKeyboardsArray(parent_btn_id: $level_button->getId(), admin: $user->isAdmin(), db: $db);
+    $level_button = $level_button ?: $user->getButton();
+    $keyboard = refineKeyboardForTelegram($level_button->getKeyboard());
 
     $data = [
         'chat_id' => $user->getid(),
@@ -46,7 +43,7 @@ function level_5(
 
     // Update user's level and progress
     if ($response) {
-        $db->update('users', ['last_btn' => $level_button->getId(), 'progress' => null], ['id' => $user->getId()]);
+        $db->update('users', ['button' => json_encode($level_button), 'progress' => null], ['id' => $user->getId()]);
 
         // Send Informative message
         sendAllFavorites($user, $db);
@@ -176,6 +173,7 @@ function handlePricesCallback(
             sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
             sendToTelegram('editMessageText', $data);
             sendAllFavorites($user, $db);
+            break;
 
         // Start showing live price updates on the current message
         case 'set_live':
@@ -183,12 +181,14 @@ function handlePricesCallback(
             deleteOldActiveLiveMessage($user, $message['message_id'], $db);
             setLiveMessage($user->getId(), $query_data['set_live'], $message['message_id'], $db);
             sendAllFavorites($user, $db, $message['message_id']);
+            break;
 
         // Show the main favorites' message
         case 'show_favorites':
             sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
             $db->update('special_messages', ['status' => 'active'], ['user_id' => $user->getId(), 'type' => 'live_price', 'status' => 'paused', 'message_id' => $message['message_id']]);
             sendAllFavorites($user, $db, $message['message_id']);
+            break;
 
         default:
             sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);

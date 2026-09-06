@@ -5,37 +5,23 @@
  */
 function getOrCreateUser(array $from, DatabaseManager $db): User
 {
-    $user = $db->read(
-        table: 'users',
-        conditions: ['id' => $from['id']],
-        single: true
-    );
+    $user = $db->read('users', ['id' => $from['id']], true);
 
     if (!$user) {
-        $admins = $db->read(
-            table: 'users',
-            conditions: ['is_admin' => 1]
-        );
-        $new_user_id = $db->create(
-            table: 'users',
-            data: [
-                'id' => $from['id'],
-                'first_name' => $from['first_name'] ?? 'N/A',
-                'last_name' => $from['last_name'] ?? null,
-                'username' => $from['username'] ?? null,
-                'settings' => json_encode(['base_currency' => 'ریال']),
-                'progress' => null,
-                'is_admin' => ($admins) ? 0 : 1, // First user is admin
-                'last_btn' => 0
-            ]
-        );
+        $admins = $db->read('users', ['is_admin' => 1]);
+        $new_user_id = $db->create('users', [
+            'id' => $from['id'],
+            'first_name' => $from['first_name'] ?? 'N/A',
+            'last_name' => $from['last_name'] ?? null,
+            'username' => $from['username'] ?? null,
+            'settings' => json_encode(['base_currency' => 'ریال']),
+            'progress' => null,
+            'button' => json_encode(getStructuredButton(0, !$admins, $db)),
+            'is_admin' => !$admins, // First user is admin
+        ]);
 
-        if ($new_user_id) {
-            $user = $db->read(
-                table: 'users',
-                conditions: ['id' => $from['id']],
-                single: true
-            );
+        if ($new_user_id || $new_user_id == 0) {
+            $user = $db->read('users', ['id' => $from['id']], true);
         } else {
             error_log("[ERROR] Failed to create new user: " . $from['id']);
             exit;
@@ -55,12 +41,11 @@ function handleIncomingMessage(array $message, DatabaseManager $db): void
     $text = $message['text'] ?? '';
 
     // Levels' Main Commands
-    if ($text === '/start') /**********/ level_0(user: $user, db: $db);
-    if ($text === '/holdings') /*******/ level_1(user: $user, db: $db);
-    if ($text === '/loans') /**********/ level_2(user: $user, db: $db);
-    if ($text === '/prices') /*********/ level_5(user: $user, db: $db);
-    if ($text === '/alerts') /*********/ level_8(user: $user, db: $db);
-    if ($text === '/accounts') /*******/ level_9(user: $user, db: $db);
+    if ($text === '/holdings') /*******/ level_1(user: $user, db: $db, level_button: getStructuredButton(1, $user->isAdmin(), $db));
+    if ($text === '/loans') /**********/ level_2(user: $user, db: $db, level_button: getStructuredButton(2, $user->isAdmin(), $db));
+    if ($text === '/prices') /*********/ level_5(user: $user, db: $db, level_button: getStructuredButton(5, $user->isAdmin(), $db));
+    if ($text === '/alerts') /*********/ level_8(user: $user, db: $db, level_button: getStructuredButton(8, $user->isAdmin(), $db));
+    if ($text === '/accounts') /*******/ level_9(user: $user, db: $db, level_button: getStructuredButton(9, $user->isAdmin(), $db));
     if ($text === '/favorites') /******/ sendAllFavorites($user, $db);
     if ($text === '/base_currency') /**/ sendSelectBaseCurrencyMessage($user, $db);
 
@@ -69,13 +54,13 @@ function handleIncomingMessage(array $message, DatabaseManager $db): void
     if ($matched && $matches[1] == 'holding') level_1(user: $user, db: $db, command_data: $matches[2]);
     if ($matched && $matches[1] == 'loan') level_2(user: $user, db: $db, command_data: $matches[2]);
 
-    $pressed_button = getPressedButton(text: $text, parent_btn_id: $user->getLastBtn(), admin: $user->isAdmin(), db: $db);
+    $pressed_button = getPressedButton($text, $user, $db);
 
     choosePath(pressed_button: $pressed_button, message: $message, user: $user, db: $db);
 }
 
 /**
- * Handles inline button presses.
+ * Handles inline and rich button callback data.
  */
 function handleCallbackQuery(array $callback_query, DatabaseManager $db): void
 {
@@ -186,13 +171,12 @@ function callbackHandler(User $user, array $callback_query, DatabaseManager $db)
 {
     $message = $callback_query['message'];
 
-    if ($user->getLastBtn() == 0) /***/ level_0(user: $user, db: $db, message: $message, callback_query: $callback_query);
-    if ($user->getLastBtn() == 1) /***/ level_1(user: $user, db: $db, message: $message, callback_query: $callback_query);
-    if ($user->getLastBtn() == 2) /***/ level_2(user: $user, db: $db, message: $message, callback_query: $callback_query);
-    if ($user->getLastBtn() == 5) /***/ level_5(user: $user, db: $db, message: $message, callback_query: $callback_query);
-    if ($user->getLastBtn() == 8) /***/ level_8(user: $user, db: $db, message: $message, callback_query: $callback_query);
-    if ($user->getLastBtn() == 11) /**/ level_11(user: $user, db: $db, message: $message, callback_query: $callback_query);
-    if ($user->getLastBtn() == 12) /**/ level_12(user: $user, db: $db, message: $message, callback_query: $callback_query);
+    if ($user->getButtonId() == 1) /***/ level_1(user: $user, db: $db, message: $message, callback_query: $callback_query);
+    if ($user->getButtonId() == 2) /***/ level_2(user: $user, db: $db, message: $message, callback_query: $callback_query);
+    if ($user->getButtonId() == 5) /***/ level_5(user: $user, db: $db, message: $message, callback_query: $callback_query);
+    if ($user->getButtonId() == 8) /***/ level_8(user: $user, db: $db, message: $message, callback_query: $callback_query);
+    if ($user->getButtonId() == 11) /**/ level_11(user: $user, db: $db, message: $message, callback_query: $callback_query);
+    if ($user->getButtonId() == 12) /**/ level_12(user: $user, db: $db, message: $message, callback_query: $callback_query);
 
     // Fallback if not handled
     sendToTelegram('editMessageText', [
@@ -219,7 +203,6 @@ function specialButtonHandler(User $user, Button $pressed_button, DatabaseManage
 function normalButtonHandler(User $user, Button $pressed_button, DatabaseManager $db): void
 {
     // Route the button to corresponding level
-    if ($pressed_button->getId() == 0) level_0(user: $user, db: $db, level_button: $pressed_button);
     if ($pressed_button->getId() == 1) level_1(user: $user, db: $db, level_button: $pressed_button);
     if ($pressed_button->getId() == 2) level_2(user: $user, db: $db, level_button: $pressed_button);
     if ($pressed_button->getId() == 5) level_5(user: $user, db: $db, level_button: $pressed_button);
@@ -229,45 +212,44 @@ function normalButtonHandler(User $user, Button $pressed_button, DatabaseManager
     if ($pressed_button->getId() == 11) level_11(user: $user, db: $db, level_button: $pressed_button);
     if ($pressed_button->getId() == 12) level_12(user: $user, db: $db, level_button: $pressed_button);
 
+    $new_button = getStructuredButton($pressed_button->getId(), $user->isAdmin(), $db);
+    $keyboard = refineKeyboardForTelegram($new_button->getKeyboard());
+
     // Default Actions for normal button
     $response = sendToTelegram('sendMessage', [
         'text' => $pressed_button->getText(),
         'chat_id' => $user->getid(),
         'reply_markup' => [
-            'keyboard' => createKeyboardsArray($pressed_button->getId(), $user->isAdmin(), $db),
+            'keyboard' => $keyboard,
             'resize_keyboard' => true,
             'is_persistent' => false,
             'input_field_placeholder' => $pressed_button->getText(),
         ]
     ]);
-
-    if ($response) $db->update(
-        table: 'users',
-        data: ['last_btn' => $pressed_button->getId(), 'progress' => null],
-        conditions: ['id' => $user->getId()]
-    );
+    if ($response)
+        // Update user with new button and cleared progress
+        $db->update('users', ['button' => json_encode($new_button), 'progress' => null], ['id' => $user->getId()]);
 
     exit;
 }
 
 function nonButtonHandler(User $user, array $message, DatabaseManager $db): void
 {
-    if ($user->getLastBtn() == '0') /***/ level_0(user: $user, db: $db, message: $message);
-    if ($user->getLastBtn() == '1') /***/ level_1(user: $user, db: $db, message: $message);
-    if ($user->getLastBtn() == '2') /***/ level_2(user: $user, db: $db, message: $message);
-    if ($user->getLastBtn() == '5') /***/ level_5(user: $user, db: $db, message: $message);
-    if ($user->getLastBtn() == '8') /***/ level_8(user: $user, db: $db, message: $message);
-    if ($user->getLastBtn() == '10') /**/ level_10(user: $user, db: $db, message: $message);
-    if ($user->getLastBtn() == '11') /**/ level_11(user: $user, db: $db, message: $message);
-    if ($user->getLastBtn() == '12') /**/ level_12(user: $user, db: $db, message: $message);
-    if ($user->getLastBtn() == 's3') /**/ empty_level(user: $user, db: $db, message: $message);
+    if ($user->getButtonId() == '1') /***/ level_1(user: $user, db: $db, message: $message);
+    if ($user->getButtonId() == '2') /***/ level_2(user: $user, db: $db, message: $message);
+    if ($user->getButtonId() == '5') /***/ level_5(user: $user, db: $db, message: $message);
+    if ($user->getButtonId() == '8') /***/ level_8(user: $user, db: $db, message: $message);
+    if ($user->getButtonId() == '10') /**/ level_10(user: $user, db: $db, message: $message);
+    if ($user->getButtonId() == '11') /**/ level_11(user: $user, db: $db, message: $message);
+    if ($user->getButtonId() == '12') /**/ level_12(user: $user, db: $db, message: $message);
+    if ($user->getButtonId() == 's3') /**/ empty_level(user: $user, db: $db, message: $message);
 
     // Fallback "Unrecognized" message
     sendToTelegram('sendMessage', [
         'text' => 'پیام نامفهوم است!',
         'chat_id' => $user->getid(),
         'reply_markup' => [
-            'keyboard' => createKeyboardsArray($user->getLastBtn(), $user->isAdmin(), $db),
+            'keyboard' => createKeyboardsArray($user->getButtonId(), $user->isAdmin(), $db),
             'resize_keyboard' => true,
             'is_persistent' => false,
         ]
