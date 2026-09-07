@@ -68,45 +68,52 @@ function sendAllFavorites(User $user, DatabaseManager $db, int|string|null $mess
     exit();
 }
 
-function getFavoriteWithExchangeRateAndAlerts(string|int $user_id, DatabaseManager $db): bool|array
+function getFavoriteWithExchangeRateAndAlerts(string|int $user_id, DatabaseManager $db): ?array
 {
     try {
         $favorites = $db->query("
             SELECT
                 a.*,
-                f.id as fav_id,
-                (select price from assets where assets.name = a.base_currency)
-                    / (select price from assets where assets.name = ifnull(json_unquote(json_extract(u.settings, '$.base_currency')), 'ریال')) as exchange_rate,
+                f.id AS fav_id,
+                (MAX(base_asset.price) / MAX(user_asset.price)) AS exchange_rate,
                 CONCAT('[',
                     GROUP_CONCAT(
-                        JSON_OBJECT(
-                            'id', al.id,
-                            'user_id', al.user_id,
-                            'asset_name', al.asset_name,
-                            'target_price', al.target_price,
-                            'trigger_type', al.trigger_type,
-                            'status', al.status,
-                            'created_date', al.created_date,
-                            'created_time', al.created_time,
-                            'triggered_date', al.triggered_date,
-                            'triggered_time', al.triggered_time,
-                            'note', al.note
+                        IF(al.id IS NOT NULL,
+                            JSON_OBJECT(
+                                'id', al.id,
+                                'user_id', al.user_id,
+                                'asset_name', al.asset_name,
+                                'target_price', al.target_price,
+                                'trigger_type', al.trigger_type,
+                                'status', al.status,
+                                'created_date', al.created_date,
+                                'created_time', al.created_time,
+                                'triggered_date', al.triggered_date,
+                                'triggered_time', al.triggered_time,
+                                'note', al.note
+                            ),NULL
                         )
                     ),
                 ']') AS alerts
             FROM favorites f 
                 LEFT JOIN assets a ON f.asset_name = a.name
-                LEFT JOIN users u ON f.user_id = u.id
+                LEFT JOIN assets base_asset ON base_asset.name = a.base_currency
+                LEFT JOIN (SELECT 
+                        id, 
+                        IFNULL(JSON_UNQUOTE(JSON_EXTRACT(settings, '$.base_currency')), 'ریال') AS base_currency
+                    FROM users) u ON f.user_id = u.id
+                LEFT JOIN assets user_asset ON user_asset.name = u.base_currency
                 LEFT JOIN alerts al ON f.asset_name = al.asset_name AND al.user_id = u.id 
-            WHERE f.user_id = $user_id
-            GROUP BY f.id, a.id, asset_type
-            ORDER BY asset_type DESC, f.id;"
+            WHERE f.user_id = " . (int)$user_id . "
+            GROUP BY f.id, a.id, a.asset_type
+            ORDER BY a.asset_type DESC, f.id;"
         )->fetchAll();
 
     } catch (Exception $e) {
         error_log('createFavoritesText: ' . $e->getMessage());
         $favorites = null;
     }
+
     return $favorites;
 }
 
@@ -169,8 +176,10 @@ function createFavoritesRichMessage(
                 $asset_line .= $based_price_text;
             }
 
-            $asset_alerts = json_decode($asset['alerts'], true);
-            $alerts_count = beautifulNumber($asset_alerts[0]['id'] != null ? sizeof($asset_alerts) : 0);
+            if ($asset['alerts']) {
+                $asset_alerts = json_decode($asset['alerts'], true);
+                $alerts_count = beautifulNumber(sizeof($asset_alerts));
+            } else $alerts_count = '۰';
             $callback_data = json_encode(['show_asset_alerts' => $asset['id']]);
             $alert_button_string = "<tg-button type='callback_data' data='$callback_data'>🔔 $alerts_count</tg-button>";
 

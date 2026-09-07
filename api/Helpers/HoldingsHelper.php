@@ -5,34 +5,37 @@
  * `current_price`, `base_currency` and `exchange_rate` (Based on user's base currency).
  * 'date' column is also converted to Jalali string in 'yyyy/mm/dd' format.
  */
-function getHoldingsWithAssetDetails(array $conditions, DatabaseManager $db, bool $single = false): bool|array
+function getHoldingsWithAssetDetails(array $conditions, DatabaseManager $db, bool $single = false): ?array
 {
-    $select_price = "select price from assets where assets.name";
-
-    $asset_base = "a.base_currency";
-    $asset_base_price = "$select_price = $asset_base";
-
-    $user_base = "ifnull(json_unquote(json_extract(u.settings, '$.base_currency')), 'ریال')";
-    $user_base_price = "$select_price = $user_base";
-
     $holdings = $db->read(
         table: 'holdings h',
         conditions: $conditions,
         single: $single,
         selectColumns: "
             h.*,
-            a.name                                   as asset_name,
-            a.price                                  as current_price,
-            a.base_currency                          as base_currency,
-            ($asset_base_price) / ($user_base_price) as exchange_rate",
-        join: '
+            a.name                               AS asset_name,
+            a.price                              AS current_price,
+            a.base_currency                      AS base_currency,
+            base_asset.price / user_asset.price  AS exchange_rate",
+        join: "
             LEFT JOIN assets a ON h.asset_id = a.id
-            LEFT JOIN users u ON h.user_id = u.id'
+            LEFT JOIN assets base_asset ON base_asset.name = a.base_currency
+            LEFT JOIN (
+                SELECT id, IFNULL(JSON_UNQUOTE(JSON_EXTRACT(settings, '$.base_currency')), 'ریال') AS base_currency
+                FROM users) u ON h.user_id = u.id
+            LEFT JOIN assets user_asset ON user_asset.name = u.base_currency"
     );
 
-    if ($single) $holdings['date'] = JalaliDate::fromGregorianString($holdings['date'])->format();
-    else foreach ($holdings as $holding) {
-        $holding['date'] = JalaliDate::fromGregorianString($holding['date'])->format();
+    if (!$holdings) {
+        return null;
+    }
+
+    if ($single) {
+        $holdings['date'] = JalaliDate::fromGregorianString($holdings['date'])->format();
+    } else {
+        foreach ($holdings as &$holding)
+            $holding['date'] = JalaliDate::fromGregorianString($holding['date'])->format();
+        unset($holding);
     }
 
     return $holdings;
