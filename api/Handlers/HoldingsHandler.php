@@ -12,19 +12,19 @@ function level_1(
     $level_button = $level_button ?: $user->getButton();
     $keyboard = refineKeyboardForTelegram($level_button->getKeyboard());
 
-    // Add '➕ افزودن دارایی جدید' button to the keyboard
-    array_unshift($keyboard, [createWebAppBtn('➕ افزودن دارایی جدید', '/assets/holding.html', add_api: true)]);
-
     $data = [
         'chat_id' => $user->getid(),
         'text' => $level_button->getText(),
         'reply_markup' => [
-            'keyboard' => $keyboard,
+            'keyboard' => &$keyboard,
             'resize_keyboard' => true,
             'is_persistent' => false,
             'input_field_placeholder' => $level_button->getText()
         ]
     ];
+
+    // Add '➕ افزودن دارایی جدید' button to the keyboard
+    array_unshift($keyboard, [createWebAppBtn('➕ افزودن دارایی جدید', '/assets/holding.html', add_api: true)]);
 
     if ($callback_query) handleHoldingsCallback($user, $callback_query, $data, $message, $db);
     if ($message && isset($message['web_app_data'])) handleHoldingsWebAppData($user, $data, $message, $db);
@@ -36,8 +36,10 @@ function level_1(
     if ($command_data) {
         $holding = getHoldingsWithAssetDetails(['h.id' => $command_data, 'h.user_id' => $user->getId()], $db, true);
         if ($holding) sendHoldingDetail($holding, $data, $user->getBaseCurrency());
-        else sendAllHoldings($user, $db, $data);
-    } else sendAllHoldings($user, $db, $data);
+    }
+    if (!$command_data) {
+        sendAllHoldings($user, $db, $data);
+    }
 
     exit;
 }
@@ -49,7 +51,6 @@ function handleHoldingsCallback(
     array           $message,
     DatabaseManager $db): void
 {
-    sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
 
     $query_data = $callback_query['data'];
 
@@ -57,20 +58,35 @@ function handleHoldingsCallback(
     $data['message_id'] = $message['message_id'];
 
     switch ($query_key) {
-        case 'holdings_list':
-            sendToTelegram('deleteMessage', ['chat_id' => $user->getid(), 'message_id' => $message['message_id']]);
-            sendToTelegram('sendMessage', $data);
-            sendAllHoldings($user, $db, $data);
+
+        case 'show_holding':
+            $holding_id = $query_data[$query_key];
+            $holding = getHoldingsWithAssetDetails(['h.id' => $holding_id], $db, true);
+            if ($holding) {
+                sendHoldingDetail($holding, $data, $user->getBaseCurrency());
+                $db->update(
+                    table: 'users',
+                    data: ['progress' => json_encode(['view_holding' => ['holding_id' => $holding['id']]])],
+                    conditions: ['id' => $user->getId()]
+                );
+                sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
+                exit;
+            }
             break;
 
+        case 'holdings_list':
+            $db->update('users', ['progress' => null], ['id' => $user->getId()]);
+            sendAllHoldings($user, $db, $data);
+            sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
+            exit();
+
         default:
-            sendToTelegram('editMessageText', [
-                'chat_id' => $user->getid(),
-                'message_id' => $message['message_id'],
-                'text' => 'این پیام منقضی شده است.'
-            ]);
-            break;
+            sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id'], 'text' => 'این پیام منقضی شده است!']);
+            sendToTelegram('deleteMessage', ['chat_id' => $user->getid(), 'message_id' => $message['message_id']]);
+            exit();
     }
+
+    sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
     exit;
 }
 
@@ -190,34 +206,7 @@ function handleHoldingsWebAppData(User $user, array $data, array $message, Datab
 
 function handleHoldingsTextMessage(User $user, array $data, array $message, DatabaseManager $db): void
 {
-
-    // Show holding detail
-    $matched = preg_match('/^\/start viewHolding_holdingId(\d+)(_holdingsMssgId(\d+))?(_initMssgId(\d+))?$/m', $message['text'], $matches);
-    if ($matched && !empty($matches[1])) {
-
-        $holding_id = $matches[1];
-
-        $holding = getHoldingsWithAssetDetails(['h.id' => $holding_id, 'h.user_id' => $user->getId()], $db, true);
-        if ($holding) {
-
-            // Delete redundant messages
-            if (isset($matches[5]))
-                sendToTelegram('deleteMessage', ['chat_id' => $user->getid(), 'message_id' => $matches[5]]); ######## Initial
-            sendToTelegram('deleteMessage', ['chat_id' => $user->getid(), 'message_id' => $matches[3]]); ############ Holdings
-            sendToTelegram('deleteMessage', ['chat_id' => $user->getid(), 'message_id' => $message['message_id']]); # Deep-Link
-
-            sendHoldingDetail($holding, $data, $user->getBaseCurrency());
-            $db->update(
-                table: 'users',
-                data: ['progress' => json_encode(['view_holding' => ['holding_id' => $holding['id']]])],
-                conditions: ['id' => $user->getId()]
-            );
-            exit;
-        } else $data['text'] = 'دارایی با این مشخصه یافت نشد!';
-    } else $data['text'] = 'پیام نامفهوم است!';
-
-    // Only irreverent texts and deep-links with wrong holding id reach here.
-    $data = checkAndAddEditHoldingButton($data, $user, $db);
+    $data['text'] = 'پیام نامفهوم است!';
     sendToTelegram('sendMessage', $data);
     exit;
 }
@@ -226,7 +215,7 @@ function sendAllHoldings(User $user, DatabaseManager $db, array $data): void
 {
     $holdings = getHoldingsWithAssetDetails(['user_id' => $user->getId()], $db);
     if ($holdings) {
-        $html = "<h2>دارایی‌های ثبت شده‌ی شما:</h2>";
+        $html = "<h1>دارایی‌های ثبت شده‌ی شما:</h1>";
         $html .= '<p><br></p>';
         $total_pro_los = 0;
         foreach ($holdings as $holding) {
@@ -255,18 +244,8 @@ function sendAllHoldings(User $user, DatabaseManager $db, array $data): void
     }
 }
 
-/**
- * Automatically adds edit button to the message.
- *
- * @param array $holding
- * @param array $data
- * @param string $user_base_currency
- * @return void
- */
-function sendHoldingDetail(array $holding, array $data, string $user_base_currency = 'ریال'): void
+function sendHoldingDetail(array $holding, array $data, string $user_base_currency = 'ریال', string|int|null $message_id = null): void
 {
-    $data['text'] = "/holding_$holding[id]\n";
-    $data['text'] .= 'جزئیات دارایی «' . $holding['asset_name'] . '»';
 
     array_unshift($data['reply_markup']['keyboard'], [
         createWebAppBtn(
@@ -277,18 +256,17 @@ function sendHoldingDetail(array $holding, array $data, string $user_base_curren
         )
     ]);
 
-    sendToTelegram('sendMessage', $data);
+    $html = createHoldingDetailRichHTML($holding, user_base_currency: $user_base_currency, detail_btn: false);
+    $html .= '<hr>';
+    $callback_data = json_encode(['holdings_list' => null]);
+    $html .= "<tg-button-row><tg-button type='callback_data' style='primary' data='$callback_data'>" . 'برگشت به لیست دارایی‌ها' . "</tg-button></tg-button-row>";
 
-    $temp_mssg = sendLoadingMessage($data['chat_id'], 'در حال دریافت اطلاعات دارایی ' . $holding['asset_name'] . ' ...');
-    if ($temp_mssg) {
+    $data['rich_message'] = ['is_rtl' => true, 'html' => $html];
 
-        $data['message_id'] = $temp_mssg['result']['message_id'];
-        $data['text'] = createHoldingDetailRichHTML($holding, user_base_currency: $user_base_currency);
-        //        $data['parse_mode'] = 'MarkdownV2';
-        $data['reply_markup'] = ['inline_keyboard' => [[['text' => 'برگشت به لیست دارایی‌ها', 'callback_data' => json_encode(['holdings_list' => null])]]]];
-
+    if ($message_id) {
+        $data['message_id'] = $message_id;
         sendToTelegram('editMessageText', $data);
-    }
+    } else sendToTelegram('sendRichMessage', $data);
 }
 
 function checkAndAddEditHoldingButton(array $data, User $user, DatabaseManager $db): array

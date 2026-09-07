@@ -44,6 +44,7 @@ function getHoldingsWithAssetDetails(array $conditions, DatabaseManager $db, boo
 function createHoldingDetailRichHTML(
     array  $holding,
     string $user_base_currency = 'ریال',
+    bool   $detail_btn = true,
     array  $attributes = [
         'space',
         'date',
@@ -57,9 +58,13 @@ function createHoldingDetailRichHTML(
     ]
 ): string
 {
-    $html = '<h4>' . beautifulNumber($holding['asset_name'], null) . ' ';
-    $html .= '<tg-button type="disabled" style="link">' . 'جزئیات و ویرایش' . '</tg-button></tg-button-row>';
-    $html .= '</h4><ul>';
+    $html = '<h3>' . beautifulNumber($holding['asset_name'], null);
+    if ($detail_btn) {
+        $callback_data = json_encode(['show_holding' => $holding['id']]);
+        $html .= " <tg-button type='callback_data' style='link' data='$callback_data'>" . 'جزئیات و ویرایش' . '</tg-button>';
+    }
+    $html .= '</h3>';
+    $html .= '<ul>';
     foreach ($attributes as $attribute) {
 
         if ($attribute == 'space') {
