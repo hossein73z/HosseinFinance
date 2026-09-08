@@ -1,5 +1,84 @@
 <?php
 
+function sendAllHoldings(User $user, DatabaseManager $db, array $data): void
+{
+    $holdings = getHoldingsWithAssetDetails(['user_id' => $user->getId()], $db);
+    if ($holdings) {
+        $html = "<h1>دارایی‌های ثبت شده‌ی شما:</h1>";
+        $html .= '<p><br></p>';
+        $total_pro_los = 0;
+        foreach ($holdings as $holding) {
+            $total_pro_los += $holding['amount'] * ($holding['current_price'] - $holding['avg_price']) * $holding['exchange_rate'];
+            $html .= createHoldingDetailRichHTML(
+                holding: $holding,
+                user_base_currency: $user->getBaseCurrency(),
+                attributes: ['org_amount', 'org_total_price', 'profit']
+            );
+            $html .= '<hr>';
+        }
+
+        $pro_los_html =
+            ($total_pro_los == 0) ?
+                "<p>🟤 جمع سود/زیان: ۰ " . $user->getBaseCurrency() . '</p>' : (
+            ($total_pro_los > 0) ?
+                "<p>🟢 جمع سود: " . beautifulNumber($total_pro_los) . ' ' . $user->getBaseCurrency() . '</p>' :
+                "<p>🔴 جمع ضرر: " . beautifulNumber($total_pro_los) . ' ' . $user->getBaseCurrency() . '</p>'
+            );
+        $html .= '<p><br></p>' . $pro_los_html;
+
+        $data['rich_message'] = ['is_rtl' => true, 'html' => $html];
+        sendToTelegram('sendRichMessage', $data);
+    } else {
+        sendToTelegram('sendMessage', ['chat_id' => $user->getid(), 'text' => 'شما هیچ دارایی‌ای ثبت نکرده‌اید.']);
+    }
+}
+
+function sendHoldingDetail(array $holding, array $data, string $user_base_currency = 'ریال', string|int|null $message_id = null): void
+{
+
+    array_unshift($data['reply_markup']['keyboard'], [
+        createWebAppBtn(
+            text: '✏ ویرایش ' . beautifulNumber($holding['asset_name'], null),
+            path: '/assets/holding.html',
+            params: ['holding' => base64_encode(json_encode($holding))],
+            add_api: true
+        )
+    ]);
+
+    $html = createHoldingDetailRichHTML($holding, user_base_currency: $user_base_currency, detail_btn: false);
+    $html .= '<hr>';
+    $callback_data = json_encode(['holdings_list' => null]);
+    $html .= "<tg-button-row><tg-button type='callback_data' style='primary' data='$callback_data'>" . 'برگشت به لیست دارایی‌ها' . "</tg-button></tg-button-row>";
+
+    $data['rich_message'] = ['is_rtl' => true, 'html' => $html];
+
+    if ($message_id) {
+        $data['message_id'] = $message_id;
+        sendToTelegram('editMessageText', $data);
+    } else sendToTelegram('sendRichMessage', $data);
+}
+
+function checkAndAddEditHoldingButton(array $data, User $user, DatabaseManager $db): array
+{
+    $progress = $user->getProgress();
+    if ($progress && key($progress) === 'view_holding') {
+        $holding = getHoldingsWithAssetDetails(['h.id' => $progress['view_holding']['holding_id'], 'h.user_id' => $user->getId()], $db, true);
+
+        if ($holding) {
+            array_unshift($data['reply_markup']['keyboard'], [
+                createWebAppBtn(
+                    text: '✏ ویرایش ' . $holding['asset_name'],
+                    path: '/assets/holding.html',
+                    params: ['holding' => base64_encode(json_encode($holding))],
+                    add_api: true
+                )
+            ]);
+        }
+    }
+
+    return $data;
+}
+
 /**
  * Return a list of holdings (Or just one, if `Single == true`) containing `asset_name`,
  * `current_price`, `base_currency` and `exchange_rate` (Based on user's base currency).
