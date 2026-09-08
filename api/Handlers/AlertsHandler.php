@@ -128,7 +128,7 @@ function sendAllAlerts(User $user, DatabaseManager $db, int|string|null $message
 function sendAssetAlerts(User $user, DatabaseManager $db, string|int $asset_id, int|string|null $message_id = null): void
 {
     $alerts = $db->query("
-        SELECT 
+        SELECT
             alerts.*,
             assets.id as asset_id,
             assets.emoji,
@@ -146,8 +146,8 @@ function sendAssetAlerts(User $user, DatabaseManager $db, string|int $asset_id, 
         'rich_message' => ['is_rtl' => true, 'html' => &$rich_text],
         'chat_id' => $user->getid(),
         'reply_markup' => ['inline_keyboard' => [
-            [['text' => '➕ افزودن هشدار جدید ➕', 'callback_data' => json_encode(['new_asset_alert' => $asset_id])]],
-            [['text' => '🔙 برگشت 🔙', "style" => "primary", 'callback_data' => json_encode(['show_favorites' => null])]],
+            [['text' => 'افزودن هشدار جدید', 'callback_data' => json_encode(['new_asset_alert' => $asset_id])]],
+            [['text' => 'برگشت به لیست علاقه‌مندی‌ها', "style" => "primary", 'callback_data' => json_encode(['show_favorites' => null])]],
         ]]
     ];
 
@@ -207,7 +207,7 @@ function isAlertPriceProgress(?array $progress): bool
 /**
  * Ask the user for the alert target price using ForceReply (keeps current reply keyboard).
  */
-function askForAlertPrice(User $user, DatabaseManager $db, array $asset): void
+function askForAlertPrice(User $user, array $asset): void
 {
     $text = 'قیمتی که می‌خواهید برای آن هشدار تنظیم کنید را نوشته و ارسال کنید.';
     $text .= "\n";
@@ -216,13 +216,13 @@ function askForAlertPrice(User $user, DatabaseManager $db, array $asset): void
     $text = markdownScape($text);
 
     sendToTelegram('sendMessage', [
-        'chat_id'      => $user->getId(),
-        'text'         => $text,
-        'parse_mode'   => 'MarkdownV2',
+        'chat_id' => $user->getId(),
+        'text' => $text,
+        'parse_mode' => 'MarkdownV2',
         'reply_markup' => [
-            'force_reply'             => true,
+            'force_reply' => true,
             'input_field_placeholder' => 'قیمت هشدار را وارد کنید',
-            'selective'               => true,
+            'selective' => true,
         ],
     ]);
 }
@@ -240,7 +240,7 @@ function handleAlertPriceInput(User $user, array $message, DatabaseManager $db):
 
     $parent_btn_id = $progress['parent_btn'] ?? $user->getButtonId();
     $progress_data = $progress['data'];
-    $progress_key  = array_key_first($progress_data);
+    $progress_key = array_key_first($progress_data);
 
     // Allow user to cancel via the Cancel reply button (s1)
     $pressed_button = $db->read('buttons', ['id' => 's1', 'attrs->>"$.text"' => $message['text'] ?? '']);
@@ -274,7 +274,7 @@ function handleAlertPriceInput(User $user, array $message, DatabaseManager $db):
     if (!$asset) {
         sendToTelegram('sendMessage', [
             'chat_id' => $user->getId(),
-            'text'    => '❌ دارایی مورد نظر یافت نشد.',
+            'text' => '❌ دارایی مورد نظر یافت نشد.',
         ]);
         cancelButton($user, $db, $parent_btn_id);
         return;
@@ -284,38 +284,38 @@ function handleAlertPriceInput(User $user, array $message, DatabaseManager $db):
 
     if ($target_price === null) {
         sendToTelegram('sendMessage', [
-            'chat_id'      => $user->getId(),
-            'text'         => "پیام نامفهوم بود.\nقیمت را به عدد بنویسید یا در صورت انصراف از دکمه لغو استفاده کنید.",
+            'chat_id' => $user->getId(),
+            'text' => "پیام نامفهوم بود.\nقیمت را به عدد بنویسید یا در صورت انصراف از دکمه لغو استفاده کنید.",
             'reply_markup' => [
-                'force_reply'             => true,
+                'force_reply' => true,
                 'input_field_placeholder' => 'قیمت هشدار را وارد کنید',
-                'selective'               => true,
+                'selective' => true,
             ],
         ]);
         exit;
     }
 
-    $price_diff   = $target_price - (float)$asset['price'];
+    $price_diff = $target_price - (float)$asset['price'];
     $diff_percent = intval(($price_diff / floatval($asset['price'])) * 100);
 
     if ($price_diff == 0) {
         sendToTelegram('sendMessage', [
-            'chat_id'      => $user->getId(),
-            'text'         => "قیمت هشدار نمی‌تواند با قیمت کنونی برابر باشد.\nقیمت دیگری بنویسید یا در صورت انصراف از دکمه لغو استفاده کنید.",
+            'chat_id' => $user->getId(),
+            'text' => "قیمت هشدار نمی‌تواند با قیمت کنونی برابر باشد.\nقیمت دیگری بنویسید یا در صورت انصراف از دکمه لغو استفاده کنید.",
             'reply_markup' => [
-                'force_reply'             => true,
+                'force_reply' => true,
                 'input_field_placeholder' => 'قیمت هشدار را وارد کنید',
-                'selective'               => true,
+                'selective' => true,
             ],
         ]);
         exit;
     }
 
     $new_alert = [
-        'user_id'      => $user->getId(),
-        'asset_name'   => $asset['name'],
+        'user_id' => $user->getId(),
+        'asset_name' => $asset['name'],
         'target_price' => $target_price,
-        'status'       => 'active',
+        'status' => 'active',
         'created_date' => JalaliDate::fromGregorian()->format(),
         'created_time' => date('H:i'),
     ];
@@ -338,7 +338,7 @@ function handleAlertPriceInput(User $user, array $message, DatabaseManager $db):
 
     sendToTelegram('sendMessage', [
         'chat_id' => $user->getId(),
-        'text'    => $text,
+        'text' => $text,
     ]);
 
     // Clear progress and return to the parent view
@@ -369,7 +369,7 @@ function managePriceAlerts(User $user, array $callback_query, array $message, Da
                 $data['reply_markup'] = ['inline_keyboard' => [
                     [['text' => 'افزودن هشدار', 'callback_data' => json_encode(['mng_alerts' => 'add_alert'])]],
                     [['text' => 'حذف هشدار', 'callback_data' => json_encode(['mng_alerts' => 'remove_alert'])]],
-                    [['text' => '🔙 برگشت 🔙', "style" => "primary", 'callback_data' => json_encode(['show_all_alerts' => null])]],
+                    [['text' => 'برگشت به لیست هشدارها', "style" => "primary", 'callback_data' => json_encode(['show_all_alerts' => null])]],
                 ]];
             }
 
@@ -440,7 +440,7 @@ function managePriceAlerts(User $user, array $callback_query, array $message, Da
 
             if ($query_key == 'fav_alert') {
                 $data['reply_markup']['inline_keyboard'] = [[
-                    ['text' => '🔙 برگشت 🔙', "style" => "primary", 'callback_data' => json_encode(['show_favorites' => null])]
+                    ['text' => 'برگشت به لیست علاقه‌مندی‌ها', "style" => "primary", 'callback_data' => json_encode(['show_favorites' => null])]
                 ]];
 
                 $assets = $db->read(
@@ -504,19 +504,19 @@ function managePriceAlerts(User $user, array $callback_query, array $message, Da
             if (!$asset) {
                 sendToTelegram('sendMessage', [
                     'chat_id' => $user->getId(),
-                    'text'    => '❌ دارایی مورد نظر یافت نشد.',
+                    'text' => '❌ دارایی مورد نظر یافت نشد.',
                 ]);
                 exit;
             }
 
             $progress = [
                 'parent_btn' => $user->getButtonId(),
-                'data'       => $progress_data,
+                'data' => $progress_data,
             ];
             $user->setProgress($progress);
             $db->update('users', ['progress' => json_encode($progress)], ['id' => $user->getId()]);
 
-            askForAlertPrice($user, $db, $asset);
+            askForAlertPrice($user, $asset);
             exit;
 
         // Ask user to confirm deleting alert
