@@ -235,7 +235,7 @@ function normalButtonHandler(User $user, Button $pressed_button, DatabaseManager
 
 function nonButtonHandler(User $user, array $message, DatabaseManager $db): void
 {
-    // Priority: if we are waiting for an alert price, handle it first
+    // Priority: progress-based free-text flows
     if (isAlertPriceProgress($user->getProgress())) {
         handleAlertPriceInput($user, $message, $db);
         return;
@@ -254,7 +254,7 @@ function nonButtonHandler(User $user, array $message, DatabaseManager $db): void
         'text' => 'پیام نامفهوم است!',
         'chat_id' => $user->getid(),
         'reply_markup' => [
-            'keyboard' => createKeyboardsArray($user->getButtonId(), $user->isAdmin(), $db),
+            'keyboard' => $user->getKeyboard(),
             'resize_keyboard' => true,
             'is_persistent' => false,
         ]
