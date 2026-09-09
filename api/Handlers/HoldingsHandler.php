@@ -295,7 +295,7 @@ function addHoldingProgress(User $user, array $data, ?array $message, DatabaseMa
             if ($message['text'] == 'لغو') level_1($user, $db);
             if ($message['text'] == 'برگشت') askForHoldingAssetName($user, $progress['add_holding']['asset_type'], $db);
             $is_number = cleanAndValidateNumber($message['text']);
-            if ($is_number) $progress['add_holding']['asset_name'] = $message['text'];
+            if ($is_number) $progress['add_holding']['amount'] = $message['text'];
             else askForHoldingAmount($user, $db, 'پیام نامفهوم بود. لطفاً مقدار دارایی را به عدد وارد کنید.');
             addHoldingProgress($user->setProgress($progress), $data, null, $db);
         }
@@ -310,6 +310,17 @@ function addHoldingProgress(User $user, array $data, ?array $message, DatabaseMa
             else askForHoldingPrice($user, $progress['add_holding']['asset_name'], $db, 'پیام نامفهوم بود. لطفاً قیمت را به عدد وارد کنید.');
             addHoldingProgress($user->setProgress($progress), $data, null, $db);
         }
+
+        // Add the holding if all the required values are presented
+        $holding['user_id'] = $user->getId();
+        $holding['asset_id'] = $db->read('assets', ['name' => $progress['add_holding']['asset_name']], true)['id'];
+        $holding['amount'] = beautifulNumber($progress['add_holding']['amount'], null, false);
+        $holding['avg_price'] = beautifulNumber($progress['add_holding']['avg_price'], null, false);
+        $holding['date'] = new DateTime()->format('Y-m-d');
+        $holding['time'] = new DateTime()->format('h:i');
+
+        addHolding($user, $holding, $data, $db);
+
     }
 }
 
@@ -430,4 +441,28 @@ function askForHoldingPrice(User            $user,
         sendToTelegram('sendMessage', $data);
     }
     exit();
+}
+
+function addHolding(User $user, array $holding, array $data, DatabaseManager $db): void
+{
+    try {
+        $asset = $db->read('assets', ['id' => $holding['asset_id']], true);
+        if (!$asset) {
+            $data['text'] = '❌ دارایی انتخاب شده پیدا نشد.';
+            sendToTelegram('sendMessage', $data);
+            level_1($user, $db);
+        }
+
+        $db->create('holdings', $holding);
+        $data['text'] = '✅ دارایی جدید با موفقیت ثبت شد.';
+    } catch (PDOException $e) {
+        error_log('Error: ' . json_encode($e->errorInfo, JSON_PRETTY_PRINT));
+        $data['text'] = '❌ خطای پایگاه داده در ثبت دارایی: ' . $e->errorInfo[2];
+    }
+
+    // Send success/failure message
+    sendToTelegram('sendMessage', $data);
+
+    // Redirect user to view all holdings
+    level_1($user, $db);
 }

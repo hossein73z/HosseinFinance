@@ -110,7 +110,7 @@ function beautifulNumber(string $text, string|null $delimiter = ',', bool $persi
     if ($persianNumbers) {
         return str_replace(english, persian, $beautifiedNumber);
     } else {
-        return $beautifiedNumber;
+        return str_replace(persian, english, $beautifiedNumber);
     }
 }
 
