@@ -143,6 +143,12 @@ class User implements JsonSerializable
         return $this;
     }
 
+    public function setKeyboard(array $keyboard): self
+    {
+        $this->button->setKeyboard($keyboard);
+        return $this;
+    }
+
     public function setIsAdmin(bool $isAdmin): self
     {
         $this->isAdmin = $isAdmin;
