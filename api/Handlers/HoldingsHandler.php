@@ -44,12 +44,7 @@ function level_1(
     exit;
 }
 
-function handleHoldingsCallback(
-    User            $user,
-    array           $callback_query,
-    array           $data,
-    array           $message,
-    DatabaseManager $db): void
+function handleHoldingsCallback(User $user, array $callback_query, array $data, array $message, DatabaseManager $db): void
 {
 
     $query_data = $callback_query['data'];
@@ -58,6 +53,10 @@ function handleHoldingsCallback(
     $data['message_id'] = $message['message_id'];
 
     switch ($query_key) {
+
+        case 'add_holding':
+            addHoldingProgress($user, $data, null, $db);
+            break;
 
         case 'show_holding':
             $holding_id = $query_data[$query_key];
@@ -74,16 +73,22 @@ function handleHoldingsCallback(
             }
             break;
 
+        case 'show_all_holdings':
+            $db->update('users', ['progress' => null], ['id' => $user->getId()]);
+            sendAllHoldings($user, $db, $data, $message['message_id']);
+            sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
+            exit;
+
         case 'holdings_list':
             $db->update('users', ['progress' => null], ['id' => $user->getId()]);
             sendAllHoldings($user, $db, $data);
             sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
-            exit();
+            exit;
 
         default:
             sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id'], 'text' => 'این پیام منقضی شده است!']);
             sendToTelegram('deleteMessage', ['chat_id' => $user->getid(), 'message_id' => $message['message_id']]);
-            exit();
+            exit;
     }
 
     sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
@@ -206,7 +211,145 @@ function handleHoldingsWebAppData(User $user, array $data, array $message, Datab
 
 function handleHoldingsTextMessage(User $user, array $data, array $message, DatabaseManager $db): void
 {
+    if (isAddHoldingProgress($user->getProgress())) addHoldingProgress($user, $data, $message, $db);
+
     $data['text'] = 'پیام نامفهوم است!';
+    $data['reply_markup']['keyboard'] = $user->getKeyboard();
     sendToTelegram('sendMessage', $data);
     exit;
+}
+
+/**
+ * Returns true when the user's progress indicates they are in the middle of
+ * adding a new holding via the chat step-by-step flow.
+ *
+ * Supports the flat shape used by the existing starter step:
+ *   ['add_holding' => ['asset_type' => null, ...]]
+ * and a nested shape if you later adopt parent_btn/data style:
+ *   ['data' => ['add_holding' => [...]]]
+ */
+function isAddHoldingProgress(?array $progress): bool
+{
+    if (!$progress || !is_array($progress)) {
+        return false;
+    }
+
+    if (array_key_exists('add_holding', $progress)) {
+        return true;
+    }
+
+    if (isset($progress['data']) && is_array($progress['data']) && array_key_exists('add_holding', $progress['data'])) {
+        return true;
+    }
+
+    return false;
+}
+
+function addHoldingProgress(User $user, array $data, ?array $message, DatabaseManager $db): void
+{
+    /**
+     * Required fields for new holding:
+     *  - asset_type
+     *  - asset_name
+     *  - amount
+     *  - note
+     *  - avg_price
+     *  - date
+     *  - time
+     *
+     * If any of these values are not presented, asks for
+     * it, otherwise adds the holding to the database.
+     */
+
+    $progress = $user->getProgress();
+    if (!$progress || !isset($progress['add_holding'])) {
+        askForHoldingAssetType($user, $db);
+    } else {
+
+        // Asset Type
+        // TODO: use inline buttons for this part
+        if (!isset($progress['add_holding']['asset_type'])) {
+            if (!$message) askForHoldingAssetType($user, $db);
+            if ($message['text'] == 'برگشت به لیست دارایی‌ها') level_1($user, $db);
+            $assets = $db->read('assets', ['asset_type' => $message['text']]);
+            if ($assets) $progress['add_holding']['asset_type'] = $message['text'];
+            else askForHoldingAssetType($user, $db, 'پیام نامفهوم بود. لطفاً دسته‌بندی مد نظر را از دکمه‌های زیر انتخاب کنید.');
+            addHoldingProgress($user->setProgress($progress), $data, null, $db);
+        }
+
+        // Asset Name
+        // TODO: use inline buttons for this part
+        if (!isset($progress['add_holding']['asset_name'])) {
+            if (!$message) askForHoldingAssetName($user, $progress['add_holding']['asset_type'], $db);
+            if ($message['text'] == 'لغو') level_1($user, $db);
+            if ($message['text'] == 'برگشت') askForHoldingAssetType($user, $db);
+            $asset = $db->read('assets', ['name' => $message['text']], true);
+            if ($asset) $progress['add_holding']['asset_name'] = $message['text'];
+            else askForHoldingAssetName($user, $progress['add_holding']['asset_type'], $db, 'پیام نامفهوم بود. لطفاً دارایی مد نظر را از دکمه‌های زیر انتخاب کنید.');
+            addHoldingProgress($user->setProgress($progress), $data, null, $db);
+        }
+    }
+}
+
+function askForHoldingAssetType(User            $user,
+                                DatabaseManager $db,
+                                ?string         $text = null): void
+{
+    $data['chat_id'] = $user->getId();
+
+    $asset_types = $db->read(
+        table: 'assets',
+        selectColumns: 'asset_type',
+        distinct: true,
+        orderBy: ['asset_type' => 'DESC']
+    );
+    if ($asset_types) {
+
+        $asset_types = array_column($asset_types, 'asset_type');
+        $keyboard[] = [['text' => 'برگشت به لیست دارایی‌ها', 'style' => 'primary']];
+        foreach ($asset_types as $asset_type) array_unshift($keyboard, [['text' => $asset_type]]);
+
+        $data['text'] = $text ?? 'دسته‌بندی دارایی مورد نظر را از دکمه‌های زیر انتخاب کنید:';
+        $data['reply_markup']['keyboard'] = $keyboard;
+        $response = sendToTelegram('sendMessage', $data);
+        if ($response) {
+            $progress = ['add_holding' => ['asset_type' => null]];
+            $db->update('users', ['progress' => json_encode($progress)], ['id' => $user->getId()]);
+        }
+    } else {
+        $data['text'] = 'دسته‌بندی‌ای در سیستم یافت نشد!';
+        sendToTelegram('sendMessage', $data);
+    }
+    exit();
+}
+
+function askForHoldingAssetName(User            $user,
+                                string          $asset_type,
+                                DatabaseManager $db,
+                                ?string         $text = null): void
+{
+    $data['chat_id'] = $user->getId();
+
+    $assets = $db->read('assets', ['asset_type' => $asset_type]);
+    if ($assets) {
+
+        $keyboard[] = [
+            ['text' => 'برگشت', 'style' => 'primary'],
+            ['text' => 'لغو', 'style' => 'danger'],
+        ];
+        foreach ($assets as $asset) array_unshift($keyboard, [['text' => $asset['name']]]);
+
+        $data['text'] = $text ?? 'دارایی مورد نظر را از دکمه‌های زیر انتخاب کنید:';
+        $data['reply_markup']['keyboard'] = $keyboard;
+        $response = sendToTelegram('sendMessage', $data);
+        if ($response) {
+            $progress = $user->getProgress();
+            $progress['add_holding']['asset_name'] = null;
+            $db->update('users', ['progress' => json_encode($progress)], ['id' => $user->getId()]);
+        }
+    } else {
+        $data['text'] = 'این دسته‌بندی خالی‌ست!';
+        sendToTelegram('sendMessage', $data);
+    }
+    exit();
 }
