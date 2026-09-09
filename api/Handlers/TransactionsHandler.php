@@ -211,11 +211,7 @@ function addTransactionProgress(User $user, array $data, ?array $message, Databa
 
     $progress = $user->getProgress();
     if (!$progress || !isset($progress['add_transaction'])) {
-        // Start adding transaction process
-        $progress = ['add_transaction' => ['type' => null]];
-        // TODO: Make 'last_btn' dynamic
-        $db->update('users', ['button' => getStructuredButton(12, $user->isAdmin(), $db), 'progress' => json_encode($progress)], ['id' => $user->getId()]);
-        askForTransactionType($user->setProgress($progress), $data, $db);
+        askForTransactionType($user, $data, $db);
     } else {
 
         // HACK: Lazy work
@@ -320,7 +316,7 @@ function askForTransactionType(User $user, array $data, DatabaseManager $db, ?st
     $response = sendToTelegram('sendMessage', $data);
     if ($response) {
         $progress = ['add_transaction' => ['type' => null]];
-        $db->update(            'users',            ['progress' => json_encode($progress)],            ['id' => $user->getId()]        );
+        $db->update('users', ['progress' => json_encode($progress)], ['id' => $user->getId()]);
     }
     exit;
 }
@@ -341,7 +337,7 @@ function askForTransactionAccount(
     if ($response) {
         $progress = $user->getProgress();
         $progress['add_transaction']['account_id'] = null;
-        $db->update(            'users',            ['progress' => json_encode($progress)],            ['id' => $user->getId()]        );
+        $db->update('users', ['progress' => json_encode($progress)], ['id' => $user->getId()]);
     }
     exit;
 }
@@ -357,7 +353,7 @@ function askForTransactionAmount(
     if ($response) {
         $progress = $user->getProgress();
         $progress['add_transaction']['amount'] = null;
-        $db->update(            'users',            ['progress' => json_encode($progress)],            ['id' => $user->getId()]        );
+        $db->update('users', ['progress' => json_encode($progress)], ['id' => $user->getId()]);
     }
     exit;
 }
@@ -373,7 +369,7 @@ function askForTransactionCategory(
     if ($response) {
         $progress = $user->getProgress();
         $progress['add_transaction']['category'] = null;
-        $db->update(            'users',            ['progress' => json_encode($progress)],            ['id' => $user->getId()]        );
+        $db->update('users', ['progress' => json_encode($progress)], ['id' => $user->getId()]);
     }
     exit;
 }
@@ -394,7 +390,7 @@ function askForTransactionDate(
         $progress = $user->getProgress();
         $progress['add_transaction']['date'] = null;
         $db->update(
-            'users',            ['progress' => json_encode($progress)],            ['id' => $user->getId()]        );
+            'users', ['progress' => json_encode($progress)], ['id' => $user->getId()]);
     }
     exit;
 }
@@ -411,7 +407,7 @@ function askForTransactionTime(
     if ($response) {
         $progress = $user->getProgress();
         $progress['add_transaction']['time'] = null;
-        $db->update(            'users',            ['progress' => json_encode($progress)],            ['id' => $user->getId()]        );
+        $db->update('users', ['progress' => json_encode($progress)], ['id' => $user->getId()]);
     }
     exit;
 }
