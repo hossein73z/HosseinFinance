@@ -252,8 +252,8 @@ function addHoldingProgress(User $user, array $data, ?array $message, DatabaseMa
      *  - asset_type
      *  - asset_name
      *  - amount
-     *  - note
      *  - avg_price
+     *  - note
      *  - date
      *  - time
      *
@@ -286,6 +286,17 @@ function addHoldingProgress(User $user, array $data, ?array $message, DatabaseMa
             $asset = $db->read('assets', ['name' => $message['text']], true);
             if ($asset) $progress['add_holding']['asset_name'] = $message['text'];
             else askForHoldingAssetName($user, $progress['add_holding']['asset_type'], $db, 'پیام نامفهوم بود. لطفاً دارایی مد نظر را از دکمه‌های زیر انتخاب کنید.');
+            addHoldingProgress($user->setProgress($progress), $data, null, $db);
+        }
+
+        // Amount
+        if (!isset($progress['add_holding']['amount'])) {
+            if (!$message) askForHoldingAmount($user, $db);
+            if ($message['text'] == 'لغو') level_1($user, $db);
+            if ($message['text'] == 'برگشت') askForHoldingAssetName($user, $progress['add_holding']['asset_type'], $db);
+            $is_number = cleanAndValidateNumber($message['text']);
+            if ($is_number) $progress['add_holding']['asset_name'] = $message['text'];
+            else askForHoldingAmount($user, $db, 'پیام نامفهوم بود. لطفاً مقدار دارایی را به عدد وارد کنید.');
             addHoldingProgress($user->setProgress($progress), $data, null, $db);
         }
     }
@@ -350,6 +361,26 @@ function askForHoldingAssetName(User            $user,
     } else {
         $data['text'] = 'این دسته‌بندی خالی‌ست!';
         sendToTelegram('sendMessage', $data);
+    }
+    exit();
+}
+
+function askForHoldingAmount(User            $user,
+                             DatabaseManager $db,
+                             ?string         $text = null): void
+{
+    $data['chat_id'] = $user->getId();
+    $data['text'] = $text ?? 'مقدار دارایی را به عدد وارد کنید:';
+    $data['reply_markup']['resize_keyboard'] = true;
+    $data['reply_markup']['keyboard'] = [[
+        ['text' => 'برگشت', 'style' => 'primary'],
+        ['text' => 'لغو', 'style' => 'danger'],
+    ]];
+    $response = sendToTelegram('sendMessage', $data);
+    if ($response) {
+        $progress = $user->getProgress();
+        $progress['add_holding']['amount'] = null;
+        $db->update('users', ['progress' => json_encode($progress)], ['id' => $user->getId()]);
     }
     exit();
 }
