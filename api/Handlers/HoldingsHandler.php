@@ -253,9 +253,9 @@ function addHoldingProgress(User $user, array $data, ?array $message, DatabaseMa
      *  - asset_name
      *  - amount
      *  - avg_price
-     *  - note
-     *  - date
-     *  - time
+     *  - TODO: note
+     *  - TODO: date
+     *  - TODO: time
      *
      * If any of these values are not presented, asks for
      * it, otherwise adds the holding to the database.
@@ -297,6 +297,17 @@ function addHoldingProgress(User $user, array $data, ?array $message, DatabaseMa
             $is_number = cleanAndValidateNumber($message['text']);
             if ($is_number) $progress['add_holding']['asset_name'] = $message['text'];
             else askForHoldingAmount($user, $db, 'پیام نامفهوم بود. لطفاً مقدار دارایی را به عدد وارد کنید.');
+            addHoldingProgress($user->setProgress($progress), $data, null, $db);
+        }
+
+        // Average Price
+        if (!isset($progress['add_holding']['avg_price'])) {
+            if (!$message) askForHoldingPrice($user, $progress['add_holding']['asset_name'], $db);
+            if ($message['text'] == 'لغو') level_1($user, $db);
+            if ($message['text'] == 'برگشت') askForHoldingAmount($user, $db);
+            $is_number = cleanAndValidateNumber($message['text']);
+            if ($is_number) $progress['add_holding']['avg_price'] = $message['text'];
+            else askForHoldingPrice($user, $progress['add_holding']['asset_name'], $db, 'پیام نامفهوم بود. لطفاً قیمت را به عدد وارد کنید.');
             addHoldingProgress($user->setProgress($progress), $data, null, $db);
         }
     }
@@ -381,6 +392,42 @@ function askForHoldingAmount(User            $user,
         $progress = $user->getProgress();
         $progress['add_holding']['amount'] = null;
         $db->update('users', ['progress' => json_encode($progress)], ['id' => $user->getId()]);
+    }
+    exit();
+}
+
+function askForHoldingPrice(User            $user,
+                            string          $asset_name,
+                            DatabaseManager $db,
+                            ?string         $text = null): void
+{
+    $data['chat_id'] = $user->getId();
+
+    $asset = $db->read('assets', ['name' => $asset_name], true);
+    if ($asset) {
+
+        $name = beautifulNumber($asset['name'], null);
+        $price = beautifulNumber($asset['price']);
+
+        $data['text'] = $text ?? 'میانگین قیمت خرید دارایی را به عدد وارد کنید:' . "\n" .
+        'قیمت کنونی «' . $name . '»: ' . $price;
+        $data['reply_markup']['resize_keyboard'] = true;
+        $data['reply_markup']['keyboard'] = [
+            [
+                ['text' => $price]
+            ], [
+                ['text' => 'برگشت', 'style' => 'primary'],
+                ['text' => 'لغو', 'style' => 'danger'],
+            ]];
+        $response = sendToTelegram('sendMessage', $data);
+        if ($response) {
+            $progress = $user->getProgress();
+            $progress['add_holding']['avg_price'] = null;
+            $db->update('users', ['progress' => json_encode($progress)], ['id' => $user->getId()]);
+        }
+    } else {
+        $data['text'] = 'این گزینه در دیتابیس وجود ندارد!';
+        sendToTelegram('sendMessage', $data);
     }
     exit();
 }
