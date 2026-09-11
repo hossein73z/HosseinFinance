@@ -1,16 +1,16 @@
 {
   "functions": {
     "api/bot.php": {
-      "runtime": "vercel-php@0.7.1"
+      "runtime": "vercel-php@0.9.0"
     },
     "api/ExternalConnections/api.php": {
-      "runtime": "vercel-php@0.7.1"
+      "runtime": "vercel-php@0.9.0"
     },
     "api/ExternalConnections/UpdatePrices.php": {
-      "runtime": "vercel-php@0.7.1"
+      "runtime": "vercel-php@0.9.0"
     },
     "api/cron/reminders.php": {
-      "runtime": "vercel-php@0.7.1"
+      "runtime": "vercel-php@0.9.0"
     }
   },
   "crons": [
