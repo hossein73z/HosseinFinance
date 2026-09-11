@@ -31,8 +31,8 @@ function sendAllHoldings(User $user, DatabaseManager $db, array $data, string|in
         $html = '<p>.شما هیچ دارایی‌ای ثبت نکرده‌اید</p>';
     }
 
-    $add_holding_callback = json_encode(['add_holding' => null]);
-    $html .= "<hr><tg-button-row><tg-button style='primary' type='callback_data' data='$add_holding_callback'>" . 'افزودن دارایی جدید' . "</tg-button></tg-button-row>";
+    // $add_holding_callback = json_encode(['add_holding' => null]);
+    // $html .= "<hr><tg-button-row><tg-button style='primary' type='callback_data' data='$add_holding_callback'>" . 'افزودن دارایی جدید' . "</tg-button></tg-button-row>";
 
     $data['rich_message'] = ['is_rtl' => true, 'html' => $html];
     unset($data['reply_markup']);
