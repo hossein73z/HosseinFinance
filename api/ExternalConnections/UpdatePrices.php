@@ -1,16 +1,9 @@
 <?php
 
-use JetBrains\PhpStorm\NoReturn;
-
-require_once __DIR__ . '/../Libraries/DatabaseManager.php';
-require_once __DIR__ . '/../Functions/ExternalEndpointsFunctions.php';
-require_once __DIR__ . '/../Functions/StringHelper.php';
-require_once __DIR__ . '/../Helpers/FavoritesHelper.php';
-require_once __DIR__ . '/../Models/User.php';
+require_once __DIR__ . '/../bootstrap.php';
 
 // --- CONFIGURATION ---
 define('PRICE_BOT_TOKEN', getenv('PRICE_BOT_TOKEN'));
-define('SHARED_SECRET', getenv('SHARED_SECRET'));
 
 // Read the raw POST data from the incoming webhook request body.
 $input = file_get_contents('php://input');
@@ -36,8 +29,6 @@ if (json_last_error() !== JSON_ERROR_NONE) {
     error_log(json_encode(['status' => 'error', 'message' => 'Invalid JSON received. Error: ' . json_last_error_msg() . '. Input: ' . $input]));
     die();
 }
-
-http_response_code(200);
 
 // --- Message Data Extraction (Date and Time) ---
 if (preg_match_all('/\|[  ].*? ((\d\d?) (.*?) (\d\d\d\d)) -[  ](\d\d:\d\d)/ums', $message['text'], $date_time_matches)) {
