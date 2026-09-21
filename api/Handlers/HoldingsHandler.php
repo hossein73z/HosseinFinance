@@ -8,7 +8,7 @@ function holdings(
     ?string         $command_data = null): void
 {
     // Create keyboards
-    $level_button = new Button(
+    $user->setButton(new Button(
         id: 'holdings',
         attrs: ['text' => '💼 دارایی‌ها'],
         adminKey: false,
@@ -17,19 +17,19 @@ function holdings(
             [
                 ['id' => 'add_new_holding', 'text' => 'افزودن دارایی جدید', 'style' => 'success', 'admin_key' => 0],
             ], [
-                ['id' => 'back', 'text' => '🔙 برگشت 🔙', 'style' => 'primary', 'admin_key' => 0],
+                ['id' => 'main_menu', 'text' => '🔙 برگشت 🔙', 'style' => 'primary', 'admin_key' => 0],
             ],
         ]
-    );
+    ));
 
     $data = [
         'chat_id' => $user->getid(),
-        'text' => $level_button->getText(),
+        'text' => $user->getButton()->getText(),
         'reply_markup' => [
-            'keyboard' => $level_button->getKeyboard(),
+            'keyboard' => $user->getKeyboard(),
             'resize_keyboard' => true,
             'is_persistent' => false,
-            'input_field_placeholder' => $level_button->getText()
+            'input_field_placeholder' => $user->getButton()->getText()
         ]
     ];
 
@@ -40,8 +40,7 @@ function holdings(
         if (isset($message['web_app_data']))
             handleHoldingsWebAppData($user, $data, $message, $db);
         elseif ($pressed_button_id = getPressedButtonID($message['text'], $user))
-            exit($pressed_button_id);
-            // levelHandler($user, $db, null, $pressed_button_id);
+            levelHandler($user, $db, button_id: $pressed_button_id);
         else {
             $data['text'] = 'پیام نامفهوم است. لطفاً یکی از دکمه‌های زیر را انتخاب کنید.';
             sendToTelegram('sendMessage', $data);
@@ -49,8 +48,8 @@ function holdings(
     }
 
     // Update user's level and progress
-    $db->update('users', ['button' => json_encode($level_button), 'progress' => null], ['id' => $user->getId()]);
-    exit($level_button->getText());
+    $db->update('users', ['button' => json_encode($user->getButton()), 'progress' => null], ['id' => $user->getId()]);
+    exit($user->getButton()->getText());
 }
 
 function handleHoldingsCallback(User $user, array $callback_query, array $data, array $message, DatabaseManager $db): void

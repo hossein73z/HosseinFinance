@@ -17,6 +17,7 @@ class Button implements JsonSerializable
      */
     public static function fromDbRow(array $row): ?self
     {
+        if (!isset($row['id'])) return null;
         return $row ? new self(
             $row['id'],
             !isset($row['attrs']) ?

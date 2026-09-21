@@ -50,8 +50,8 @@ function levelHandler(
     ?User           $user,
     DatabaseManager $db,
     ?array          $message = null,
-    ?string         $button_id = null,
-    ?array          $callback_query = null): void
+    ?array          $callback_query = null,
+    ?string         $button_id = null): void
 {
 
     $button_id = $button_id ?? $user->getButtonId();
@@ -62,5 +62,5 @@ function levelHandler(
     if ($button_id == 'main_menu') mainMenu(user: $user, db: $db, message: $message);
     if ($button_id == 'holdings') holdings(user: $user, db: $db, message: $message);
 
-    exit('Unhandled message.');
+    exit('Unhandled message. ' . ($message && isset($message['text']) ? "Message text: $message[text]" : "Normal button id: $button_id"));
 }

@@ -41,7 +41,7 @@ function mainMenu(
 
     if ($message)
         if ($pressed_button_id = getPressedButtonID($message['text'], $user))
-            levelHandler($user, $db, null, $pressed_button_id);
+            levelHandler($user, $db, button_id: $pressed_button_id);
         else
             $data['text'] = 'پیام نامفهوم است. لطفاً یکی از دکمه‌های زیر را انتخاب کنید.';
 
