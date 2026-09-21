@@ -52,6 +52,41 @@ function holdings(
     exit($user->getButton()->getText());
 }
 
+function add_holding(
+    User            $user,
+    DatabaseManager $db,
+    ?array          $message = null,
+    ?array          $callback_query = null,
+    ?string         $command_data = null): void
+{
+    // Create keyboards
+    $user->setButton(new Button(
+        id: 'add_new_holding',
+        attrs: ['text' => 'افزودن دارایی جدید'],
+        adminKey: false,
+        belongTo: 'main_menu',
+        keyboard: [[['id' => 'holdings', 'text' => '❌ لغو ❌', 'style' => 'danger', 'admin_key' => 0]]]
+    ));
+
+    $data = [
+        'chat_id' => $user->getid(),
+        'text' => $user->getButton()->getText(),
+        'reply_markup' => [
+            'keyboard' => $user->getKeyboard(),
+            'resize_keyboard' => true,
+            'is_persistent' => false,
+            'input_field_placeholder' => $user->getButton()->getText()
+        ]
+    ];
+
+    // Handle cancel button
+    if ($message && $pressed_button_id = getPressedButtonID($message['text'], $user))
+        levelHandler($user, $db, button_id: $pressed_button_id);
+
+    addHoldingProgress($user, $data, $message, $db);
+
+}
+
 function handleHoldingsCallback(User $user, array $callback_query, array $data, array $message, DatabaseManager $db): void
 {
 
@@ -322,9 +357,7 @@ function addHoldingProgress(User $user, array $data, ?array $message, DatabaseMa
     }
 }
 
-function askForHoldingAssetType(User            $user,
-                                DatabaseManager $db,
-                                ?string         $text = null): void
+function askForHoldingAssetType(User $user, DatabaseManager $db, ?string $text = null): void
 {
     $data['chat_id'] = $user->getId();
 
@@ -334,10 +367,11 @@ function askForHoldingAssetType(User            $user,
         distinct: true,
         orderBy: ['asset_type' => 'DESC']
     );
+
     if ($asset_types) {
 
         $asset_types = array_column($asset_types, 'asset_type');
-        $keyboard[] = [['text' => 'برگشت به لیست دارایی‌ها', 'style' => 'primary']];
+        $keyboard = $user->getKeyboard();
         foreach ($asset_types as $asset_type) array_unshift($keyboard, [['text' => $asset_type]]);
 
         $data['text'] = $text ?? 'دسته‌بندی دارایی مورد نظر را از دکمه‌های زیر انتخاب کنید:';
@@ -345,7 +379,7 @@ function askForHoldingAssetType(User            $user,
         $response = sendToTelegram('sendMessage', $data);
         if ($response) {
             $progress = ['add_holding' => ['asset_type' => null]];
-            $db->update('users', ['progress' => json_encode($progress)], ['id' => $user->getId()]);
+            $db->update('users', ['button' => json_encode($user->getButton()), 'progress' => json_encode($progress)], ['id' => $user->getId()]);
         }
     } else {
         $data['text'] = 'دسته‌بندی‌ای در سیستم یافت نشد!';
