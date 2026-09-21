@@ -41,6 +41,7 @@ function handleIncomingMessage(array $message, DatabaseManager $db): void
 
     // Levels' Main Commands
     if ($text === '/start') mainMenu($user, $db);
+    if ($text === '/holdings') holdings($user, $db);
 
     levelHandler($user, $db, $message);
 }
@@ -57,6 +58,9 @@ function levelHandler(
 
     // Route to corresponding level
     if (!$button_id) mainMenu(user: $user, db: $db, message: $message);
+
+    if ($button_id == 'main_menu') mainMenu(user: $user, db: $db, message: $message);
+    if ($button_id == 'holdings') holdings(user: $user, db: $db, message: $message);
 
     exit('Unhandled message.');
 }

@@ -1,47 +1,56 @@
 <?php
 
-function level_1(
+function holdings(
     User            $user,
     DatabaseManager $db,
-    ?Button         $level_button = null,
     ?array          $message = null,
     ?array          $callback_query = null,
     ?string         $command_data = null): void
 {
     // Create keyboards
-    $level_button = $level_button ?: $user->getButton();
-    $keyboard = refineKeyboardForTelegram($level_button->getKeyboard());
+    $level_button = new Button(
+        id: 'holdings',
+        attrs: ['text' => '💼 دارایی‌ها'],
+        adminKey: false,
+        belongTo: 'main_menu',
+        keyboard: [
+            [
+                ['id' => 'add_new_holding', 'text' => 'افزودن دارایی جدید', 'style' => 'success', 'admin_key' => 0],
+            ], [
+                ['id' => 'back', 'text' => '🔙 برگشت 🔙', 'style' => 'primary', 'admin_key' => 0],
+            ],
+        ]
+    );
 
     $data = [
         'chat_id' => $user->getid(),
         'text' => $level_button->getText(),
         'reply_markup' => [
-            'keyboard' => &$keyboard,
+            'keyboard' => $level_button->getKeyboard(),
             'resize_keyboard' => true,
             'is_persistent' => false,
             'input_field_placeholder' => $level_button->getText()
         ]
     ];
 
-    // Add '➕ افزودن دارایی جدید' button to the keyboard
-    array_unshift($keyboard, [createWebAppBtn('➕ افزودن دارایی جدید', '/assets/holding.html', add_api: true)]);
-
     if ($callback_query) handleHoldingsCallback($user, $callback_query, $data, $message, $db);
-    if ($message && isset($message['web_app_data'])) handleHoldingsWebAppData($user, $data, $message, $db);
-    if ($message && !isset($message['web_app_data'])) handleHoldingsTextMessage($user, $data, $message, $db);
+    if (!$message)
+        sendAllHoldings($user, $db, $data);
+    else {
+        if (isset($message['web_app_data']))
+            handleHoldingsWebAppData($user, $data, $message, $db);
+        elseif ($pressed_button_id = getPressedButtonID($message['text'], $user))
+            exit($pressed_button_id);
+            // levelHandler($user, $db, null, $pressed_button_id);
+        else {
+            $data['text'] = 'پیام نامفهوم است. لطفاً یکی از دکمه‌های زیر را انتخاب کنید.';
+            sendToTelegram('sendMessage', $data);
+        }
+    }
 
     // Update user's level and progress
     $db->update('users', ['button' => json_encode($level_button), 'progress' => null], ['id' => $user->getId()]);
-
-    if ($command_data) {
-        $holding = getHoldingsWithAssetDetails(['h.id' => $command_data, 'h.user_id' => $user->getId()], $db, true);
-        if ($holding) sendHoldingDetail($holding, $data, $user->getBaseCurrency());
-    }
-    if (!$command_data) {
-        sendAllHoldings($user, $db, $data);
-    }
-
-    exit;
+    exit($level_button->getText());
 }
 
 function handleHoldingsCallback(User $user, array $callback_query, array $data, array $message, DatabaseManager $db): void
@@ -209,16 +218,6 @@ function handleHoldingsWebAppData(User $user, array $data, array $message, Datab
     exit;
 }
 
-function handleHoldingsTextMessage(User $user, array $data, array $message, DatabaseManager $db): void
-{
-    if (isAddHoldingProgress($user->getProgress())) addHoldingProgress($user, $data, $message, $db);
-
-    $data['text'] = 'پیام نامفهوم است!';
-    $data['reply_markup']['keyboard'] = $user->getKeyboard();
-    sendToTelegram('sendMessage', $data);
-    exit;
-}
-
 /**
  * Returns true when the user's progress indicates they are in the middle of
  * adding a new holding via the chat step-by-step flow.
@@ -270,7 +269,7 @@ function addHoldingProgress(User $user, array $data, ?array $message, DatabaseMa
         // TODO: use inline buttons for this part
         if (!isset($progress['add_holding']['asset_type'])) {
             if (!$message) askForHoldingAssetType($user, $db);
-            if ($message['text'] == 'برگشت به لیست دارایی‌ها') level_1($user, $db);
+            if ($message['text'] == 'برگشت به لیست دارایی‌ها') holdings($user, $db);
             $assets = $db->read('assets', ['asset_type' => $message['text']]);
             if ($assets) $progress['add_holding']['asset_type'] = $message['text'];
             else askForHoldingAssetType($user, $db, 'پیام نامفهوم بود. لطفاً دسته‌بندی مد نظر را از دکمه‌های زیر انتخاب کنید.');
@@ -281,7 +280,7 @@ function addHoldingProgress(User $user, array $data, ?array $message, DatabaseMa
         // TODO: use inline buttons for this part
         if (!isset($progress['add_holding']['asset_name'])) {
             if (!$message) askForHoldingAssetName($user, $progress['add_holding']['asset_type'], $db);
-            if ($message['text'] == 'لغو') level_1($user, $db);
+            if ($message['text'] == 'لغو') holdings($user, $db);
             if ($message['text'] == 'برگشت') askForHoldingAssetType($user, $db);
             $asset = $db->read('assets', ['name' => $message['text']], true);
             if ($asset) $progress['add_holding']['asset_name'] = $message['text'];
@@ -292,7 +291,7 @@ function addHoldingProgress(User $user, array $data, ?array $message, DatabaseMa
         // Amount
         if (!isset($progress['add_holding']['amount'])) {
             if (!$message) askForHoldingAmount($user, $db);
-            if ($message['text'] == 'لغو') level_1($user, $db);
+            if ($message['text'] == 'لغو') holdings($user, $db);
             if ($message['text'] == 'برگشت') askForHoldingAssetName($user, $progress['add_holding']['asset_type'], $db);
             $is_number = cleanAndValidateNumber($message['text']);
             if ($is_number) $progress['add_holding']['amount'] = $message['text'];
@@ -303,7 +302,7 @@ function addHoldingProgress(User $user, array $data, ?array $message, DatabaseMa
         // Average Price
         if (!isset($progress['add_holding']['avg_price'])) {
             if (!$message) askForHoldingPrice($user, $progress['add_holding']['asset_name'], $db);
-            if ($message['text'] == 'لغو') level_1($user, $db);
+            if ($message['text'] == 'لغو') holdings($user, $db);
             if ($message['text'] == 'برگشت') askForHoldingAmount($user, $db);
             $is_number = cleanAndValidateNumber($message['text']);
             if ($is_number) $progress['add_holding']['avg_price'] = $message['text'];
@@ -450,7 +449,7 @@ function addHolding(User $user, array $holding, array $data, DatabaseManager $db
         if (!$asset) {
             $data['text'] = '❌ دارایی انتخاب شده پیدا نشد.';
             sendToTelegram('sendMessage', $data);
-            level_1($user, $db);
+            holdings($user, $db);
         }
 
         $db->create('holdings', $holding);
@@ -464,5 +463,5 @@ function addHolding(User $user, array $holding, array $data, DatabaseManager $db
     sendToTelegram('sendMessage', $data);
 
     // Redirect user to view all holdings
-    level_1($user, $db);
+    holdings($user, $db);
 }
