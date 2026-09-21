@@ -15,9 +15,9 @@ class Button implements JsonSerializable
     /**
      * Factory method to easily create a Button instance from a database row
      */
-    public static function fromDbRow(array $row): self
+    public static function fromDbRow(array $row): ?self
     {
-        return new self(
+        return $row ? new self(
             $row['id'],
             !isset($row['attrs']) ?
                 [] :
@@ -31,7 +31,7 @@ class Button implements JsonSerializable
                 (is_string($row['keyboard']) ?
                     json_decode($row['keyboard'], true) :
                     $row['keyboard'])
-        );
+        ) : null;
     }
 
     // --- Getters ---

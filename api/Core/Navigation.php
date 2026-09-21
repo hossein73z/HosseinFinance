@@ -25,14 +25,14 @@ function backButton(User $user, DatabaseManager $db, int|string|null $parent_btn
             array_pop($current_progress);
             // Clear the current last level
             $current_progress[array_key_last($current_progress)] = null;
-            normalButtonHandler($user->setProgress($progress), $current_btn, $db);
+            levelHandler($user->setProgress($progress), $current_btn, $db);
         }
     }
 
     // If user has no progress (Or is at level 1 of a progress) redirect back to the parent level.
     $parent_btn = getStructuredButton($current_btn->getBelongTo(), $user->isAdmin(), $db);
 
-    normalButtonHandler(user: $user->setProgress(null), pressed_button: $parent_btn, db: $db);
+    levelHandler(user: $user->setProgress(null), pressed_button: $parent_btn, db: $db);
 }
 
 function cancelButton(User $user, DatabaseManager $db, int|string|null $parent_btn_id = null): void

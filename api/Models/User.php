@@ -88,7 +88,7 @@ class User implements JsonSerializable
         return $this->button;
     }
 
-    public function getButtonId(): ?int
+    public function getButtonId(): ?string
     {
         if (!$this->button) return null;
         else return $this->button->getId();
@@ -204,7 +204,7 @@ class User implements JsonSerializable
             'username' => $this->username,
             'settings' => $this->settings,
             'progress' => $this->progress,
-            'button' => $this->button,
+            'button' => json_encode($this->button),
             'is_admin' => (int)$this->isAdmin,
         ];
     }
