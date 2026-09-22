@@ -1,8 +1,7 @@
 <?php
 
-function sendAllHoldings(User $user, DatabaseManager $db, array $data, string|int|null $message_id = null): void
+function sendAllHoldings(User $user, DatabaseManager $db, string|int|null $message_id = null): void
 {
-    if (!$message_id) sendToTelegram('sendMessage', $data);
     $holdings = getHoldingsWithAssetDetails(['user_id' => $user->getId()], $db);
     if ($holdings) {
         $html = "<h1>دارایی‌های ثبت شده‌ی شما:</h1>";
@@ -31,11 +30,7 @@ function sendAllHoldings(User $user, DatabaseManager $db, array $data, string|in
         $html = '<p>.شما هیچ دارایی‌ای ثبت نکرده‌اید</p>';
     }
 
-    // $add_holding_callback = json_encode(['add_holding' => null]);
-    // $html .= "<hr><tg-button-row><tg-button style='primary' type='callback_data' data='$add_holding_callback'>" . 'افزودن دارایی جدید' . "</tg-button></tg-button-row>";
-
-    $data['rich_message'] = ['is_rtl' => true, 'html' => $html];
-    unset($data['reply_markup']);
+    $data = ['chat_id' => $user->getId(), 'rich_message' => ['is_rtl' => true, 'html' => $html]];
     if (!$message_id) sendToTelegram('sendRichMessage', $data);
     else sendToTelegram('editMessageText', $data);
 }

@@ -7,48 +7,50 @@ function holdings(
     ?array          $callback_query = null,
     ?string         $command_data = null): void
 {
-    // Create keyboards
-    $user->setButton(new Button(
-        id: 'holdings',
-        attrs: ['text' => '💼 دارایی‌ها'],
-        adminKey: false,
-        belongTo: 'main_menu',
-        keyboard: [
-            [
-                ['id' => 'add_new_holding', 'text' => 'افزودن دارایی جدید', 'style' => 'success', 'admin_key' => 0],
-            ], [
-                ['id' => 'main_menu', 'text' => '🔙 برگشت 🔙', 'style' => 'primary', 'admin_key' => 0],
-            ],
-        ]
-    ));
+
+    if ($callback_query) {
+        handleHoldingsCallback($user, $callback_query, $message, $db);
+    } elseif (!$message) { // Just entered the Level
+        $user->setProgress(null);
+        $user->setButton(new Button(
+            id: 'holdings',
+            attrs: ['text' => '💼 دارایی‌ها'],
+            adminKey: false,
+            belongTo: 'main_menu',
+            keyboard: [
+                [['id' => 'add_new_holding', 'text' => 'افزودن دارایی جدید', 'style' => 'success', 'admin_key' => 0],],
+                [['id' => 'main_menu', 'text' => '🔙 برگشت 🔙', 'style' => 'primary', 'admin_key' => 0],],
+            ]
+        ));
+    } else { // Received a message in the level
+
+        // Received message contains web_app data
+        if (isset($message['web_app_data']))
+            handleHoldingsWebAppData($user, $message, $db);
+
+        // Received message is a button
+        elseif ($pressed_button_id = getPressedButtonID($message['text'], $user))
+            levelHandler($user, $db, button_id: $pressed_button_id);
+
+        // Received message is not recognizable
+        else $data['text'] = 'پیام نامفهوم است. لطفاً یکی از دکمه‌های زیر را انتخاب کنید.';
+    }
 
     $data = [
         'chat_id' => $user->getid(),
-        'text' => $user->getButton()->getText(),
+        'text' => $data['text'] ?? $user->getButton()->getText(),
         'reply_markup' => [
-            'keyboard' => $user->getKeyboard(),
+            'keyboard' => $data['reply_markup']['keyboard'] ?? $user->getKeyboard(),
             'resize_keyboard' => true,
-            'is_persistent' => false,
+            'is_persistent' => true,
             'input_field_placeholder' => $user->getButton()->getText()
         ]
     ];
 
-    if ($callback_query) handleHoldingsCallback($user, $callback_query, $data, $message, $db);
-    if (!$message)
-        sendAllHoldings($user, $db, $data);
-    else {
-        if (isset($message['web_app_data']))
-            handleHoldingsWebAppData($user, $data, $message, $db);
-        elseif ($pressed_button_id = getPressedButtonID($message['text'], $user))
-            levelHandler($user, $db, button_id: $pressed_button_id);
-        else {
-            $data['text'] = 'پیام نامفهوم است. لطفاً یکی از دکمه‌های زیر را انتخاب کنید.';
-            sendToTelegram('sendMessage', $data);
-        }
-    }
-
-    // Update user's level and progress
-    $db->update('users', ['button' => json_encode($user->getButton()), 'progress' => null], ['id' => $user->getId()]);
+    $response = sendToTelegram('sendMessage', $data);
+    if ($response)
+        $db->update('users', ['button' => json_encode($user->getButton()), 'progress' => null], ['id' => $user->getId()]);
+    if (!$message) sendAllHoldings($user, $db);
     exit($user->getButton()->getText());
 }
 
@@ -87,13 +89,16 @@ function add_holding(
 
 }
 
-function handleHoldingsCallback(User $user, array $callback_query, array $data, array $message, DatabaseManager $db): void
+function handleHoldingsCallback(User $user, array $callback_query, array $message, DatabaseManager $db): void
 {
 
     $query_data = $callback_query['data'];
-
     $query_key = array_key_first($query_data);
-    $data['message_id'] = $message['message_id'];
+
+    $data = [
+        'chat_id' => $user->getid(),
+        'message_id' => $message['message_id'],
+    ];
 
     switch ($query_key) {
 
@@ -118,13 +123,13 @@ function handleHoldingsCallback(User $user, array $callback_query, array $data, 
 
         case 'show_all_holdings':
             $db->update('users', ['progress' => null], ['id' => $user->getId()]);
-            sendAllHoldings($user, $db, $data, $message['message_id']);
+            sendAllHoldings($user, $db,  $message['message_id']);
             sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
             exit;
 
         case 'holdings_list':
             $db->update('users', ['progress' => null], ['id' => $user->getId()]);
-            sendAllHoldings($user, $db, $data);
+            sendAllHoldings($user, $db);
             sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
             exit;
 
@@ -138,7 +143,7 @@ function handleHoldingsCallback(User $user, array $callback_query, array $data, 
     exit;
 }
 
-function handleHoldingsWebAppData(User $user, array $data, array $message, DatabaseManager $db): void
+function handleHoldingsWebAppData(User $user, array $message, DatabaseManager $db): void
 {
     $web_app_data = json_decode($message['web_app_data']['data'], true);
 
@@ -237,13 +242,24 @@ function handleHoldingsWebAppData(User $user, array $data, array $message, Datab
         $expected_data = true;
     }
 
+    $data = [
+        'chat_id' => $user->getid(),
+        'text' => $user->getButton()->getText(),
+        'reply_markup' => [
+            'keyboard' => $user->getKeyboard(),
+            'resize_keyboard' => true,
+            'is_persistent' => false,
+            'input_field_placeholder' => $user->getButton()->getText()
+        ]
+    ];
+
     if ($expected_data) {
         // Send success/failure message
         sendToTelegram('sendMessage', $data);
 
         // Clear user progress and show all holdings
         $db->update('users', ['progress' => null], ['id' => $user->getId()]);
-        sendAllHoldings($user, $db, $data);
+        sendAllHoldings($user, $db);
     } else {
         $data['text'] = 'داده‌های ارسالی قابل پردازش نیستند!';
         $data = checkAndAddEditHoldingButton($data, $user, $db);
