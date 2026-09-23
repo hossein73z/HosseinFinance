@@ -78,25 +78,16 @@ function add_holding(
 function handleHoldingsCallback(User $user, array $callback_query, array $message, DatabaseManager $db): void
 {
 
-    $query_data = $callback_query['data'];
+    $query_data = json_decode(html_entity_decode($callback_query['data'], ENT_QUOTES, 'UTF-8'), true);
     $query_key = array_key_first($query_data);
-
-    $data = [
-        'chat_id' => $user->getid(),
-        'message_id' => $message['message_id'],
-    ];
 
     switch ($query_key) {
 
-        case 'add_holding':
-            addHoldingProgress($user, null, $db);
-            break;
-
-        case 'show_holding':
+        case 'view_holding':
             $holding_id = $query_data[$query_key];
             $holding = getHoldingsWithAssetDetails(['h.id' => $holding_id], $db, true);
             if ($holding) {
-                sendHoldingDetail($holding, $data, $user->getBaseCurrency());
+                sendHoldingDetail($user, $holding, $message['message_id']);
                 $db->update(
                     table: 'users',
                     data: ['progress' => json_encode(['view_holding' => ['holding_id' => $holding['id']]])],
@@ -108,14 +99,7 @@ function handleHoldingsCallback(User $user, array $callback_query, array $messag
             break;
 
         case 'show_all_holdings':
-            $db->update('users', ['progress' => null], ['id' => $user->getId()]);
             sendAllHoldings($user, $db, $message['message_id']);
-            sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
-            exit;
-
-        case 'holdings_list':
-            $db->update('users', ['progress' => null], ['id' => $user->getId()]);
-            sendAllHoldings($user, $db);
             sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
             exit;
 
@@ -176,7 +160,7 @@ function handleHoldingsWebAppData(User $user, array $message, DatabaseManager $d
                         data: ['progress' => json_encode(['view_holding' => ['holding_id' => $holding['id']]])],
                         conditions: ['id' => $user->getId()]
                     );
-                    sendHoldingDetail($holding, $data, $user->getBaseCurrency());
+                    sendHoldingDetail($user, $holding, $message['message_id']);
                 }
                 exit;
             }

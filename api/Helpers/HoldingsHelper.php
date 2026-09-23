@@ -32,32 +32,25 @@ function sendAllHoldings(User $user, DatabaseManager $db, string|int|null $messa
 
     $data = ['chat_id' => $user->getId(), 'rich_message' => ['is_rtl' => true, 'html' => $html]];
     if (!$message_id) sendToTelegram('sendRichMessage', $data);
-    else sendToTelegram('editMessageText', $data);
+    else {
+        $data['message_id'] = $message_id;
+        sendToTelegram('editMessageText', $data);
+    }
 }
 
-function sendHoldingDetail(array $holding, array $data, string $user_base_currency = 'ریال', string|int|null $message_id = null): void
+function sendHoldingDetail(User $user, array $holding, string|int $message_id): void
 {
-
-    array_unshift($data['reply_markup']['keyboard'], [
-        createWebAppBtn(
-            text: '✏ ویرایش ' . beautifulNumber($holding['asset_name'], null),
-            path: '/assets/holding.html',
-            params: ['holding' => base64_encode(json_encode($holding))],
-            add_api: true
-        )
-    ]);
+    $user_base_currency = $user->getBaseCurrency() ?? 'ریال';
 
     $html = createHoldingDetailRichHTML($holding, user_base_currency: $user_base_currency, detail_btn: false);
     $html .= '<hr>';
-    $callback_data = json_encode(['holdings_list' => null]);
+    $callback_data = json_encode(['show_all_holdings' => null]);
     $html .= "<tg-button-row><tg-button type='callback_data' style='primary' data='$callback_data'>" . 'برگشت به لیست دارایی‌ها' . "</tg-button></tg-button-row>";
 
+    $data['chat_id'] = $user->getId();
+    $data['message_id'] = $message_id;
     $data['rich_message'] = ['is_rtl' => true, 'html' => $html];
-
-    if ($message_id) {
-        $data['message_id'] = $message_id;
-        sendToTelegram('editMessageText', $data);
-    } else sendToTelegram('sendRichMessage', $data);
+    sendToTelegram('editMessageText', $data);
 }
 
 function checkAndAddEditHoldingButton(array $data, User $user, DatabaseManager $db): array
@@ -141,7 +134,7 @@ function createHoldingDetailRichHTML(
 {
     $html = '<h3>' . beautifulNumber($holding['asset_name'], null);
     if ($detail_btn) {
-        $callback_data = json_encode(['show_holding' => $holding['id']]);
+        $callback_data = json_encode(['view_holding' => $holding['id']], JSON_UNESCAPED_UNICODE);
         $html .= " <tg-button type='callback_data' style='link' data='$callback_data'>" . 'جزئیات و ویرایش' . '</tg-button>';
     }
     $html .= '</h3>';
