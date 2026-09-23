@@ -4,8 +4,7 @@ function holdings(
     User            $user,
     DatabaseManager $db,
     ?array          $message = null,
-    ?array          $callback_query = null,
-    ?string         $command_data = null): void
+    ?array          $callback_query = null): void
 {
 
     if ($callback_query) {
@@ -57,9 +56,7 @@ function holdings(
 function add_holding(
     User            $user,
     DatabaseManager $db,
-    ?array          $message = null,
-    ?array          $callback_query = null,
-    ?string         $command_data = null): void
+    ?array          $message = null): void
 {
     // Create keyboards
     $user->setButton(new Button(
@@ -70,22 +67,11 @@ function add_holding(
         keyboard: [[['id' => 'holdings', 'text' => '❌ لغو ❌', 'style' => 'danger', 'admin_key' => 0]]]
     ));
 
-    $data = [
-        'chat_id' => $user->getid(),
-        'text' => $user->getButton()->getText(),
-        'reply_markup' => [
-            'keyboard' => $user->getKeyboard(),
-            'resize_keyboard' => true,
-            'is_persistent' => false,
-            'input_field_placeholder' => $user->getButton()->getText()
-        ]
-    ];
-
     // Handle cancel button
     if ($message && $pressed_button_id = getPressedButtonID($message['text'], $user))
         levelHandler($user, $db, button_id: $pressed_button_id);
 
-    addHoldingProgress($user, $data, $message, $db);
+    addHoldingProgress($user, $message, $db);
 
 }
 
@@ -103,7 +89,7 @@ function handleHoldingsCallback(User $user, array $callback_query, array $messag
     switch ($query_key) {
 
         case 'add_holding':
-            addHoldingProgress($user, $data, null, $db);
+            addHoldingProgress($user, null, $db);
             break;
 
         case 'show_holding':
@@ -123,7 +109,7 @@ function handleHoldingsCallback(User $user, array $callback_query, array $messag
 
         case 'show_all_holdings':
             $db->update('users', ['progress' => null], ['id' => $user->getId()]);
-            sendAllHoldings($user, $db,  $message['message_id']);
+            sendAllHoldings($user, $db, $message['message_id']);
             sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
             exit;
 
@@ -268,33 +254,7 @@ function handleHoldingsWebAppData(User $user, array $message, DatabaseManager $d
     exit;
 }
 
-/**
- * Returns true when the user's progress indicates they are in the middle of
- * adding a new holding via the chat step-by-step flow.
- *
- * Supports the flat shape used by the existing starter step:
- *   ['add_holding' => ['asset_type' => null, ...]]
- * and a nested shape if you later adopt parent_btn/data style:
- *   ['data' => ['add_holding' => [...]]]
- */
-function isAddHoldingProgress(?array $progress): bool
-{
-    if (!$progress || !is_array($progress)) {
-        return false;
-    }
-
-    if (array_key_exists('add_holding', $progress)) {
-        return true;
-    }
-
-    if (isset($progress['data']) && is_array($progress['data']) && array_key_exists('add_holding', $progress['data'])) {
-        return true;
-    }
-
-    return false;
-}
-
-function addHoldingProgress(User $user, array $data, ?array $message, DatabaseManager $db): void
+function addHoldingProgress(User $user, ?array $message, DatabaseManager $db): void
 {
     /**
      * Required fields for new holding:
@@ -310,54 +270,64 @@ function addHoldingProgress(User $user, array $data, ?array $message, DatabaseMa
      * it, otherwise adds the holding to the database.
      */
 
+    $data = [
+        'chat_id' => $user->getid(),
+        'reply_markup' => [
+            'keyboard' => $user->getKeyboard(),
+            'resize_keyboard' => true,
+            'is_persistent' => true,
+            'force_reply' => true,
+            'input_field_placeholder' => $user->getButton()->getText()
+        ]
+    ];
+
     $progress = $user->getProgress();
     if (!$progress || !isset($progress['add_holding'])) {
-        askForHoldingAssetType($user, $db);
+        askForHoldingAssetType($user, $data, $db);
     } else {
 
         // Asset Type
-        // TODO: use inline buttons for this part
+        // TODO: Skip this level if asset name is already specified
         if (!isset($progress['add_holding']['asset_type'])) {
-            if (!$message) askForHoldingAssetType($user, $db);
+            if (!$message) askForHoldingAssetType($user, $data, $db);
             if ($message['text'] == 'برگشت به لیست دارایی‌ها') holdings($user, $db);
             $assets = $db->read('assets', ['asset_type' => $message['text']]);
-            if ($assets) $progress['add_holding']['asset_type'] = $message['text'];
-            else askForHoldingAssetType($user, $db, 'پیام نامفهوم بود. لطفاً دسته‌بندی مد نظر را از دکمه‌های زیر انتخاب کنید.');
-            addHoldingProgress($user->setProgress($progress), $data, null, $db);
+            if ($assets) $progress['add_holding']['asset_type'] = $assets[0]['asset_type'];
+            else askForHoldingAssetType($user, $data, $db, 'پیام نامفهوم بود. لطفاً دسته‌بندی مد نظر را از دکمه‌های زیر انتخاب کنید.');
+            addHoldingProgress($user->setProgress($progress), null, $db);
         }
 
         // Asset Name
-        // TODO: use inline buttons for this part
         if (!isset($progress['add_holding']['asset_name'])) {
-            if (!$message) askForHoldingAssetName($user, $progress['add_holding']['asset_type'], $db);
+            if (!$message) askForHoldingAssetName($user, $data, $progress['add_holding']['asset_type'], $db);
             if ($message['text'] == 'لغو') holdings($user, $db);
-            if ($message['text'] == 'برگشت') askForHoldingAssetType($user, $db);
+            if ($message['text'] == 'برگشت') askForHoldingAssetType($user, $data, $db);
             $asset = $db->read('assets', ['name' => $message['text']], true);
-            if ($asset) $progress['add_holding']['asset_name'] = $message['text'];
-            else askForHoldingAssetName($user, $progress['add_holding']['asset_type'], $db, 'پیام نامفهوم بود. لطفاً دارایی مد نظر را از دکمه‌های زیر انتخاب کنید.');
-            addHoldingProgress($user->setProgress($progress), $data, null, $db);
+            if ($asset) $progress['add_holding']['asset_name'] = $asset['name'];
+            else askForHoldingAssetName($user, $data, $progress['add_holding']['asset_type'], $db, 'پیام نامفهوم بود. لطفاً دارایی مد نظر را از دکمه‌های زیر انتخاب کنید.');
+            addHoldingProgress($user->setProgress($progress), null, $db);
         }
 
         // Amount
         if (!isset($progress['add_holding']['amount'])) {
-            if (!$message) askForHoldingAmount($user, $db);
+            if (!$message) askForHoldingAmount($user, $data, $db);
             if ($message['text'] == 'لغو') holdings($user, $db);
-            if ($message['text'] == 'برگشت') askForHoldingAssetName($user, $progress['add_holding']['asset_type'], $db);
-            $is_number = cleanAndValidateNumber($message['text']);
-            if ($is_number) $progress['add_holding']['amount'] = $message['text'];
-            else askForHoldingAmount($user, $db, 'پیام نامفهوم بود. لطفاً مقدار دارایی را به عدد وارد کنید.');
-            addHoldingProgress($user->setProgress($progress), $data, null, $db);
+            if ($message['text'] == 'برگشت') askForHoldingAssetName($user, $data, $progress['add_holding']['asset_type'], $db);
+            $valid_number = cleanAndValidateNumber($message['text']);
+            if ($valid_number) $progress['add_holding']['amount'] = $valid_number;
+            else askForHoldingAmount($user, $data, $db, 'پیام نامفهوم بود. لطفاً مقدار دارایی را به عدد وارد کنید.');
+            addHoldingProgress($user->setProgress($progress), null, $db);
         }
 
         // Average Price
         if (!isset($progress['add_holding']['avg_price'])) {
-            if (!$message) askForHoldingPrice($user, $progress['add_holding']['asset_name'], $db);
+            if (!$message) askForHoldingPrice($user, $data, $progress['add_holding']['asset_name'], $db);
             if ($message['text'] == 'لغو') holdings($user, $db);
-            if ($message['text'] == 'برگشت') askForHoldingAmount($user, $db);
-            $is_number = cleanAndValidateNumber($message['text']);
-            if ($is_number) $progress['add_holding']['avg_price'] = $message['text'];
-            else askForHoldingPrice($user, $progress['add_holding']['asset_name'], $db, 'پیام نامفهوم بود. لطفاً قیمت را به عدد وارد کنید.');
-            addHoldingProgress($user->setProgress($progress), $data, null, $db);
+            if ($message['text'] == 'برگشت') askForHoldingAmount($user, $data, $db);
+            $valid_number = cleanAndValidateNumber($message['text']);
+            if ($valid_number) $progress['add_holding']['avg_price'] = $valid_number;
+            else askForHoldingPrice($user, $data, $progress['add_holding']['asset_name'], $db, 'پیام نامفهوم بود. لطفاً قیمت را به عدد وارد کنید.');
+            addHoldingProgress($user->setProgress($progress), null, $db);
         }
 
         // Add the holding if all the required values are presented
@@ -373,10 +343,8 @@ function addHoldingProgress(User $user, array $data, ?array $message, DatabaseMa
     }
 }
 
-function askForHoldingAssetType(User $user, DatabaseManager $db, ?string $text = null): void
+function askForHoldingAssetType(User $user, array $data, DatabaseManager $db, ?string $text = null): void
 {
-    $data['chat_id'] = $user->getId();
-
     $asset_types = $db->read(
         table: 'assets',
         selectColumns: 'asset_type',
@@ -394,8 +362,8 @@ function askForHoldingAssetType(User $user, DatabaseManager $db, ?string $text =
         $data['reply_markup']['keyboard'] = $keyboard;
         $response = sendToTelegram('sendMessage', $data);
         if ($response) {
-            $progress = ['add_holding' => ['asset_type' => null]];
-            $db->update('users', ['button' => json_encode($user->getButton()), 'progress' => json_encode($progress)], ['id' => $user->getId()]);
+            $user->setProgress(['add_holding' => ['asset_type' => null]]);
+            $db->update('users', $user->toDbArray(), ['id' => $user->getId()]);
         }
     } else {
         $data['text'] = 'دسته‌بندی‌ای در سیستم یافت نشد!';
@@ -404,19 +372,14 @@ function askForHoldingAssetType(User $user, DatabaseManager $db, ?string $text =
     exit();
 }
 
-function askForHoldingAssetName(User            $user,
-                                string          $asset_type,
-                                DatabaseManager $db,
-                                ?string         $text = null): void
+function askForHoldingAssetName(User $user, array $data, string $asset_type, DatabaseManager $db, ?string $text = null): void
 {
-    $data['chat_id'] = $user->getId();
-
     $assets = $db->read('assets', ['asset_type' => $asset_type]);
     if ($assets) {
 
         $keyboard[] = [
             ['text' => 'برگشت', 'style' => 'primary'],
-            ['text' => 'لغو', 'style' => 'danger'],
+            ['text' => 'لغو', 'style' => 'danger']
         ];
         foreach ($assets as $asset) array_unshift($keyboard, [['text' => $asset['name']]]);
 
@@ -426,7 +389,7 @@ function askForHoldingAssetName(User            $user,
         if ($response) {
             $progress = $user->getProgress();
             $progress['add_holding']['asset_name'] = null;
-            $db->update('users', ['progress' => json_encode($progress)], ['id' => $user->getId()]);
+            $db->update('users', ['progress' => json_encode($progress, JSON_PRETTY_PRINT)], ['id' => $user->getId()]);
         }
     } else {
         $data['text'] = 'این دسته‌بندی خالی‌ست!';
@@ -435,13 +398,9 @@ function askForHoldingAssetName(User            $user,
     exit();
 }
 
-function askForHoldingAmount(User            $user,
-                             DatabaseManager $db,
-                             ?string         $text = null): void
+function askForHoldingAmount(User $user, array $data, DatabaseManager $db, ?string $text = null): void
 {
-    $data['chat_id'] = $user->getId();
     $data['text'] = $text ?? 'مقدار دارایی را به عدد وارد کنید:';
-    $data['reply_markup']['resize_keyboard'] = true;
     $data['reply_markup']['keyboard'] = [[
         ['text' => 'برگشت', 'style' => 'primary'],
         ['text' => 'لغو', 'style' => 'danger'],
@@ -450,26 +409,23 @@ function askForHoldingAmount(User            $user,
     if ($response) {
         $progress = $user->getProgress();
         $progress['add_holding']['amount'] = null;
-        $db->update('users', ['progress' => json_encode($progress)], ['id' => $user->getId()]);
+        $db->update('users', ['progress' => json_encode($progress, JSON_PRETTY_PRINT)], ['id' => $user->getId()]);
     }
     exit();
 }
 
-function askForHoldingPrice(User            $user,
-                            string          $asset_name,
-                            DatabaseManager $db,
-                            ?string         $text = null): void
+function askForHoldingPrice(User $user, array $data, string $asset_name, DatabaseManager $db, ?string $html = null): void
 {
-    $data['chat_id'] = $user->getId();
-
     $asset = $db->read('assets', ['name' => $asset_name], true);
     if ($asset) {
 
         $name = beautifulNumber($asset['name'], null);
-        $price = beautifulNumber($asset['price']);
+        $price = beautifulNumber($asset['price'], delimiter: '،');
+        $base = beautifulNumber($asset['base_currency'], null);
 
-        $data['text'] = $text ?? 'میانگین قیمت خرید دارایی را به عدد وارد کنید:' . "\n" .
-        'قیمت کنونی «' . $name . '»: ' . $price;
+        $data['rich_message']['html'] = $html ??
+            ('میانگین قیمت خرید دارایی را به عدد وارد کنید:' . "<br>" .
+                'قیمت کنونی ' . "«{$name}»: <b>$price</b> $base");
         $data['reply_markup']['resize_keyboard'] = true;
         $data['reply_markup']['keyboard'] = [
             [
@@ -478,11 +434,11 @@ function askForHoldingPrice(User            $user,
                 ['text' => 'برگشت', 'style' => 'primary'],
                 ['text' => 'لغو', 'style' => 'danger'],
             ]];
-        $response = sendToTelegram('sendMessage', $data);
+        $response = sendToTelegram('sendRichMessage', $data);
         if ($response) {
             $progress = $user->getProgress();
             $progress['add_holding']['avg_price'] = null;
-            $db->update('users', ['progress' => json_encode($progress)], ['id' => $user->getId()]);
+            $db->update('users', ['progress' => json_encode($progress, JSON_PRETTY_PRINT)], ['id' => $user->getId()]);
         }
     } else {
         $data['text'] = 'این گزینه در دیتابیس وجود ندارد!';

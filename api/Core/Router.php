@@ -84,7 +84,7 @@ function levelHandler(
 
     if ($button_id == 'main_menu') mainMenu(user: $user, db: $db, message: $message);
     if ($button_id == 'holdings') holdings(user: $user, db: $db, message: $message, callback_query: $callback_query);
-    if ($button_id == 'add_new_holding') add_holding(user: $user, db: $db, message: $message, callback_query: $callback_query);
+    if ($button_id == 'add_new_holding') add_holding(user: $user, db: $db, message: $message);
 
     exit('Unhandled message. ' . ($message && isset($message['text']) ? "Message text: $message[text]" : "Normal button id: $button_id"));
 }
