@@ -102,7 +102,7 @@ function beautifulNumber(string $text, string|null $delimiter = ',', bool $persi
         }
 
         // 3. Convert the cleaned string to a float and use PHP's number_format.
-        $numberAsFloat = (float)$cleanedNumberString;
+        $numberAsFloat = $cleanedNumberString;
         // Use number_format(number, decimals, dec_point, thousands_sep)
         $beautifiedNumber = number_format($numberAsFloat, $decimals, '.', $delimiter);
     } else $beautifiedNumber = $text;
