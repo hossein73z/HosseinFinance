@@ -1,62 +1,54 @@
 <?php
 
-function level_8(
+function alerts_menu(
     User            $user,
     DatabaseManager $db,
-    ?Button         $level_button = null,
     ?array          $message = null,
     ?array          $callback_query = null): void
 {
-    // Create keyboards
-    $level_button = $level_button ?: $user->getButton();
-    $keyboard = refineKeyboardForTelegram($level_button->getKeyboard());
+
+    if ($callback_query) {
+        managePriceAlerts($user, $callback_query, $message, $db);
+    } elseif (!$message) {
+        $user->setProgress(null);
+        $user->setButton(new Button(
+            id: 'alerts',
+            attrs: ['text' => '🔔 هشدارها'],
+            adminKey: false,
+            belongTo: 'main_menu',
+            keyboard: [[['id' => 'main_menu', 'text' => '🔙 برگشت 🔙', 'style' => 'primary', 'admin_key' => 0]]]
+        ));
+    } else {
+
+        // Received message is a button
+        if ($pressed_button_id = getPressedButtonID($message['text'], $user))
+            levelHandler($user, $db, button_id: $pressed_button_id);
+
+        else {
+            // Received text is an awaited alert price
+            handleAlertPriceInput($user, $message, $db);
+
+            // Received message is not recognizable
+            $data['text'] = 'پیام نامفهوم است.';
+        }
+    }
 
     $data = [
         'chat_id' => $user->getid(),
-        'text' => $level_button->getText(),
+        'text' => $data['text'] ?? $user->getButton()->getText(),
         'reply_markup' => [
-            'keyboard' => $keyboard,
+            'keyboard' => $data['reply_markup']['keyboard'] ?? $user->getKeyboard(),
             'resize_keyboard' => true,
-            'is_persistent' => false,
-            'input_field_placeholder' => $level_button->getText()
+            'is_persistent' => true,
+            'input_field_placeholder' => $user->getButton()->getText()
         ]
     ];
 
-    if ($callback_query) handleAlertsCallback($user, $message);
-    if ($message) handleAlertsTextMessage($data);
-
-    // Send initial message
     $response = sendToTelegram('sendMessage', $data);
-
-    // Update user's level and progress
-    if ($response) {
-        $db->update('users', ['button' => json_encode($level_button), 'progress' => null], ['id' => $user->getId()]);
-
-        // Send Informative message
-        sendAllAlerts($user, $db);
-    }
-
-    exit;
-}
-
-function handleAlertsCallback(User $user, array $message): void
-{
-    $data = [
-        'chat_id' => $user->getid(),
-        'message_id' => $message['message_id'],
-        'text' => 'این پیام منقضی شده است.'
-    ];
-
-    sendToTelegram('editMessageText', $data);
-    exit;
-}
-
-function handleAlertsTextMessage(array $data): void
-{
-    // Send default message of this level
-    $data['text'] = 'پیام نامفهوم است!';
-    sendToTelegram('sendMessage', $data);
-    exit;
+    if ($response)
+        $db->update('users', ['button' => json_encode($user->getButton()), 'progress' => null], ['id' => $user->getId()]);
+    if (!$message) sendAllAlerts($user, $db);
+    exit($user->getButton()->getText());
 }
 
 function sendAllAlerts(User $user, DatabaseManager $db, int|string|null $message_id = null): void
@@ -192,19 +184,6 @@ function sendAssetAlerts(User $user, DatabaseManager $db, string|int $asset_id, 
 }
 
 /**
- * Returns true when the user's progress indicates we are waiting for an alert target price.
- */
-function isAlertPriceProgress(?array $progress): bool
-{
-    if (!$progress || !isset($progress['data']) || !is_array($progress['data'])) {
-        return false;
-    }
-
-    $key = array_key_first($progress['data']);
-    return in_array($key, ['new_alert_price', 'edit_alert_price', 'new_asset_alert', 'edit_asset_alert'], true);
-}
-
-/**
  * Ask the user for the alert target price using ForceReply (keeps current reply keyboard).
  */
 function askForAlertPrice(User $user, array $asset): void
@@ -220,10 +199,12 @@ function askForAlertPrice(User $user, array $asset): void
         'text' => $text,
         'parse_mode' => 'MarkdownV2',
         'reply_markup' => [
+            'keyboard' => $user->getKeyboard(),
+            'resize_keyboard' => true,
+            'is_persistent' => true,
             'force_reply' => true,
-            'input_field_placeholder' => 'قیمت هشدار را وارد کنید',
-            'selective' => true,
-        ],
+            'input_field_placeholder' => 'قیمت هشدار را وارد کنید' # HACK
+        ]
     ]);
 }
 
@@ -231,40 +212,31 @@ function askForAlertPrice(User $user, array $asset): void
  * Process a text message that is expected to be an alert target price.
  * Called from nonButtonHandler when isAlertPriceProgress() is true.
  */
-function handleAlertPriceInput(User $user, array $message, DatabaseManager $db): void
+function handleAlertPriceInput(User $user, array $message, DatabaseManager $db): null
 {
     $progress = $user->getProgress();
-    if (!$progress || !isAlertPriceProgress($progress)) {
-        return;
-    }
+    if (!$progress) return null;
 
-    $parent_btn_id = $progress['parent_btn'] ?? $user->getButtonId();
-    $progress_data = $progress['data'];
-    $progress_key = array_key_first($progress_data);
+    $progress_key = array_key_first($progress);
+    if (!in_array($progress_key, ['new_alert_price', 'edit_alert_price', 'new_asset_alert', 'edit_asset_alert'], true))
+        return null;
 
-    // Allow user to cancel via the Cancel reply button (s1)
-    $pressed_button = $db->read('buttons', ['id' => 's1', 'attrs->>"$.text"' => $message['text'] ?? '']);
-    if ($pressed_button) {
-        cancelButton($user, $db, $parent_btn_id);
-        return;
-    }
-
-    // Resolve the related asset (and alert_id when editing)
+    // Resolve the related asset (and `alert_id` when editing)
     $alert_id = null;
     if ($progress_key === 'new_alert_price') {
-        $asset_id = $progress_data['new_alert_price']['asset_id'];
+        $asset_id = $progress[$progress_key]['asset_id'];
         $asset = $db->read('assets', ['id' => $asset_id], true);
     } elseif ($progress_key === 'edit_alert_price') {
-        $alert_id = $progress_data['edit_alert_price']['alert_id'];
+        $alert_id = $progress[$progress_key]['alert_id'];
         $asset = $db->query("
             SELECT assets.*
             FROM assets JOIN alerts ON alerts.asset_name = assets.name
             WHERE alerts.user_id = '{$user->getId()}' AND alerts.id = '$alert_id'")->fetch();
     } elseif ($progress_key === 'new_asset_alert') {
-        $asset_id = $progress_data['new_asset_alert']['asset_id'];
+        $asset_id = $progress[$progress_key]['asset_id'];
         $asset = $db->read('assets', ['id' => $asset_id], true);
     } else { // edit_asset_alert
-        $alert_id = $progress_data['edit_asset_alert']['alert_id'];
+        $alert_id = $progress[$progress_key]['alert_id'];
         $asset = $db->query("
             SELECT assets.*
             FROM assets JOIN alerts ON alerts.asset_name = assets.name
@@ -276,8 +248,7 @@ function handleAlertPriceInput(User $user, array $message, DatabaseManager $db):
             'chat_id' => $user->getId(),
             'text' => '❌ دارایی مورد نظر یافت نشد.',
         ]);
-        cancelButton($user, $db, $parent_btn_id);
-        return;
+        levelHandler($user, $db, button_id: 'main_menu'); # HACK
     }
 
     $target_price = cleanAndValidateNumber($message['text'] ?? '');
@@ -287,10 +258,12 @@ function handleAlertPriceInput(User $user, array $message, DatabaseManager $db):
             'chat_id' => $user->getId(),
             'text' => "پیام نامفهوم بود.\nقیمت را به عدد بنویسید یا در صورت انصراف از دکمه لغو استفاده کنید.",
             'reply_markup' => [
+                'keyboard' => $user->getKeyboard(),
+                'resize_keyboard' => true,
+                'is_persistent' => true,
                 'force_reply' => true,
-                'input_field_placeholder' => 'قیمت هشدار را وارد کنید',
-                'selective' => true,
-            ],
+                'input_field_placeholder' => 'قیمت هشدار را وارد کنید', # HACK
+            ]
         ]);
         exit;
     }
@@ -303,15 +276,18 @@ function handleAlertPriceInput(User $user, array $message, DatabaseManager $db):
             'chat_id' => $user->getId(),
             'text' => "قیمت هشدار نمی‌تواند با قیمت کنونی برابر باشد.\nقیمت دیگری بنویسید یا در صورت انصراف از دکمه لغو استفاده کنید.",
             'reply_markup' => [
+                'keyboard' => $user->getKeyboard(),
+                'resize_keyboard' => true,
+                'is_persistent' => true,
                 'force_reply' => true,
-                'input_field_placeholder' => 'قیمت هشدار را وارد کنید',
-                'selective' => true,
-            ],
+                'input_field_placeholder' => 'قیمت هشدار را وارد کنید', # HACK
+            ]
         ]);
         exit;
     }
 
     $new_alert = [
+        'id' => $alert_id,
         'user_id' => $user->getId(),
         'asset_name' => $asset['name'],
         'target_price' => $target_price,
@@ -319,9 +295,6 @@ function handleAlertPriceInput(User $user, array $message, DatabaseManager $db):
         'created_date' => JalaliDate::fromGregorian()->format(),
         'created_time' => date('H:i'),
     ];
-    if ($alert_id !== null) {
-        $new_alert['id'] = $alert_id;
-    }
 
     $result = $db->upsert('alerts', $new_alert);
 
@@ -336,13 +309,13 @@ function handleAlertPriceInput(User $user, array $message, DatabaseManager $db):
         $text = '❌ خطای پایگاه داده!';
     }
 
-    sendToTelegram('sendMessage', [
-        'chat_id' => $user->getId(),
-        'text' => $text,
-    ]);
+    sendToTelegram('sendMessage', ['chat_id' => $user->getId(), 'text' => $text, 'reply_markup' => ['remove_keyboard' => true]]);
 
-    // Clear progress and return to the parent view
-    cancelButton($user, $db, $parent_btn_id);
+    if ($progress_key == 'new_alert_price') levelHandler($user, $db, button_id: 'alerts');
+    if ($progress_key == 'edit_alert_price') levelHandler($user, $db, button_id: 'alerts');
+    if ($progress_key == 'new_asset_alert') levelHandler($user, $db, button_id: 'prices');
+    if ($progress_key == 'edit_asset_alert') levelHandler($user, $db, button_id: 'prices');
+    exit();
 }
 
 function managePriceAlerts(User $user, array $callback_query, array $message, DatabaseManager $db): void
@@ -353,9 +326,9 @@ function managePriceAlerts(User $user, array $callback_query, array $message, Da
         'text' => 'این پیام منقضی شده است.'
     ];
 
-    $query_data = $callback_query['data'];
-
+    $query_data = json_decode(html_entity_decode($callback_query['data'], ENT_QUOTES, 'UTF-8'), true);
     $query_key = array_key_first($query_data);
+
     switch ($query_key) {
 
         // Add or remove alerts
@@ -430,13 +403,13 @@ function managePriceAlerts(User $user, array $callback_query, array $message, Da
                 }
             }
 
-            sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
             sendToTelegram('editMessageText', $data);
+            sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
             exit;
 
         // Show list of asset to select for new alert
-        case 'fav_alert': // ------- Request from favorites message
-        case 'new_alert_type': // -- Request from alert manager message
+        case 'fav_alert': # ─────── Request from favorites message
+        case 'new_alert_type': # ── Request from alert manager message
 
             if ($query_key == 'fav_alert') {
                 $data['reply_markup']['inline_keyboard'] = [[
@@ -467,38 +440,45 @@ function managePriceAlerts(User $user, array $callback_query, array $message, Da
                 );
             } else $data['text'] = 'دسته‌بندی مورد نظر خالی‌ست!';
 
-            sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
             sendToTelegram('editMessageText', $data);
+            sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
             exit;
 
         // Ask for alert price via ForceReply (no empty level / s3)
-        case 'new_alert_asset_id': // -- Add price for new alert, -- from main alerts menu and favorites' message
-        case 'edit_alert_price': // ---- Edit price of an alert, --- from main alerts menu
-        case 'new_asset_alert': // ----- Add price for new alert, -- from favorites' alert menu
-        case 'edit_asset_alert': // ---- Edit price of an alert, --- from favorites' alert menu
+        case 'new_alert_asset_id': # ── Add price for new alert, ── from main alerts menu and favorites' message
+        case 'edit_alert_price': # ──── Edit price of an alert, ─── from main alerts menu
+        case 'new_asset_alert': # ───── Add price for new alert, ── from favorites' alert menu
+        case 'edit_asset_alert': # ──── Edit price of an alert, ─── from favorites' alert menu
 
-            sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
             sendToTelegram('deleteMessage', ['chat_id' => $user->getid(), 'message_id' => $message['message_id']]);
 
             $item_id = $query_data[$query_key];
             if ($query_key == 'new_alert_asset_id') {
-                $progress_data = ['new_alert_price' => ['asset_id' => $item_id]];
+                $user->setKeyboard([[['id' => 'alerts', 'text' => '❌ لغو ❌', 'style' => 'danger', 'admin_key' => 0]]]);
+                $progress = ['new_alert_price' => ['asset_id' => $item_id]];
                 $asset = $db->read('assets', ['id' => $item_id], true);
+
             } elseif ($query_key == 'edit_alert_price') {
-                $progress_data = ['edit_alert_price' => ['alert_id' => $item_id]];
+                $user->setKeyboard([[['id' => 'alerts', 'text' => '❌ لغو ❌', 'style' => 'danger', 'admin_key' => 0]]]);
+                $progress = ['edit_alert_price' => ['alert_id' => $item_id]];
                 $asset = $db->query("
                     SELECT assets.*
                     FROM assets JOIN alerts ON alerts.asset_name = assets.name
                     WHERE alerts.user_id = '{$user->getId()}' AND alerts.id = '$item_id'")->fetch();
+
             } elseif ($query_key == 'new_asset_alert') {
-                $progress_data = ['new_asset_alert' => ['asset_id' => $item_id]];
+                $user->setKeyboard([[['id' => 'prices', 'text' => '❌ لغو ❌', 'style' => 'danger', 'admin_key' => 0]]]);
+                $progress = ['new_asset_alert' => ['asset_id' => $item_id]];
                 $asset = $db->read('assets', ['id' => $item_id], true);
+
             } else {
-                $progress_data = ['edit_asset_alert' => ['alert_id' => $item_id]];
+                $user->setKeyboard([[['id' => 'prices', 'text' => '❌ لغو ❌', 'style' => 'danger', 'admin_key' => 0]]]);
+                $progress = ['edit_asset_alert' => ['alert_id' => $item_id]];
                 $asset = $db->query("
                     SELECT assets.*
                     FROM assets JOIN alerts ON alerts.asset_name = assets.name
                     WHERE alerts.user_id = '{$user->getId()}' AND alerts.id = '$item_id'")->fetch();
+
             }
 
             if (!$asset) {
@@ -509,19 +489,15 @@ function managePriceAlerts(User $user, array $callback_query, array $message, Da
                 exit;
             }
 
-            $progress = [
-                'parent_btn' => $user->getButtonId(),
-                'data' => $progress_data,
-            ];
             $user->setProgress($progress);
-            $db->update('users', ['progress' => json_encode($progress)], ['id' => $user->getId()]);
+            $db->update('users', $user->toDbArray(), ['id' => $user->getId()]);
 
             askForAlertPrice($user, $asset);
             exit;
 
         // Ask user to confirm deleting alert
-        case 'del_alert': // -------- Request from main alerts' message
-        case 'del_asset_alert': // -- Request from favorites message
+        case 'del_alert': # ──────── Request from main alerts' message
+        case 'del_asset_alert': # ── Request from favorites message
 
             // Query structure due to length limitation: [query_key => [alert_id => asset_id]]
             $alert_id = array_key_first($query_data[$query_key]);

@@ -42,6 +42,7 @@ function handleIncomingMessage(array $message, DatabaseManager $db): void
     // Levels' Main Commands
     if ($text === '/start') mainMenu($user, $db);
     if ($text === '/holdings') holdings_menu($user, $db);
+    if ($text === '/alerts') alerts_menu($user, $db);
 
     levelHandler($user, $db, $message);
 }
@@ -85,6 +86,7 @@ function levelHandler(
     if ($button_id == 'main_menu') mainMenu(user: $user, db: $db, message: $message, callback_query: $callback_query);
     if ($button_id == 'holdings') holdings_menu(user: $user, db: $db, message: $message, callback_query: $callback_query);
     if ($button_id == 'add_new_holding') add_holding_menu(user: $user, db: $db, message: $message, callback_query: $callback_query);
+    if ($button_id == 'alerts') alerts_menu(user: $user, db: $db, message: $message, callback_query: $callback_query);
 
     exit('Unhandled message. ' . ($message && isset($message['text']) ? "message_text=\"$message[text]\"" : "button_id=\"$button_id\""));
 }
