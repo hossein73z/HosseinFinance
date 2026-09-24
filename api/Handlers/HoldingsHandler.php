@@ -1,6 +1,6 @@
 <?php
 
-function holdings(
+function holdings_menu(
     User            $user,
     DatabaseManager $db,
     ?array          $message = null,
@@ -53,40 +53,6 @@ function holdings(
     exit($user->getButton()->getText());
 }
 
-function add_holding(
-    User            $user,
-    DatabaseManager $db,
-    ?array          $message = null): void
-{
-
-    // Handle back and cancel buttons
-    if ($message && $pressed_button_id = getPressedButtonID($message['text'], $user))
-        switch ($pressed_button_id) {
-            case 'back':
-                $progress = $user->getProgress();
-                $progress_key = array_key_first($progress);
-                unset($progress[$progress_key][array_key_first($progress[$progress_key])]); // TODO: Clean this
-                $user->setProgress($progress);
-                addHoldingProgress($user, null, $db);
-                break;
-            default:
-                levelHandler($user, $db, button_id: $pressed_button_id);
-                break;
-        }
-    elseif (!$message) {
-        $user->setButton(new Button(
-            id: 'add_new_holding',
-            attrs: ['text' => 'افزودن دارایی جدید'],
-            adminKey: false,
-            belongTo: 'main_menu',
-            keyboard: []
-        ));
-    }
-
-    addHoldingProgress($user, $message, $db);
-
-}
-
 function handleHoldingsCallback(User $user, array $callback_query, array $message, DatabaseManager $db): void
 {
 
@@ -102,7 +68,7 @@ function handleHoldingsCallback(User $user, array $callback_query, array $messag
             if ($holding) {
                 sendHoldingDetail($user, $holding, $message['message_id'], is_editing: $query_key === 'edit_holding');
                 sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
-                exit;
+                exit(($query_key == 'view_holding' ? 'View' : 'Edit') . " holding: id=$holding_id asset_name=\"$holding[asset_name]\"");
             }
             break;
 
@@ -120,10 +86,8 @@ function handleHoldingsCallback(User $user, array $callback_query, array $messag
                 if ($query_key != 'edit_holding_amount') $progress['edit_holding']['amount'] = $holding['amount'];
                 $progress['edit_holding']['holding_id'] = $holding['id'];
 
-                add_holding($user->setProgress($progress), $db);
-
-                sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
-                exit;
+                sendToTelegram('deleteMessage', ['chat_id' => $user->getId(), 'message_id' => $message['message_id']]);
+                add_holding_menu($user->setProgress($progress), $db);
             }
             break;
 
@@ -267,6 +231,45 @@ function handleHoldingsWebAppData(User $user, array $message, DatabaseManager $d
     exit;
 }
 
+function add_holding_menu(
+    User            $user,
+    DatabaseManager $db,
+    ?array          $message = null,
+    ?array          $callback_query = null): void
+{
+
+    if ($callback_query) {
+        sendToTelegram('deleteMessage', ['chat_id' => $user->getId(), 'message_id' => $message['message_id']]);
+        sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id'], 'text' => 'این پیام منقضی شده است!']);
+        exit('Expired callback query.');
+    } elseif ($message && $pressed_button_id = getPressedButtonID($message['text'], $user))
+        switch ($pressed_button_id) {
+            case 'back':
+                $progress = $user->getProgress();
+                $progress_key = array_key_first($progress);
+                unset($progress[$progress_key][array_key_first($progress[$progress_key])]); // TODO: Clean this
+                $user->setProgress($progress);
+                addHoldingProgress($user, null, $db);
+                break;
+            default:
+                levelHandler($user, $db, button_id: $pressed_button_id);
+                break;
+        }
+    elseif (!$message) {
+        $user->setButton(new Button(
+            id: 'add_new_holding',
+            attrs: ['text' => 'افزودن دارایی جدید'],
+            adminKey: false,
+            belongTo: 'main_menu',
+            keyboard: []
+        ));
+    }
+
+    addHoldingProgress($user, $message, $db);
+
+}
+
+
 function addHoldingProgress(User $user, ?array $message, DatabaseManager $db): void
 {
     /**
@@ -290,7 +293,7 @@ function addHoldingProgress(User $user, ?array $message, DatabaseManager $db): v
             'resize_keyboard' => true,
             'is_persistent' => true,
             'force_reply' => true,
-            'input_field_placeholder' => $user->getButton()->getText()
+            'input_field_placeholder' => $user->getButton()->getText() // TODO: Write a different text for each level
         ]
     ];
 
@@ -382,10 +385,12 @@ function askForHoldingAssetName(User $user, array $data, string $asset_type, Dat
     $assets = $db->read('assets', ['asset_type' => $asset_type]);
     if ($assets) {
 
-        $keyboard = [[
-            ['id' => 'back', 'text' => '🔙 برگشت 🔙', 'style' => 'primary', 'admin_key' => 0],
-            ['id' => 'holdings', 'text' => '❌ لغو ❌', 'style' => 'danger', 'admin_key' => 0],
-        ]];
+        $keyboard = [
+            array_key_first($user->getProgress()) == 'edit_holding' ?
+                [['id' => 'holdings', 'text' => '❌ لغو ❌', 'style' => 'danger', 'admin_key' => 0]] :
+                [['id' => 'back', 'text' => '🔙 برگشت 🔙', 'style' => 'primary', 'admin_key' => 0],
+                    ['id' => 'holdings', 'text' => '❌ لغو ❌', 'style' => 'danger', 'admin_key' => 0],]
+        ];
         foreach ($assets as $asset) array_unshift($keyboard, [['text' => $asset['name']]]);
 
         $data['text'] = $text ?? 'دارایی مورد نظر را از دکمه‌های زیر انتخاب کنید:';
@@ -404,10 +409,12 @@ function askForHoldingAssetName(User $user, array $data, string $asset_type, Dat
 
 function askForHoldingAmount(User $user, array $data, DatabaseManager $db, ?string $text = null): void
 {
-    $keyboard = [[
-        ['id' => 'back', 'text' => '🔙 برگشت 🔙', 'style' => 'primary', 'admin_key' => 0],
-        ['id' => 'holdings', 'text' => '❌ لغو ❌', 'style' => 'danger', 'admin_key' => 0],
-    ]];
+    $keyboard = [
+        array_key_first($user->getProgress()) == 'edit_holding' ?
+            [['id' => 'holdings', 'text' => '❌ لغو ❌', 'style' => 'danger', 'admin_key' => 0]] :
+            [['id' => 'back', 'text' => '🔙 برگشت 🔙', 'style' => 'primary', 'admin_key' => 0],
+                ['id' => 'holdings', 'text' => '❌ لغو ❌', 'style' => 'danger', 'admin_key' => 0],]
+    ];
 
     $data['text'] = $text ?? 'مقدار دارایی را به عدد وارد کنید:';
     $data['reply_markup']['keyboard'] = $keyboard;
@@ -435,13 +442,18 @@ function askForHoldingPrice(User $user, array $data, string $asset_name, Databas
         $keyboard = [
             [
                 ['text' => $price]
-            ], [
-                ['id' => 'back', 'text' => '🔙 برگشت 🔙', 'style' => 'primary', 'admin_key' => 0],
-                ['id' => 'holdings', 'text' => '❌ لغو ❌', 'style' => 'danger', 'admin_key' => 0],
-            ]];
+            ],
+            array_key_first($user->getProgress()) == 'edit_holding' ?
+                [['id' => 'holdings', 'text' => '❌ لغو ❌', 'style' => 'danger', 'admin_key' => 0]] :
+                [
+                    ['id' => 'back', 'text' => '🔙 برگشت 🔙', 'style' => 'primary', 'admin_key' => 0],
+                    ['id' => 'holdings', 'text' => '❌ لغو ❌', 'style' => 'danger', 'admin_key' => 0]
+                ]
+        ];
         $data['reply_markup']['keyboard'] = $keyboard;
         $response = sendToTelegram('sendRichMessage', $data);
         if ($response) {
+            $user->setKeyboard($keyboard);
             $db->update('users', $user->toDbArray(), ['id' => $user->getId()]);
         }
     } else {
@@ -458,7 +470,7 @@ function upsertHolding(User $user, array $holding, array $data, DatabaseManager 
         if (!$asset) {
             $data['text'] = '❌ دارایی انتخاب شده پیدا نشد.';
             sendToTelegram('sendMessage', $data);
-            holdings($user, $db);
+            holdings_menu($user, $db);
         }
 
         $db->upsert('holdings', $holding);
@@ -474,5 +486,5 @@ function upsertHolding(User $user, array $holding, array $data, DatabaseManager 
     sendToTelegram('sendMessage', $data);
 
     // Redirect user to view all holdings
-    holdings($user, $db);
+    holdings_menu($user, $db);
 }

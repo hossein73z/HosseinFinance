@@ -4,10 +4,14 @@ function mainMenu(
     User            $user,
     DatabaseManager $db,
     ?array          $message = null,
-): void
+    ?array          $callback_query = null): void
 {
 
-    if (!$message) { // Just entered the Level
+    if ($callback_query) {
+        sendToTelegram('deleteMessage', ['chat_id' => $user->getId(), 'message_id' => $message['message_id']]);
+        sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id'], 'text' => 'این پیام منقضی شده است!']);
+        exit('Expired callback query.');
+    } elseif (!$message) { // Just entered the Level
         $user->setProgress(null);
         $user->setButton(new Button(
             id: 'main_menu',
@@ -19,10 +23,11 @@ function mainMenu(
                     ['id' => 'holdings', 'text' => '💼 دارایی‌ها', 'admin_key' => 0],
                     ['id' => 'loans', 'text' => '🏦 وام و اقساط', 'admin_key' => 0]
                 ], [
+                    ['id' => 'prices', 'text' => '💰 قیمت‌ها', 'admin_key' => 0],
+                    ['id' => 'alerts', 'text' => '🔔 هشدارها', 'admin_key' => 0],
+                ], [
                     ['id' => 'accounts', 'text' => '🧾 حساب‌ها', 'admin_key' => 0],
                     ['id' => 'transactions', 'text' => '🔃 تراکنش‌ها', 'admin_key' => 0]
-                ], [
-                    ['id' => 'tools', 'text' => '🛠 ابزارها', 'admin_key' => 0]
                 ], [
                     ['id' => 'administration', 'text' => '👑 بخش مدیریت', 'style' => 'danger', 'admin_key' => 1],
                     ['id' => 'settings', 'text' => '⚙ تنظیمات', 'style' => 'primary', 'admin_key' => 0]

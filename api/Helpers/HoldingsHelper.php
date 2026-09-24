@@ -67,15 +67,15 @@ function sendHoldingDetail(User $user, array $holding, string|int $message_id, b
         $html .= '<tg-button-row>';
 
         // note
-        $edit_callback = json_encode(['edit_holding_note' => $holding['id']]);
+//        $edit_callback = json_encode(['edit_holding_note' => $holding['id']]);
         $html .= "<tg-button type='disabled'>" . 'یادداشت' . "</tg-button>";
 
         // date
-        $edit_callback = json_encode(['edit_holding_date' => $holding['id']]);
+//        $edit_callback = json_encode(['edit_holding_date' => $holding['id']]);
         $html .= "<tg-button type='disabled'>" . 'تاریخ' . "</tg-button>";
 
         // time
-        $edit_callback = json_encode(['edit_holding_time' => $holding['id']]);
+//        $edit_callback = json_encode(['edit_holding_time' => $holding['id']]);
         $html .= "<tg-button type='disabled'>" . 'ساعت' . "</tg-button>";
 
         $html .= '</tg-button-row>';

@@ -94,7 +94,7 @@ function getPressedButton(string $text, User $user, DatabaseManager $db): ?Butto
     return $pressed_button_id == null ? null : getStructuredButton($pressed_button_id, $user->isAdmin(), $db);
 }
 
-function getPressedButtonID(string $text, User $user): ?string
+function getPressedButtonID(?string $text, User $user): ?string
 {
 
     $keyboard = $user->getKeyboard();
