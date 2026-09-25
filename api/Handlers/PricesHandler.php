@@ -1,62 +1,70 @@
 <?php
 
-function level_5(
+function prices_menu(
     User            $user,
     DatabaseManager $db,
-    ?Button         $level_button = null,
     ?array          $message = null,
     ?array          $callback_query = null): void
 {
-    // Create keyboards
-    $level_button = $level_button ?: $user->getButton();
-    $keyboard = refineKeyboardForTelegram($level_button->getKeyboard());
+
+    if ($callback_query) {
+        handlePricesCallback($user, $callback_query, $message, $db);
+    } else {
+        $assets = $db->read(table: 'assets', orderBy: ['asset_type' => 'DESC']);
+        $asset_types = array_values(array_unique(array_column($assets, 'asset_type')));
+
+        if (!$message) {
+
+            $keyboard = [
+                [['id' => 'favorites', 'text' => '❤ علاقه‌مندی‌ها ❤', 'style' => 'success', 'admin_key' => 0]],
+                [['id' => 'main_menu', 'text' => '🔙 برگشت 🔙', 'style' => 'primary', 'admin_key' => 0]],
+            ];
+            foreach ($asset_types as $asset_type) array_unshift($keyboard, [['text' => $asset_type]]);
+
+            $user->setProgress(null);
+            $user->setButton(new Button(
+                id: 'prices',
+                attrs: ['text' => '💰 قیمت‌ها'],
+                adminKey: false,
+                belongTo: 'main_menu',
+                keyboard: $keyboard
+            ));
+        } elseif ($pressed_button_id = getPressedButtonID($message['text'], $user)) {
+            levelHandler($user, $db, button_id: $pressed_button_id);
+        } else {
+            if (in_array($message['text'], $asset_types)) {
+
+                $base_prices = CreateNamePricePairs(array_merge($asset_types, [$user->getBaseCurrency()]), $db);
+
+                if ($assets) $data['text'] = createPricesTextForSingleAssetType($assets, $base_prices, $user->getBaseCurrency());
+                else $data['text'] = 'این دسته بندی خالی‌ست!';
+
+            } else $data['text'] = 'پیام نامفهوم است!' . "\n" . 'یکی از دسته‌بندی‌های زیر را انتخاب کنید:';
+        }
+    }
 
     $data = [
         'chat_id' => $user->getid(),
-        'text' => $level_button->getText(),
+        'text' => $data['text'] ?? $user->getButton()->getText(),
         'reply_markup' => [
-            'keyboard' => $keyboard,
+            'keyboard' => $data['reply_markup']['keyboard'] ?? $user->getKeyboard(),
             'resize_keyboard' => true,
-            'is_persistent' => false,
-            'input_field_placeholder' => $level_button->getText()
+            'is_persistent' => true,
+            'input_field_placeholder' => $user->getButton()->getText()
         ]
     ];
 
-    $asset_types = $db->read(
-        table: 'assets',
-        selectColumns: 'asset_type',
-        distinct: true,
-        orderBy: ['asset_type' => 'DESC']
-    );
-
-    $asset_types = array_column($asset_types, 'asset_type');
-
-    // Add asset types to level 5 keyboard
-    foreach ($asset_types as $asset_type) array_unshift($keyboard, [['text' => $asset_type]]);
-    $data['reply_markup']['keyboard'] = $keyboard;
-
-    if ($callback_query) handlePricesCallback($user, $callback_query, $message, $asset_types, $db);
-    if ($message) handlePricesTextMessage($data, $message, $asset_types, $user->getBaseCurrency(), $db);
-
-    // Send initial message
     $response = sendToTelegram('sendMessage', $data);
-
-    // Update user's level and progress
-    if ($response) {
-        $db->update('users', ['button' => json_encode($level_button), 'progress' => null], ['id' => $user->getId()]);
-
-        // Send Informative message
-        sendAllFavorites($user, $db);
-    }
-
-    exit;
+    if ($response)
+        $db->update('users', ['button' => json_encode($user->getButton()), 'progress' => null], ['id' => $user->getId()]);
+    if (!$message) sendAllFavorites($user, $db);
+    exit($user->getButton()->getText());
 }
 
 function handlePricesCallback(
     User            $user,
     array           $callback_query,
     array           $message,
-    array           $asset_types,
     DatabaseManager $db): void
 {
     $data = [
@@ -81,6 +89,13 @@ function handlePricesCallback(
             $data['reply_markup']['inline_keyboard'] = [[
                 ['text' => '🔙 برگشت 🔙', "style" => "primary", 'callback_data' => json_encode(['show_favorites' => null])]
             ]];
+
+            $asset_types = $db->read(
+                table: 'assets',
+                selectColumns: 'asset_type',
+                distinct: true,
+                orderBy: ['asset_type' => 'DESC']);
+            $asset_types = array_column($asset_types, 'asset_type');
 
             foreach ($asset_types as $asset_type) {
                 array_unshift(
@@ -199,37 +214,6 @@ function handlePricesCallback(
             ]);
             exit;
     }
-}
-
-function handlePricesTextMessage(
-    array           $data,
-    array           $message,
-    array           $asset_types,
-    string          $base_currency,
-    DatabaseManager $db): void
-{
-    if (in_array($message['text'], $asset_types)) {
-
-        // Retrieve all related assets
-        $assets = $db->read('assets', ['asset_type' => $message['text']]);
-
-        $base_prices = CreateNamePricePairs(
-            array_merge(array_unique(array_column($assets, 'base_currency')), [$base_currency]),
-            $db
-        );
-
-        if ($assets) $data['text'] = createPricesTextForSingleAssetType($assets, $base_prices, $base_currency);
-        else $data['text'] = 'این دسته بندی خالی‌ست!';
-
-        $data['reply_to_message_id'] = $message['message_id'];
-        sendToTelegram('sendMessage', $data);
-        exit;
-    }
-
-    // Send default message of this level
-    $data['text'] = 'پیام نامفهوم است!' . "\n" . 'یکی از دسته‌بندی‌های زیر را انتخاب کنید:';
-    sendToTelegram('sendMessage', $data);
-    exit;
 }
 
 /**
