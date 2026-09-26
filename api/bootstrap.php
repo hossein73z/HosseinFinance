@@ -8,7 +8,6 @@ require_once __DIR__ . '/config/config.php';
 // Core
 require_once __DIR__ . '/Core/Router.php';
 require_once __DIR__ . '/Core/WebhookSecurity.php';
-require_once __DIR__ . '/Core/Navigation.php';
 
 // Libraries
 require_once __DIR__ . '/Libraries/DatabaseManager.php';

@@ -1,5 +1,7 @@
 <?php
 
+use JetBrains\PhpStorm\NoReturn;
+
 /**
  * Retrieves an existing user or registers a new one.
  */
@@ -33,6 +35,7 @@ function getOrCreateUser(array $from, DatabaseManager $db): User
 /**
  * Handles normal text messages, commands, and web app data.
  */
+#[NoReturn]
 function handleIncomingMessage(array $message, DatabaseManager $db): void
 {
     $user = getOrCreateUser($message['from'], $db);
@@ -71,6 +74,7 @@ function handleCallbackQuery(array $callback_query, DatabaseManager $db): void
     }
 }
 
+#[NoReturn]
 function levelHandler(
     ?User           $user,
     DatabaseManager $db,
@@ -82,14 +86,21 @@ function levelHandler(
     $button_id = $button_id ?? $user->getButtonId();
 
     // Route to corresponding level
-    if (!$button_id) mainMenu(user: $user, db: $db, message: $message);
-
-    if ($button_id == 'main_menu') mainMenu(user: $user, db: $db, message: $message, callback_query: $callback_query);
-    if ($button_id == 'holdings') holdings_menu(user: $user, db: $db, message: $message, callback_query: $callback_query);
-    if ($button_id == 'add_new_holding') add_holding_menu(user: $user, db: $db, message: $message, callback_query: $callback_query);
-    if ($button_id == 'prices') prices_menu(user: $user, db: $db, message: $message, callback_query: $callback_query);
-    if ($button_id == 'favorites') sendAllFavorites($user, $db);
-    if ($button_id == 'alerts') alerts_menu(user: $user, db: $db, message: $message, callback_query: $callback_query);
-
-    exit('Unhandled ' . ($message && isset($message['text']) ? "message: text=\"$message[text]\"" : "button: id=\"$button_id\""));
+    switch ($button_id) {
+        case null:
+        case 'main_menu':
+            mainMenu(user: $user, db: $db, message: $message, callback_query: $callback_query);
+        case 'holdings':
+            holdings_menu(user: $user, db: $db, message: $message, callback_query: $callback_query);
+        case 'add_new_holding':
+            add_holding_menu(user: $user, db: $db, message: $message, callback_query: $callback_query);
+        case 'prices':
+            prices_menu(user: $user, db: $db, message: $message, callback_query: $callback_query);
+        case 'favorites':
+            sendAllFavorites($user, $db);
+        case 'alerts':
+            alerts_menu(user: $user, db: $db, message: $message, callback_query: $callback_query);
+        default:
+            exit('Unhandled ' . ($message && isset($message['text']) ? "message: text=\"$message[text]\"" : "button: id=\"$button_id\""));
+    }
 }

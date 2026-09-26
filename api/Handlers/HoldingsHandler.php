@@ -1,5 +1,8 @@
 <?php
 
+use JetBrains\PhpStorm\NoReturn;
+
+#[NoReturn]
 function holdings_menu(
     User            $user,
     DatabaseManager $db,
@@ -53,6 +56,7 @@ function holdings_menu(
     exit($user->getButton()->getText());
 }
 
+#[NoReturn]
 function handleHoldingsCallback(User $user, array $callback_query, array $message, DatabaseManager $db): void
 {
 
@@ -231,6 +235,7 @@ function handleHoldingsWebAppData(User $user, array $message, DatabaseManager $d
     exit;
 }
 
+#[NoReturn]
 function add_holding_menu(
     User            $user,
     DatabaseManager $db,
@@ -250,10 +255,8 @@ function add_holding_menu(
                 unset($progress[$progress_key][array_key_first($progress[$progress_key])]); // TODO: Clean this
                 $user->setProgress($progress);
                 addHoldingProgress($user, null, $db);
-                break;
             default:
                 levelHandler($user, $db, button_id: $pressed_button_id);
-                break;
         }
     elseif (!$message) {
         $user->setButton(new Button(
@@ -270,6 +273,7 @@ function add_holding_menu(
 }
 
 
+#[NoReturn]
 function addHoldingProgress(User $user, ?array $message, DatabaseManager $db): void
 {
     /**
@@ -349,8 +353,10 @@ function addHoldingProgress(User $user, ?array $message, DatabaseManager $db): v
     $holding['time'] = new DateTime()->format('h:i');
 
     upsertHolding($user, $holding, $data, $db);
+    exit('Add holding: ' . json_encode($holding, JSON_UNESCAPED_UNICODE));
 }
 
+#[NoReturn]
 function askForHoldingAssetType(User $user, array $data, DatabaseManager $db, ?string $text = null): void
 {
     $asset_types = $db->read(
@@ -380,6 +386,7 @@ function askForHoldingAssetType(User $user, array $data, DatabaseManager $db, ?s
     exit();
 }
 
+#[NoReturn]
 function askForHoldingAssetName(User $user, array $data, string $asset_type, DatabaseManager $db, ?string $text = null): void
 {
     $assets = $db->read('assets', ['asset_type' => $asset_type]);
@@ -407,6 +414,7 @@ function askForHoldingAssetName(User $user, array $data, string $asset_type, Dat
     exit();
 }
 
+#[NoReturn]
 function askForHoldingAmount(User $user, array $data, DatabaseManager $db, ?string $text = null): void
 {
     $keyboard = [
@@ -426,6 +434,7 @@ function askForHoldingAmount(User $user, array $data, DatabaseManager $db, ?stri
     exit();
 }
 
+#[NoReturn]
 function askForHoldingPrice(User $user, array $data, string $asset_name, DatabaseManager $db, ?string $html = null): void
 {
     $asset = $db->read('assets', ['name' => $asset_name], true);

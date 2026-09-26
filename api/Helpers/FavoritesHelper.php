@@ -1,7 +1,8 @@
 <?php
 
-require_once __DIR__ . '/../Functions/MessageFunctions.php';
+use JetBrains\PhpStorm\NoReturn;
 
+#[NoReturn]
 function sendAllFavorites(User $user, DatabaseManager $db, int|string|null $message_id = null): void
 {
 

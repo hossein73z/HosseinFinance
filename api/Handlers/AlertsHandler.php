@@ -1,5 +1,8 @@
 <?php
 
+use JetBrains\PhpStorm\NoReturn;
+
+#[NoReturn]
 function alerts_menu(
     User            $user,
     DatabaseManager $db,
@@ -51,6 +54,7 @@ function alerts_menu(
     exit($user->getButton()->getText());
 }
 
+#[NoReturn]
 function sendAllAlerts(User $user, DatabaseManager $db, int|string|null $message_id = null): void
 {
     $alerts = $db->query("
@@ -117,6 +121,7 @@ function sendAllAlerts(User $user, DatabaseManager $db, int|string|null $message
     exit();
 }
 
+#[NoReturn]
 function sendAssetAlerts(User $user, DatabaseManager $db, string|int $asset_id, int|string|null $message_id = null): void
 {
     $alerts = $db->query("
@@ -542,7 +547,6 @@ function managePriceAlerts(User $user, array $callback_query, array $message, Da
             sendToTelegram('editMessageText', $data);
             if ($query_key == 'conf_del_alert') sendAllAlerts($user, $db);
             else sendAssetAlerts($user, $db, $asset_id);
-            break;
 
         // Show list of alerts for specific asset
         // Called from favorites menu
@@ -551,13 +555,11 @@ function managePriceAlerts(User $user, array $callback_query, array $message, Da
             sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
             $db->update('special_messages', ['status' => 'paused'], ['user_id' => $user->getId(), 'type' => 'live_price', 'status' => 'active', 'message_id' => $message['message_id']]);
             sendAssetAlerts($user, $db, $asset_id, $message['message_id']);
-            break;
 
         // Show main list of all alerts
         case 'show_all_alerts':
             sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
             sendAllAlerts($user, $db, $message['message_id']);
-            exit;
     }
 
     sendToTelegram('editMessageText', $data);

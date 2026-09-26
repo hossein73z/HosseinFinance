@@ -1,5 +1,8 @@
 <?php
 
+use JetBrains\PhpStorm\NoReturn;
+
+#[NoReturn]
 function prices_menu(
     User            $user,
     DatabaseManager $db,

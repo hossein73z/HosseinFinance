@@ -1,5 +1,8 @@
 <?php
 
+use JetBrains\PhpStorm\NoReturn;
+
+#[NoReturn]
 function mainMenu(
     User            $user,
     DatabaseManager $db,
