@@ -331,7 +331,7 @@ function managePriceAlerts(User $user, array $callback_query, array $message, Da
         'text' => 'این پیام منقضی شده است.'
     ];
 
-    $query_data = json_decode(html_entity_decode($callback_query['data'], ENT_QUOTES, 'UTF-8'), true);
+    $query_data = $callback_query['data'];
     $query_key = array_key_first($query_data);
 
     switch ($query_key) {

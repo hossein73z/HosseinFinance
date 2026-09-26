@@ -52,7 +52,7 @@ function prices_menu(
         'reply_markup' => [
             'keyboard' => $data['reply_markup']['keyboard'] ?? $user->getKeyboard(),
             'resize_keyboard' => true,
-            'is_persistent' => true,
+            'is_persistent' => false,
             'input_field_placeholder' => $user->getButton()->getText()
         ]
     ];
@@ -107,8 +107,8 @@ function handlePricesCallback(
                 );
             }
 
-            sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
             sendToTelegram('editMessageText', $data);
+            sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
             $db->update('special_messages', ['status' => 'paused'], ['user_id' => $user->getId(), 'type' => 'live_price', 'status' => 'active', 'message_id' => $message['message_id']]);
             exit;
 
@@ -116,9 +116,9 @@ function handlePricesCallback(
          * Show a message to manage favorites under with a specific
          * type. All the three cases below show the same message.
          */
-        case 'mng_fav_type': // --- Just show list of assets
-        case 'mng_fav_add': // ---- Show list of assets and add a favorite
-        case 'mng_fav_del': // ---- Show list of assets and delete a favorite
+        case 'mng_fav_type': // ── Just show list of assets
+        case 'mng_fav_add': // ─── Show list of assets and add a favorite
+        case 'mng_fav_del': // ─── Show list of assets and delete a favorite
 
             $data['reply_markup']['inline_keyboard'] = [[
                 ['text' => '🔙 برگشت 🔙', "style" => "primary", 'callback_data' => json_encode(['edit_fav' => null])],
@@ -140,13 +140,13 @@ function handlePricesCallback(
             // Read assets under $asset_type with added `in_favorites` property
             $assets = $db->query(
                 "
-                select
+                SELECT
                     a.*, IF(f.user_id IS NULL, 0, 1) AS in_favorites
-                from assets a 
-                left join favorites f
-                    on f.asset_name = a.name
+                FROM assets a 
+                LEFT JOIN favorites f
+                    ON f.asset_name = a.name
                     AND f.user_id = " . $user->getId() . "
-                where
+                WHERE
                     a.asset_type = '$asset_type'"
             )->fetchAll();
 
@@ -165,8 +165,8 @@ function handlePricesCallback(
                 }
             } else $data['text'] = 'دسته‌بندی مورد نظر خالی‌ست!';
 
-            sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
             sendToTelegram('editMessageText', $data);
+            sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
             $db->update('special_messages', ['status' => 'paused'], ['user_id' => $user->getId(), 'type' => 'live_price', 'status' => 'active', 'message_id' => $message['message_id']]);
             exit;
 
@@ -188,33 +188,29 @@ function handlePricesCallback(
                 $data['text'] = '❌ خطای پایگاه داده!';
             }
 
-            sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
             sendToTelegram('editMessageText', $data);
+            sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
             sendAllFavorites($user, $db);
-            break;
 
         // Start showing live price updates on the current message
         case 'set_live':
-            sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
             deleteOldActiveLiveMessage($user, $message['message_id'], $db);
             setLiveMessage($user->getId(), $query_data['set_live'], $message['message_id'], $db);
             sendAllFavorites($user, $db, $message['message_id']);
-            break;
 
         // Show the main favorites' message
         case 'show_favorites':
             sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
             $db->update('special_messages', ['status' => 'active'], ['user_id' => $user->getId(), 'type' => 'live_price', 'status' => 'paused', 'message_id' => $message['message_id']]);
             sendAllFavorites($user, $db, $message['message_id']);
-            break;
 
         default:
-            sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
             sendToTelegram('editMessageText', [
                 'chat_id' => $user->getid(),
                 'message_id' => $message['message_id'],
                 'text' => 'این پیام منقضی شده است.'
             ]);
+            sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
             exit;
     }
 }

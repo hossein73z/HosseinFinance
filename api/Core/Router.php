@@ -55,6 +55,7 @@ function handleCallbackQuery(array $callback_query, DatabaseManager $db): void
 {
 
     $message = &$callback_query['message'];
+    $callback_query['data'] = json_decode(html_entity_decode($callback_query['data'], ENT_QUOTES, 'UTF-8'), true);
 
     $user = $db->read(
         table: 'users',

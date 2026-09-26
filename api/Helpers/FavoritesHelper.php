@@ -58,7 +58,7 @@ function sendAllFavorites(User $user, DatabaseManager $db, int|string|null $mess
     } else {
         /** Editing existing favorites' message */
 
-        $is_live = $live_message['message_id'] == $message_id;
+        $is_live = $live_message && $live_message['message_id'] == $message_id;
         sendToTelegram('editMessageText', [
             'chat_id' => $user->getid(),
             'message_id' => $message_id,
