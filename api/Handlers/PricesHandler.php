@@ -116,7 +116,7 @@ function handlePricesCallback(
          * Show a message to manage favorites under with a specific
          * type. All the three cases below show the same message.
          */
-        case 'mng_fav_type': // ── Just show list of assets
+        case 'mng_fav_type': // ── Show list of assets
         case 'mng_fav_add': // ─── Show list of assets and add a favorite
         case 'mng_fav_del': // ─── Show list of assets and delete a favorite
 

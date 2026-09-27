@@ -65,7 +65,44 @@ function handleCallbackQuery(array $callback_query, DatabaseManager $db): void
 
     if ($user) {
         $user = User::fromDbRow($user);
-        levelHandler($user, $db, $message, $callback_query);
+
+        // Non-level-related callbacks
+        switch (array_key_first($callback_query['data'])) {
+            case'view_holding':
+            case'edit_holding':
+            case'edit_holding_name':
+            case'edit_holding_price':
+            case'edit_holding_amount':
+            case'show_all_holdings':
+                holdings_menu($user, $db, $message, $callback_query);
+
+            case 'mng_alerts':
+            case 'fav_alert':
+            case 'new_alert_type':
+            case 'new_alert_asset_id':
+            case 'edit_alert_price':
+            case 'new_asset_alert':
+            case 'edit_asset_alert':
+            case 'del_alert':
+            case 'del_asset_alert':
+            case 'conf_del_alert':
+            case 'conf_del_asset_alert':
+            case 'show_asset_alerts':
+            case 'show_all_alerts':
+                alerts_menu($user, $db, $message, $callback_query);
+
+            case 'edit_fav':
+            case 'mng_fav_type':
+            case 'mng_fav_add':
+            case 'mng_fav_del':
+            case 'new_fav_name':
+            case 'set_live':
+            case 'show_favorites':
+                prices_menu($user, $db, $message, $callback_query);
+
+            default:
+                levelHandler($user, $db, $message, $callback_query);
+        }
 
     } else {
         sendToTelegram('deleteMessage', [
