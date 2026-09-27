@@ -11,8 +11,11 @@ function mainMenu(
 {
 
     if ($callback_query) {
-        sendToTelegram('deleteMessage', ['chat_id' => $user->getId(), 'message_id' => $message['message_id']]);
-        sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id'], 'text' => 'این پیام منقضی شده است!']);
+        sendToTelegram('editMessageText', [
+            'chat_id' => $user->getid(),
+            'message_id' => $message['message_id'],
+            'text' => 'این پیام منقضی شده است.'
+        ]);
         exit('Expired callback query.');
     } elseif (!$message) { // Just entered the Level
         $user->setProgress(null);

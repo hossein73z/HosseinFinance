@@ -47,7 +47,6 @@ function handleTransactionsCallback(User $user, array $message): void
         'message_id' => $message['message_id'],
         'text' => 'این پیام منقضی شده است.'
     ];
-
     sendToTelegram('editMessageText', $data);
     exit;
 }
@@ -188,8 +187,6 @@ function handleAddTransactionCallback(User $user, array $callback_query, array $
         'message_id' => $message['message_id'],
         'text' => 'این پیام منقضی شده است.'
     ];
-
-    sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
     sendToTelegram('editMessageText', $data);
     exit;
 }

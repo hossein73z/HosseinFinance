@@ -210,7 +210,6 @@ function handlePricesCallback(
                 'message_id' => $message['message_id'],
                 'text' => 'این پیام منقضی شده است.'
             ]);
-            sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
             exit;
     }
 }
