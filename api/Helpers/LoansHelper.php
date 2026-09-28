@@ -89,11 +89,11 @@ function getLoanWithInstallments(int|string $user_id, DatabaseManager $db, bool 
             foreach ($loan['installments'] as &$installment) {
 
                 // Create `due_date` gregorian object just for calculations
-                $due_date = DateTime::createFromFormat('Y-m-d', $installment['due_date'])->setTime(0, 0, 0);
+                $due_date = DateTime::createFromFormat('Y-m-d', $installment['due_date'])->setTime(0, 0);
 
                 // Create `is_due` and `is_paid` boolean values
                 $is_paid = boolval($installment['is_paid']);
-                $remaining_days = (new DateTime('today'))->diff($due_date);
+                $remaining_days = new DateTime('today')->diff($due_date);
                 $is_due = $remaining_days->days === 0 || $remaining_days->invert;
 
                 // Initialize installments' summary
@@ -151,17 +151,18 @@ function prepareLoanForWebApp(array $loan): array
 {
     unset($loan['user_id']);
     unset($loan['created_at']);
-    foreach ($loan['installments'] as &$installment) {
-        unset($installment['loan_id']);
-        unset($installment['alert_date']);
-        unset($installment['is_due']);
-        unset($installment['remaining_days']);
-    }
+    if ($loan['installments'])
+        foreach ($loan['installments'] as &$installment) {
+            unset($installment['loan_id']);
+            unset($installment['alert_date']);
+            unset($installment['is_due']);
+            unset($installment['remaining_days']);
+        }
 
     return $loan;
 }
 
-function createLoansView(array $loans, ?string $loans_mssg_id = null, ?string $initial_mssg_id = null, bool $summerized = true): string
+function createLoansRichMessage(array $loans, bool $summerized = true): array
 {
     /**
      * Considerations for `$loans` array:
@@ -169,16 +170,15 @@ function createLoansView(array $loans, ?string $loans_mssg_id = null, ?string $i
      *     installments under `installments` column.
      *  -- All dates (loans' received date and installments'
      *     due and alert date) must be in Jalali string.
-     *  -- Installments must be sorted ascending by their duedate.
+     *  -- Installments must be sorted ascending by their `due_date`.
      *  -- Installments must have 'is_due' bool value.
      */
-
-    $text = 'وام‌های ثبت شده‌ی شما: ' . "\n";
 
     $paid_total = 0;
     $overdue_total = 0;
     $remaining_total = 0;
 
+    $html = '';
     foreach ($loans as $loan) {
 
         // Create installments' view and detail
@@ -205,20 +205,17 @@ function createLoansView(array $loans, ?string $loans_mssg_id = null, ?string $i
             }
 
             $last_year = array_key_last($insts_per_year);
-            $installments_detail = "\n‏      ┘─ وضعیت اقساط\: ";
+            $installments_detail = '<br>' . '‏' . '┘─ وضعیت اقساط: ';
             foreach ($insts_per_year as $year => $year_installments) {
                 $prefix = ($year != $last_year) ?
-                    "\n‏          ┤─ " :
-                    "\n‏          ┘─ ";
-                $installments_detail .= $prefix . beautifulNumber($year, null) . '\: ' . implode('', $year_installments);
+                    '<br>' . '‏' . '&nbsp;&nbsp;&nbsp;&nbsp;┤─ ' :
+                    '<br>' . '‏' . '&nbsp;&nbsp;&nbsp;&nbsp;┘─ ';
+                $installments_detail .= $prefix . beautifulNumber($year, null) . ': ' . implode('', $year_installments);
             }
         } else {
             $installments_detail = '';
             $summerized_insts_text = '';
         }
-
-        $deep_link = "https://t.me/" . BOT_ID . "?start=showLoan_loanId{$loan['id']}" . ($loans_mssg_id ? "_loansMssgId" . $loans_mssg_id : '') . ($initial_mssg_id ? "_initMssgId" . $initial_mssg_id : '');
-        $loan_name = "\n‏" . "\-* [" . beautifulNumber($loan['name'], null) . "]($deep_link)*";
 
         if (isset($loan['next_installment'])) {
 
@@ -236,27 +233,28 @@ function createLoansView(array $loans, ?string $loans_mssg_id = null, ?string $i
                     beautifulNumber($next_installment['amount']) . ' ریال برای ' . $remaining_days . ' روز دیگر');
         } else $next_payment_text = 'پایان یافته';
 
-        if (!$summerized) {
-            $detail =
-                "\n‏      │  " .
-                "\n‏      ┤─ " . 'مبلغ وام: ' . beautifulNumber($loan['total_amount']) .
-                "\n‏      ┤─ " . 'تاریخ دریافت: ' . beautifulNumber($loan['received_date'], null) .
-                "\n‏      ┤─ " . 'قسط بعدی: ' . beautifulNumber($next_payment_text, null);
+        // Loan name and button
+        $loan_callback = json_encode(['view_loan' => $loan['id']]);
+        $loan_name_html = "<tg-button type='callback_data' data='$loan_callback'>" . beautifulNumber($loan['name'], null) . "</tg-button>";
 
-            $detail .= $installments_detail . "\n";
-        } else
-            $detail = ': ' . beautifulNumber($next_payment_text, null) . "\n" . $summerized_insts_text . "\n";
+        if (!$summerized)
+            $insts_detail_html = "‏" . "┤─ " . 'مبلغ وام: ' . beautifulNumber($loan['total_amount']) .
+                '<br>' . "‏" . "┤─ " . 'تاریخ دریافت: ' . beautifulNumber($loan['received_date'], null) .
+                '<br>' . "‏" . "┤─ " . 'قسط بعدی: ' . beautifulNumber($next_payment_text, null);
+        else
+            $insts_detail_html = ': ' . beautifulNumber($next_payment_text, null) . "<p>$summerized_insts_text</p>";
 
-        $text .= $loan_name . markdownScape($detail);
+        $html .= "<li>$loan_name_html<p>$insts_detail_html$installments_detail<br></p></li>";
     }
 
-    $total_report_text =
-        "خلاصه وضعیت اقساط وام‌های جاری: " . "\n" .
-        "    - 🟢 " . "جمع اقساط پرداخت شده: " . beautifulNumber($paid_total) . "\n" .
-        "    - 🔴 " . "جمع اقساط معوق: " . beautifulNumber($overdue_total) . "\n" .
-        "    - ⚪ " . "جمع اقساط سررسید نشده: " . beautifulNumber($remaining_total);
+    $total_summery_report_text =
+        '<h4>' . "خلاصه وضعیت اقساط وام‌های جاری: " . '</h4>' . '<ul>' .
+        "<li>🟢 " . "جمع اقساط پرداخت شده: " . beautifulNumber($paid_total) . '</li>' .
+        "<li>🔴 " . "جمع اقساط معوق: " . beautifulNumber($overdue_total) . '</li>' .
+        "<li>⚪ " . "جمع اقساط سررسید نشده: " . beautifulNumber($remaining_total) . '</li>' .
+        '</ul>';
 
-    return markdownScape($total_report_text) . "\n\n" . $text;
+    return ['is_rtl' => true, 'html' => $total_summery_report_text . "<hr>" . '<h3>' . 'وام‌های ثبت شده‌ی شما: ' . '</h3>' . "<ul>$html</ul>"];
 }
 
 function createLoanDetailText(array $loan, ?string $markdown = null, ?string $mssg_id = null): string
@@ -322,22 +320,23 @@ function createLoanDetailKeyboard(array $loan): array
     $keyboard = [];
     $keyboard_row = [];
     $btn_in_row = 3;
-    foreach ($loan['installments'] as $installment) {
+    if ($loan['installments'])
+        foreach ($loan['installments'] as $installment) {
 
-        if ($installment['is_paid']) $payment_icon = '🟢';
-        elseif ($installment['is_due']) $payment_icon = $installment['remaining_days'] == 0 ? "🟡" : '🔴';
-        else $payment_icon = "⚪";
+            if ($installment['is_paid']) $payment_icon = '🟢';
+            elseif ($installment['is_due']) $payment_icon = $installment['remaining_days'] == 0 ? "🟡" : '🔴';
+            else $payment_icon = "⚪";
 
-        $keyboard_row[] = [
-            'text' => $payment_icon . ' ' . beautifulNumber($installment['due_date'], null),
-            'callback_data' => json_encode(['inplace_inst_pay_toggle' => $installment['id']])
-        ];
+            $keyboard_row[] = [
+                'text' => $payment_icon . ' ' . beautifulNumber($installment['due_date'], null),
+                'callback_data' => json_encode(['inplace_inst_pay_toggle' => $installment['id']])
+            ];
 
-        if (sizeof($keyboard_row) >= $btn_in_row) {
-            $keyboard[] = $keyboard_row;
-            $keyboard_row = [];
+            if (sizeof($keyboard_row) >= $btn_in_row) {
+                $keyboard[] = $keyboard_row;
+                $keyboard_row = [];
+            }
         }
-    }
 
     if ($keyboard_row) $keyboard[] = $keyboard_row;
     $keyboard[] = [['text' => 'لیست وام‌ها', 'callback_data' => json_encode(['loans_list' => null])]];
