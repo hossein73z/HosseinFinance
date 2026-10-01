@@ -291,7 +291,7 @@ function createLoanDetailRichMessage(array $loan, ?string $mssg_id = null): arra
             $amount = beautifulNumber($installment['amount']);
 
             $emoji_callback = json_encode(['inplace_inst_pay_toggle' => $installment['id']]);
-            $emoji_button_html = "<tg-button type='callback_data' data='$emoji_callback'>$payment_emoji</tg-button>";
+            $emoji_button_html = "<tg-button style='link' type='callback_data' data='$emoji_callback'>$payment_emoji</tg-button>";
             $installments_text .= "<br>‏&nbsp;&nbsp;&nbsp;&nbsp;$inst_num) $emoji_button_html $date: $amount";
         }
 

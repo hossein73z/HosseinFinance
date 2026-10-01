@@ -10,10 +10,9 @@ function loans_menu(
     ?array          $callback_query = null): void
 {
 
-    if ($callback_query) {
+    if ($callback_query)
         handleLoansCallback($user, $callback_query, $message, $db);
-    } elseif (!$message) { // Just entered the Level
-        $user->setProgress(null);
+    elseif (!$message)
         $user->setButton(new Button(
             id: 'loans',
             attrs: ['text' => '🏦 وام و اقساط'],
@@ -23,20 +22,11 @@ function loans_menu(
                 [createWebAppBtn('➕ افزودن وام جدید', '/assets/loan.html')],
                 [['id' => 'main_menu', 'text' => '🔙 برگشت 🔙', 'style' => 'primary', 'admin_key' => 0],],
             ]
-        ));
-    } else { // Received a message in the level
-
-        // Received message contains web_app data
-        if (isset($message['web_app_data']))
-            handleLoansWebAppData($user, $message, $db);
-
-        // Received message is a button
-        elseif ($pressed_button_id = getPressedButtonID($message['text'], $user))
-            levelHandler($user, $db, button_id: $pressed_button_id);
-
-        else
-            handleLoansTextMessage($user, $message, $db);
-    }
+        ))->setProgress(null);
+    elseif (isset($message['web_app_data']))
+        handleLoansWebAppData($user, $message, $db);
+    elseif ($pressed_button_id = getPressedButtonID($message['text'], $user))
+        levelHandler($user, $db, button_id: $pressed_button_id);
 
     $data = [
         'chat_id' => $user->getid(),
@@ -68,9 +58,20 @@ function handleLoansCallback(
 
     switch ($query_key) {
         case 'loans_list':
+            $user->setButton(new Button(
+                id: 'loans',
+                attrs: ['text' => '🏦 وام و اقساط'],
+                adminKey: false,
+                belongTo: 'main_menu',
+                keyboard: [
+                    [createWebAppBtn('➕ افزودن وام جدید', '/assets/loan.html')],
+                    [['id' => 'main_menu', 'text' => '🔙 برگشت 🔙', 'style' => 'primary', 'admin_key' => 0],],
+                ]
+            ))->setProgress(null);
+
             $data = [
                 'chat_id' => $user->getid(),
-                'text' => $data['text'] ?? $user->getButton()->getText(),
+                'text' => $user->getButton()->getText(),
                 'reply_markup' => [
                     'keyboard' => $user->getKeyboard(),
                     'resize_keyboard' => true,
@@ -310,107 +311,6 @@ function handleLoansWebAppData(
     exit;
 }
 
-#[NoReturn]
-function handleLoansTextMessage(
-    User            $user,
-    array           $message,
-    DatabaseManager $db): void
-{
-
-    $data = [
-        'chat_id' => $user->getid(),
-        'reply_markup' => [
-            'keyboard' => $user->getKeyboard(),
-            'resize_keyboard' => true,
-            'is_persistent' => false,
-            'input_field_placeholder' => $user->getButton()->getText()
-        ]
-    ];
-
-    // Show loan detail
-    $matched = preg_match("/^\/start showLoan_loanId(\d+?)(_loansMssgId(\d+?))?(_initMssgId(\d+?))?$/m", $message['text'], $matches);
-    if ($matched && !empty($matches[1])) {
-
-        $loan = getLoanWithInstallments(user_id: $user->getId(), db: $db, jalali: true, loan_id: $matches[1]);
-
-        if ($loan) { // else: Send default Irrelevance message
-
-            $user->setKeyboard(
-                [
-                    [createWebAppBtn('✏ ویرایش وام «' . $loan['name'] . '»', '/assets/loan.html', ['data' => base64_encode(json_encode(prepareLoanForWebApp($loan)))])],
-                    [createWebAppBtn('➕ افزودن وام جدید', '/assets/loan.html')],
-                    [['id' => 'loans', 'text' => '🔙 برگشت 🔙', 'style' => 'primary', 'admin_key' => 0],]
-                ]
-            );
-            $data = [
-                'chat_id' => $user->getid(),
-                'text' => 'جزئیات وام «' . beautifulNumber($loan['name'], null) . '»',
-                'reply_markup' => [
-                    'keyboard' => $user->getKeyboard(),
-                    'resize_keyboard' => true,
-                    'is_persistent' => false,
-                    'input_field_placeholder' => $user->getButton()->getText(),
-                ]
-            ];
-
-            $response = sendToTelegram('sendMessage', $data);
-            if ($response) {
-                $db->update('users', $user->setProgress(null)->toDbArray(), ['id' => $user->getId()]);
-
-                // Delete redundant messages
-                if (isset($matches[5]))
-                    sendToTelegram('deleteMessage', ['chat_id' => $user->getid(), 'message_id' => $matches[5]]); # ───────── Initial
-                sendToTelegram('deleteMessage', ['chat_id' => $user->getid(), 'message_id' => $matches[3]]); # ───────────── Loans View
-                sendToTelegram('deleteMessage', ['chat_id' => $user->getid(), 'message_id' => $message['message_id']]); # ── Deep-Link
-
-                sendLoanDetail($loan, $data);
-            }
-        }
-    }
-
-    // Toggle Installment Payment
-    $matched = preg_match("/^\/start toggleInstPayment_instId(\d+?)_mssgId(\d+?)$/m", $message['text'], $matches);
-    if ($matched && !empty($matches[1])) {
-
-        // Delete deep-link message
-        sendToTelegram('deleteMessage', ['chat_id' => $user->getid(), 'message_id' => $message['message_id']]);
-
-        $installment = $db->read(
-            table: 'installments i',
-            conditions: ['i.id' => $matches[1], 'l.user_id' => $user->getId()],
-            single: true,
-            selectColumns: 'i.*, l.user_id',
-            join: 'LEFT JOIN loans l ON i.loan_id = l.id'
-        );
-
-        if ($installment) {
-            // else: Default Irrelevance message will be sent
-
-            $db->update(
-                table: 'installments',
-                data: ['is_paid' => !$installment['is_paid']],
-                conditions: ['id' => $installment['id']]
-            );
-
-            $loan = getLoanWithInstallments(user_id: $user->getId(), db: $db, jalali: true, loan_id: $installment['loan_id']);
-
-            if ($loan) {
-                sendToTelegram('editMessageText', [
-                    'chat_id' => $user->getid(),
-                    'message_id' => $matches[2],
-                    'rich_message' => createLoanDetailRichMessage($loan, $matches[2]),
-                    'reply_markup' => ['inline_keyboard' => [[['text' => 'برگشت به لیست وام‌ها', 'callback_data' => json_encode(['loans_list' => null])]]]]
-                ]);
-            }
-            exit;
-        }
-    }
-
-    $data['text'] = 'پیام نامفهوم است!';
-    sendToTelegram('sendMessage', $data);
-    exit;
-}
-
 function sendAllLoans(
     User            $user,
     DatabaseManager $db,
@@ -438,7 +338,7 @@ function sendAllLoans(
         sendToTelegram('sendMessage', ['chat_id' => $user->getid(), 'text' => 'هیچ وام یا قسطی برای شما ثبت نشده است!']);
     }
 
-    $db->update('users', ['progress' => null], ['id' => $user->getId()]);
+    $db->update('users', $user->toDbArray(), ['id' => $user->getId()]);
 }
 
 function sendInstallmentsForNextNDays(User $user, DatabaseManager $db, int $n = 30, ?string $mssg_id_to_edit = null): bool
