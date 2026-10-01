@@ -165,7 +165,6 @@ function prepareLoanForWebApp(array $loan): array
 function createLoansRichMessage(array $loans, bool $summerized = true): array
 {
     /**
-     * TODO: Clean this function
      * Considerations for `$loans` array:
      *  -- Each loan must have all related
      *     installments under `installments` column.
@@ -175,87 +174,106 @@ function createLoansRichMessage(array $loans, bool $summerized = true): array
      *  -- Installments must have 'is_due' bool value.
      */
 
-    $paid_total = 0;
-    $overdue_total = 0;
-    $remaining_total = 0;
-
-    $html = '';
+    // Create html for loans
+    $loans_html = '';
     foreach ($loans as $loan) {
 
-        // Create installments' view and detail
-        $installments = &$loan['installments'];
-        if ($installments) {
+        // Loan's name button HTML
+        $loan_callback = json_encode(['view_loan' => $loan['id']]);
+        $loan_name_html = "‏" . "<tg-button type='callback_data' data='$loan_callback'>" . beautifulNumber($loan['name'], null) . "</tg-button>";
 
-            // Create payment status icon for the installment
+        // Installments HTML code without outer tag
+        $insts_html = null;
+        if ($installments = &$loan['installments']) {
+
+            // Create payment status emoji for the installment
             $insts_per_year = [];
-            $summerized_insts_text = '‏';
             foreach ($installments as $installment) {
 
                 $due_date = JalaliDate::fromString($installment['due_date']);
 
                 if ($summerized) {
-                    if ($installment['is_paid']) $summerized_insts_text .= "🟢";
-                    elseif ($installment['is_due']) $summerized_insts_text .= $installment['remaining_days'] == 0 ? "🟡" : "🔴";
-                    else $summerized_insts_text .= "⚪";
+                    $insts_html = $insts_html ?? "<br>‏";
+                    if ($installment['is_paid'])
+                        $insts_html .= "🟢";
+                    elseif ($installment['is_due'])
+                        if ($installment['remaining_days'] == 0)
+                            $insts_html .= "🟡";
+                        else
+                            $insts_html .= "🔴";
+                    else
+                        $insts_html .= "⚪";
                 } else {
                     $due_year = $due_date->jy;
-                    if ($installment['is_paid']) $insts_per_year[$due_year][] = "🟢";
-                    elseif ($installment['is_due']) $insts_per_year[$due_year][] = $installment['remaining_days'] == 0 ? "🟡" : "🔴";
-                    else $insts_per_year[$due_year][] = "⚪";
+                    if ($installment['is_paid'])
+                        $insts_per_year[$due_year][] = "🟢";
+                    elseif ($installment['is_due'])
+                        if ($installment['remaining_days'] == 0)
+                            $insts_per_year[$due_year][] = "🟡";
+                        else
+                            $insts_per_year[$due_year][] = "🔴";
+                    else
+                        $insts_per_year[$due_year][] = "⚪";
                 }
             }
 
-            $last_year = array_key_last($insts_per_year);
-            $installments_detail = '<br>' . '‏' . '┘─ وضعیت اقساط: ';
-            foreach ($insts_per_year as $year => $year_installments) {
-                $prefix = ($year != $last_year) ?
-                    '<br>' . '‏' . '&nbsp;&nbsp;&nbsp;&nbsp;┤─ ' :
-                    '<br>' . '‏' . '&nbsp;&nbsp;&nbsp;&nbsp;┘─ ';
-                $installments_detail .= $prefix . beautifulNumber($year, null) . ': ' . implode('', $year_installments);
+            if (!$summerized) {
+                $last_year = array_key_last($insts_per_year);
+                $insts_html = $insts_html ?? "<br>" . "┘─ وضعیت اقساط: ";
+                foreach ($insts_per_year as $year => $year_installments) {
+                    $prefix = "‏" . "&nbsp;&nbsp;&nbsp; " . (($year != $last_year) ? "┤─" : "┘─");
+                    $insts_html .= "<br>$prefix " . beautifulNumber($year, null) . ': ' . implode('', $year_installments);
+                }
             }
-        } else {
-            $installments_detail = '';
-            $summerized_insts_text = '';
         }
 
+        // Next payment's date as text: $next_payment_text
         if (isset($loan['next_installment'])) {
-
-            // Add to total installments' report if the loan is not finished
-            $paid_total += $loan['insts_summary']['paid_sum'];
-            $overdue_total += $loan['insts_summary']['overdue_sum'];
-            $remaining_total += $loan['insts_summary']['remaining_sum'];
 
             // Create text for the next payment
             $next_installment = $loan['next_installment'];
-            $remaining_days = $next_installment['remaining_days'];
-            $next_payment_text =
-                $remaining_days == 0 ?
-                    beautifulNumber($next_installment['amount']) . ' ریال برای امروز' : ($remaining_days == 1 ? beautifulNumber($next_installment['amount']) . ' ریال برای فردا' :
-                    beautifulNumber($next_installment['amount']) . ' ریال برای ' . $remaining_days . ' روز دیگر');
-        } else $next_payment_text = 'پایان یافته';
+            $remaining_days = beautifulNumber($next_installment['remaining_days'], null);
+            $inst_amount = beautifulNumber($next_installment['amount']);
 
-        // Loan name and button
-        $loan_callback = json_encode(['view_loan' => $loan['id']]);
-        $loan_name_html = "<tg-button type='callback_data' data='$loan_callback'>" . beautifulNumber($loan['name'], null) . "</tg-button>";
+            if ($remaining_days == '۰') $next_payment_text = $inst_amount . " ریال برای امروز";
+            elseif ($remaining_days == '۱') $next_payment_text = $inst_amount . " ریال برای فردا";
+            else $next_payment_text = $inst_amount . ' ریال برای ' . $remaining_days . ' روز دیگر';
 
-        if (!$summerized)
-            $insts_detail_html = "‏" . "┤─ " . 'مبلغ وام: ' . beautifulNumber($loan['total_amount']) .
-                '<br>' . "‏" . "┤─ " . 'تاریخ دریافت: ' . beautifulNumber($loan['received_date'], null) .
-                '<br>' . "‏" . "┤─ " . 'قسط بعدی: ' . beautifulNumber($next_payment_text, null);
-        else
-            $insts_detail_html = ': ' . beautifulNumber($next_payment_text, null) . "<p>$summerized_insts_text</p>";
+        } else
+            $next_payment_text = 'پایان یافته';
 
-        $html .= "<li>$loan_name_html<p>$insts_detail_html$installments_detail<br></p></li>";
+        // General HTML information of the loan without outer tag: $loan_general_html
+        $loan_general_html = $summerized ?
+            ": $next_payment_text" :
+            "<br>┤─ " . "مبلغ وام: " . beautifulNumber($loan['total_amount']) .
+            "<br>┤─ " . "تاریخ دریافت: " . beautifulNumber($loan['received_date'], null) .
+            "<br>┤─ " . "قسط بعدی: " . beautifulNumber($next_payment_text, null);
+
+        $loans_html .= "<li>" . $loan_name_html . $loan_general_html . $insts_html . "<br>‏" . "</li>";
     }
 
-    $total_summery_report_text =
-        '<h4>' . "خلاصه وضعیت اقساط وام‌های جاری: " . '</h4>' . '<ul>' .
-        "<li>🟢 " . "جمع اقساط پرداخت شده: " . beautifulNumber($paid_total) . '</li>' .
-        "<li>🔴 " . "جمع اقساط معوق: " . beautifulNumber($overdue_total) . '</li>' .
-        "<li>⚪ " . "جمع اقساط سررسید نشده: " . beautifulNumber($remaining_total) . '</li>' .
-        '</ul>';
+    // Calculate total numbers for summery
+    $total_paid = 0;
+    $total_overdue = 0;
+    $total_remaining = 0;
+    foreach ($loans as $loan) {
+        $total_paid += $loan['insts_summary']['paid_sum'];
+        $total_overdue += $loan['insts_summary']['overdue_sum'];
+        $total_remaining += $loan['insts_summary']['remaining_sum'];
 
-    return ['is_rtl' => true, 'html' => $total_summery_report_text . "<hr>" . '<h3>' . 'وام‌های ثبت شده‌ی شما: ' . '</h3>' . "<ul>$html</ul>"];
+    }
+
+    // Total summery HTML for the beginning of the HTML code
+    $total_summery_html =
+        "<h4>" . "خلاصه وضعیت اقساط وام‌های جاری: " . "</h4>" . "<ul>" .
+        "<li>🟢 " . "جمع اقساط پرداخت شده: " . beautifulNumber($total_paid) . "</li>" .
+        "<li>🔴 " . "جمع اقساط معوق: " . beautifulNumber($total_overdue) . "</li>" .
+        "<li>⚪ " . "جمع اقساط سررسید نشده: " . beautifulNumber($total_remaining) . "</li>" .
+        "</ul>";
+
+    // Final HTML code
+    $html = "$total_summery_html<hr><h3>" . "وام‌های ثبت شده‌ی شما: " . "</h3><ul>$loans_html</ul>";
+    return ['is_rtl' => true, 'html' => $html];
 }
 
 function createLoanDetailRichMessage(array $loan): array
@@ -311,4 +329,31 @@ function createLoanDetailRichMessage(array $loan): array
     } else $html = '<p>هیچ قسطی برای این وام ثبت نشده است!</p>';
 
     return ['is_rtl' => true, 'html' => $html];
+}
+
+function createLoanDetailInlineKeyboard(array $installments, int $col_count = 4): array
+{
+    $keyboard = [];
+    $button_array = [];
+    foreach ($installments as $installment) {
+        if ($installment['is_paid'])
+            $payment_emoji = "🟢";
+        elseif ($installment['is_due'])
+            if ($installment['remaining_days'] == 0)
+                $payment_emoji = "🟡";
+            else $payment_emoji = "🔴";
+        else $payment_emoji = "⚪";
+        $button_array[] = [
+            'text' => beautifulNumber("$payment_emoji $installment[due_date]", null),
+            'callback_data' => json_encode(['inplace_inst_pay_toggle' => $installment['id']]),
+        ];
+        if (sizeof($button_array) >= $col_count) {
+            $keyboard[] = $button_array;
+            $button_array = [];
+        }
+    }
+    $keyboard[] = $button_array;
+    $keyboard[] = [['text' => 'برگشت به لیست وام‌ها', 'callback_data' => json_encode(['loans_list' => null])]];
+
+    return $keyboard;
 }

@@ -69,14 +69,14 @@ function handleLoansCallback(
                 ]
             ];
             sendToTelegram('sendMessage', $data);
-            sendToTelegram('deleteMessage', ['chat_id' => $user->getId(), 'message_id' => $message['message_id']]);
             sendAllLoans($user, $db, $user->getDetailedLoan());
+            sendToTelegram('deleteMessage', ['chat_id' => $user->getId(), 'message_id' => $message['message_id']]);
             break;
 
         case 'detailed_loans':
-            sendAllLoans($user, $db, $query_data[$query_key]);
+            sendAllLoans($user, $db, $query_data[$query_key], $message['message_id']);
             $user->setDetailedLoan($query_data[$query_key]);
-            $db->update('users', ['settings' => json_encode($user->getSettings())], ['id' => $user->getId()]);
+            $db->update('users', $user->toDbArray(), ['id' => $user->getId()]);
             break;
 
         case 'view_loan':
@@ -104,8 +104,8 @@ function handleLoansCallback(
                 $response = sendToTelegram('sendMessage', $data);
                 if ($response) {
                     $db->update('users', $user->setProgress(null)->toDbArray(), ['id' => $user->getId()]);
-                    sendToTelegram('deleteMessage', ['chat_id' => $data['chat_id'], 'message_id' => $message['message_id']]);
                     sendLoanDetail($user->getId(), $loan);
+                    sendToTelegram('deleteMessage', ['chat_id' => $data['chat_id'], 'message_id' => $message['message_id']]);
                 }
             }
             break;
@@ -267,6 +267,7 @@ function handleLoansWebAppData(
             [createWebAppBtn('✏ ویرایش وام «' . $loan['name'] . '»', '/assets/loan.html', ['data' => $encoded_loan])]);
         sendToTelegram('sendMessage', $data);
         sendLoanDetail($user->getId(), $loan);
+        exit;
     }
 
     // Delete existing loan and related installments
@@ -303,14 +304,15 @@ function handleLoansWebAppData(
 function sendAllLoans(
     User            $user,
     DatabaseManager $db,
-    bool            $summerized = true): void
+    bool            $summerized = true,
+    string|int|null $message_id = null
+): void
 {
 
     $loans = getLoanWithInstallments(user_id: $user->getId(), db: $db, jalali: true);
 
     if ($loans) {
-
-        sendToTelegram('sendRichMessage', [
+        $data = [
             'chat_id' => $user->getid(),
             'rich_message' => createLoansRichMessage($loans, $summerized),
             'reply_markup' => ['inline_keyboard' => [
@@ -322,9 +324,15 @@ function sendAllLoans(
                     'callback_data' => json_encode(['insts_for_n_days' => 30])
                 ]]
             ]]
-        ]);
+        ];
+        if ($message_id) {
+            $data['message_id'] = $message_id;
+            sendToTelegram('editMessageText', $data);
+        } else
+            sendToTelegram('sendRichMessage', $data);
     } else {
-        sendToTelegram('sendMessage', ['chat_id' => $user->getid(), 'text' => 'هیچ وام یا قسطی برای شما ثبت نشده است!']);
+        if ($message_id) sendToTelegram('sendMessage', ['chat_id' => $user->getid(), 'message_id' => $message_id, 'text' => 'هیچ وام یا قسطی برای شما ثبت نشده است!']);
+        else sendToTelegram('sendMessage', ['chat_id' => $user->getid(), 'text' => 'هیچ وام یا قسطی برای شما ثبت نشده است!']);
     }
 
     $db->update('users', $user->toDbArray(), ['id' => $user->getId()]);
@@ -381,16 +389,13 @@ function sendInstallmentsForNextNDays(User $user, DatabaseManager $db, int $n = 
         return false;
 }
 
-#[NoReturn]
 function sendLoanDetail(string|int $chat_id, array $loan, string|int|null $message_id = null): void
 {
     $data = [
         'chat_id' => $chat_id,
         'rich_message' => createLoanDetailRichMessage($loan),
         'reply_markup' => [
-            'inline_keyboard' => [
-                [['text' => 'برگشت به لیست وام‌ها', 'callback_data' => json_encode(['loans_list' => null])]]
-            ]
+            'inline_keyboard' => createLoanDetailInlineKeyboard($loan['installments']),
         ]
     ];
     if ($message_id) {
@@ -399,8 +404,6 @@ function sendLoanDetail(string|int $chat_id, array $loan, string|int|null $messa
     } else {
         sendToTelegram('sendRichMessage', $data);
     }
-
-    exit;
 }
 
 function payInstallmentFromCronJob(User $user, array $callback_query, array $message, DatabaseManager $db): void
@@ -434,8 +437,6 @@ function inplaceInstallmentPaymentToggle(User $user, string|int $installment_id,
 
     $loan = getLoanWithInstallments(user_id: $user->getId(), db: $db, jalali: true, installment_id: $installment_id);
 
-    if ($loan) {
-        sendLoanDetail($user->getId(), $loan, $message['message_id']);
-    }
+    if ($loan) sendLoanDetail($user->getId(), $loan, $message['message_id']);
     exit();
 }
