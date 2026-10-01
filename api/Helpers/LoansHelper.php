@@ -165,6 +165,7 @@ function prepareLoanForWebApp(array $loan): array
 function createLoansRichMessage(array $loans, bool $summerized = true): array
 {
     /**
+     * TODO: Clean this function
      * Considerations for `$loans` array:
      *  -- Each loan must have all related
      *     installments under `installments` column.
@@ -257,7 +258,7 @@ function createLoansRichMessage(array $loans, bool $summerized = true): array
     return ['is_rtl' => true, 'html' => $total_summery_report_text . "<hr>" . '<h3>' . 'وام‌های ثبت شده‌ی شما: ' . '</h3>' . "<ul>$html</ul>"];
 }
 
-function createLoanDetailRichMessage(array $loan, ?string $mssg_id = null): array
+function createLoanDetailRichMessage(array $loan): array
 {
     /**
      * Generates a formatted loan details text with installment information.
@@ -305,7 +306,8 @@ function createLoanDetailRichMessage(array $loan, ?string $mssg_id = null): arra
             "<br>" . "شروع یادآوری اقساط از " . beautifulNumber($loan['alert_offset']) . " روز قبل از سررسید" .
             "<br>" . "جزئیات اقساط: ";
 
-        $html = "<h3>$loan[name]</h3>" . "<p>$loan_general_info$installments_text</p>";
+        $footer = "<footer>برای تغییر وضعیت پرداخت هر قسط، ایموجی آن قسط را لمس کنید.</footer>";
+        $html = "<h3>$loan[name]</h3>" . "<p>$loan_general_info$installments_text</p><hr>$footer";
     } else $html = '<p>هیچ قسطی برای این وام ثبت نشده است!</p>';
 
     return ['is_rtl' => true, 'html' => $html];

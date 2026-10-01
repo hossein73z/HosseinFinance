@@ -36,20 +36,7 @@ function alerts_menu(
         }
     }
 
-    $data = [
-        'chat_id' => $user->getid(),
-        'text' => $data['text'] ?? $user->getButton()->getText(),
-        'reply_markup' => [
-            'keyboard' => $data['reply_markup']['keyboard'] ?? $user->getKeyboard(),
-            'resize_keyboard' => true,
-            'is_persistent' => true,
-            'input_field_placeholder' => $user->getButton()->getText()
-        ]
-    ];
-
-    $response = sendToTelegram('sendMessage', $data);
-    if ($response)
-        $db->update('users', ['button' => json_encode($user->getButton()), 'progress' => null], ['id' => $user->getId()]);
+    sendInitialLevelMessage($user, $db, $data ?? null);
     if (!$message) sendAllAlerts($user, $db);
     exit($user->getButton()->getText());
 }

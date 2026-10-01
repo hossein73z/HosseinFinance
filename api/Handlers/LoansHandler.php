@@ -27,21 +27,10 @@ function loans_menu(
         handleLoansWebAppData($user, $message, $db);
     elseif ($pressed_button_id = getPressedButtonID($message['text'], $user))
         levelHandler($user, $db, button_id: $pressed_button_id);
+    else
+        $data['text'] = 'پیام نامفهوم است.';
 
-    $data = [
-        'chat_id' => $user->getid(),
-        'text' => $data['text'] ?? $user->getButton()->getText(),
-        'reply_markup' => [
-            'keyboard' => $data['reply_markup']['keyboard'] ?? $user->getKeyboard(),
-            'resize_keyboard' => true,
-            'is_persistent' => false,
-            'input_field_placeholder' => $user->getButton()->getText()
-        ]
-    ];
-
-    $response = sendToTelegram('sendMessage', $data);
-    if ($response)
-        $db->update('users', ['button' => json_encode($user->getButton()), 'progress' => null], ['id' => $user->getId()]);
+    sendInitialLevelMessage($user, $db, $data ?? null);
     if (!$message) sendAllLoans($user, $db, $user->getDetailedLoan());
     exit($user->getButton()->getText());
 }
@@ -116,7 +105,7 @@ function handleLoansCallback(
                 if ($response) {
                     $db->update('users', $user->setProgress(null)->toDbArray(), ['id' => $user->getId()]);
                     sendToTelegram('deleteMessage', ['chat_id' => $data['chat_id'], 'message_id' => $message['message_id']]);
-                    sendLoanDetail($loan, $data);
+                    sendLoanDetail($user->getId(), $loan);
                 }
             }
             break;
@@ -277,7 +266,7 @@ function handleLoansWebAppData(
             $data['reply_markup']['keyboard'],
             [createWebAppBtn('✏ ویرایش وام «' . $loan['name'] . '»', '/assets/loan.html', ['data' => $encoded_loan])]);
         sendToTelegram('sendMessage', $data);
-        sendLoanDetail($loan, $data);
+        sendLoanDetail($user->getId(), $loan);
     }
 
     // Delete existing loan and related installments
@@ -393,11 +382,17 @@ function sendInstallmentsForNextNDays(User $user, DatabaseManager $db, int $n = 
 }
 
 #[NoReturn]
-function sendLoanDetail(array $loan, array $data, string|int|null $message_id = null): void
+function sendLoanDetail(string|int $chat_id, array $loan, string|int|null $message_id = null): void
 {
-
-    $data['rich_message'] = createLoanDetailRichMessage($loan, $message_id);
-    $data['reply_markup'] = ['inline_keyboard' => [[['text' => 'برگشت به لیست وام‌ها', 'callback_data' => json_encode(['loans_list' => null])]]]];
+    $data = [
+        'chat_id' => $chat_id,
+        'rich_message' => createLoanDetailRichMessage($loan),
+        'reply_markup' => [
+            'inline_keyboard' => [
+                [['text' => 'برگشت به لیست وام‌ها', 'callback_data' => json_encode(['loans_list' => null])]]
+            ]
+        ]
+    ];
     if ($message_id) {
         $data['message_id'] = $message_id;
         sendToTelegram('editMessageText', $data);
@@ -440,12 +435,7 @@ function inplaceInstallmentPaymentToggle(User $user, string|int $installment_id,
     $loan = getLoanWithInstallments(user_id: $user->getId(), db: $db, jalali: true, installment_id: $installment_id);
 
     if ($loan) {
-        sendToTelegram('editMessageText', [
-            'chat_id' => $user->getid(),
-            'message_id' => $message['message_id'],
-            'rich_message' => createLoanDetailRichMessage($loan, $message['message_id']),
-            'reply_markup' => ['inline_keyboard' => [[['text' => 'برگشت به لیست وام‌ها', 'callback_data' => json_encode(['loans_list' => null])]]]]
-        ]);
+        sendLoanDetail($user->getId(), $loan, $message['message_id']);
     }
     exit();
 }
