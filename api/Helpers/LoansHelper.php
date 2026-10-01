@@ -290,7 +290,7 @@ function createLoanDetailRichMessage(array $loan, ?string $mssg_id = null): arra
             $date = beautifulNumber($installment['due_date'], null);
             $amount = beautifulNumber($installment['amount']);
 
-            $emoji_callback= json_encode(['inplace_inst_pay_toggle' => $installment['id']]);
+            $emoji_callback = json_encode(['inplace_inst_pay_toggle' => $installment['id']]);
             $emoji_button_html = "<tg-button type='callback_data' data='$emoji_callback'>$payment_emoji</tg-button>";
             $installments_text .= "<br>‏&nbsp;&nbsp;&nbsp;&nbsp;$inst_num) $emoji_button_html $date: $amount";
         }
@@ -309,33 +309,4 @@ function createLoanDetailRichMessage(array $loan, ?string $mssg_id = null): arra
     } else $html = '<p>هیچ قسطی برای این وام ثبت نشده است!</p>';
 
     return ['is_rtl' => true, 'html' => $html];
-}
-
-function createLoanDetailKeyboard(array $loan): array
-{
-    $keyboard = [];
-    $keyboard_row = [];
-    $btn_in_row = 3;
-    if ($loan['installments'])
-        foreach ($loan['installments'] as $installment) {
-
-            if ($installment['is_paid']) $payment_icon = '🟢';
-            elseif ($installment['is_due']) $payment_icon = $installment['remaining_days'] == 0 ? "🟡" : '🔴';
-            else $payment_icon = "⚪";
-
-            $keyboard_row[] = [
-                'text' => $payment_icon . ' ' . beautifulNumber($installment['due_date'], null),
-                'callback_data' => json_encode(['inplace_inst_pay_toggle' => $installment['id']])
-            ];
-
-            if (sizeof($keyboard_row) >= $btn_in_row) {
-                $keyboard[] = $keyboard_row;
-                $keyboard_row = [];
-            }
-        }
-
-    if ($keyboard_row) $keyboard[] = $keyboard_row;
-    $keyboard[] = [['text' => 'لیست وام‌ها', 'callback_data' => json_encode(['loans_list' => null])]];
-
-    return $keyboard;
 }

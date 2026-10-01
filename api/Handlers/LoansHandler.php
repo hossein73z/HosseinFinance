@@ -399,7 +399,7 @@ function handleLoansTextMessage(
                     'chat_id' => $user->getid(),
                     'message_id' => $matches[2],
                     'rich_message' => createLoanDetailRichMessage($loan, $matches[2]),
-                    'reply_markup' => ['inline_keyboard' => createLoanDetailKeyboard($loan)]
+                    'reply_markup' => ['inline_keyboard' => [[['text' => 'برگشت به لیست وام‌ها', 'callback_data' => json_encode(['loans_list' => null])]]]]
                 ]);
             }
             exit;
@@ -497,8 +497,7 @@ function sendLoanDetail(array $loan, array $data, string|int|null $message_id = 
 {
 
     $data['rich_message'] = createLoanDetailRichMessage($loan, $message_id);
-    $data['reply_markup'] = ['inline_keyboard' => createLoanDetailKeyboard($loan)];
-
+    $data['reply_markup'] = ['inline_keyboard' => [[['text' => 'برگشت به لیست وام‌ها', 'callback_data' => json_encode(['loans_list' => null])]]]];
     if ($message_id) {
         $data['message_id'] = $message_id;
         sendToTelegram('editMessageText', $data);
@@ -545,7 +544,7 @@ function inplaceInstallmentPaymentToggle(User $user, string|int $installment_id,
             'chat_id' => $user->getid(),
             'message_id' => $message['message_id'],
             'rich_message' => createLoanDetailRichMessage($loan, $message['message_id']),
-            'reply_markup' => ['inline_keyboard' => createLoanDetailKeyboard($loan)]
+            'reply_markup' => ['inline_keyboard' => [[['text' => 'برگشت به لیست وام‌ها', 'callback_data' => json_encode(['loans_list' => null])]]]]
         ]);
     }
     exit();
