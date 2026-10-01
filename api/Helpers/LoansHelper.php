@@ -257,7 +257,7 @@ function createLoansRichMessage(array $loans, bool $summerized = true): array
     return ['is_rtl' => true, 'html' => $total_summery_report_text . "<hr>" . '<h3>' . 'وام‌های ثبت شده‌ی شما: ' . '</h3>' . "<ul>$html</ul>"];
 }
 
-function createLoanDetailText(array $loan, ?string $markdown = null, ?string $mssg_id = null): string
+function createLoanDetailRichMessage(array $loan, ?string $mssg_id = null): array
 {
     /**
      * Generates a formatted loan details text with installment information.
@@ -290,29 +290,25 @@ function createLoanDetailText(array $loan, ?string $markdown = null, ?string $ms
             $date = beautifulNumber($installment['due_date'], null);
             $amount = beautifulNumber($installment['amount']);
 
-            if ($markdown) {
-                $link = "https://t.me/" . BOT_ID . "?start=toggleInstPayment_instId$installment[id]_mssgId$mssg_id";
-                $installments_text .= "\n" . '‏' . '    ' . markdownScape($inst_num) . "\) [$payment_emoji]($link)  " . markdownScape($date) . ':  ' . markdownScape($amount);
-            } else
-                $installments_text .= "\n" . '‏' . "    $inst_num) $payment_emoji  $date:  $amount";
+            $emoji_callback= json_encode(['inplace_inst_pay_toggle' => $installment['id']]);
+            $emoji_button_html = "<tg-button type='callback_data' data='$emoji_callback'>$payment_emoji</tg-button>";
+            $installments_text .= "<br>‏&nbsp;&nbsp;&nbsp;&nbsp;$inst_num) $emoji_button_html $date: $amount";
         }
 
-        $general_info = "‏*" . $loan['name'] . "*:\n" .
-            "\n" . "مبلغ وام\: " . beautifulNumber($loan['total_amount']) .
-            "\n" . "تاریخ دریافت\: " . beautifulNumber($loan['received_date'], null) .
-            "\n" . "کل بازپرداخت\: " . beautifulNumber(array_sum(array_column($installments, 'amount'))) .
-            "\n" . beautifulNumber($loan['insts_summary']['paid_count']) . " قسط پرداخت‌شده، معادل " . beautifulNumber($loan['insts_summary']['paid_sum']) .
-            "\n" . beautifulNumber($loan['insts_summary']['remaining_count']) . " قسط باقی مانده، معادل " . beautifulNumber($loan['insts_summary']['remaining_sum']) .
-            "\n" . beautifulNumber($loan['insts_summary']['overdue_count']) . " قسط معوقه، معادل " . beautifulNumber($loan['insts_summary']['overdue_sum']) .
-            "\n" . "شروع یادآوری اقساط از " . beautifulNumber($loan['alert_offset']) . " روز قبل از سررسید" .
-            "\n" . "جزئیات اقساط\:";
+        $loan_general_info =
+            "<br>" . "مبلغ وام: " . beautifulNumber($loan['total_amount']) .
+            "<br>" . "تاریخ دریافت: " . beautifulNumber($loan['received_date'], null) .
+            "<br>" . "کل بازپرداخت: " . beautifulNumber(array_sum(array_column($installments, 'amount'))) .
+            "<br>" . "تعداد اقساط پرداخت‌شده: " . beautifulNumber($loan['insts_summary']['paid_count']) . " (معادل " . beautifulNumber($loan['insts_summary']['paid_sum']) . " ریال)" .
+            "<br>" . "تعداد اقساط باقی مانده: " . beautifulNumber($loan['insts_summary']['remaining_count']) . " (معادل " . beautifulNumber($loan['insts_summary']['remaining_sum']) . " ریال)" .
+            "<br>" . "تعداد اقساط معوقه: " . beautifulNumber($loan['insts_summary']['overdue_count']) . " (معادل " . beautifulNumber($loan['insts_summary']['overdue_sum']) . " ریال)" .
+            "<br>" . "شروع یادآوری اقساط از " . beautifulNumber($loan['alert_offset']) . " روز قبل از سررسید" .
+            "<br>" . "جزئیات اقساط: ";
 
-        if ($markdown) $general_info = markdownScape($general_info);
+        $html = "<h3>$loan[name]</h3>" . "<p>$loan_general_info$installments_text</p>";
+    } else $html = '<p>هیچ قسطی برای این وام ثبت نشده است!</p>';
 
-        $text = $general_info . $installments_text;
-    } else $text = $markdown ? markdownScape('هیچ قسطی برای این وام ثبت نشده است!') : 'هیچ قسطی برای این وام ثبت نشده است!';
-
-    return $text;
+    return ['is_rtl' => true, 'html' => $html];
 }
 
 function createLoanDetailKeyboard(array $loan): array

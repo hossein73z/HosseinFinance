@@ -45,7 +45,7 @@ function handleIncomingMessage(array $message, DatabaseManager $db): void
     // Levels' Main Commands
     if ($text === '/start') mainMenu($user, $db);
     if ($text === '/holdings') holdings_menu($user, $db);
-    if ($text === '/loans') level_2($user, $db);
+    if ($text === '/loans') loans_menu($user, $db);
     if ($text === '/prices') prices_menu($user, $db);
     if ($text === '/alerts') alerts_menu($user, $db);
 
@@ -132,7 +132,7 @@ function levelHandler(
         case 'holdings':
             holdings_menu(user: $user, db: $db, message: $message, callback_query: $callback_query);
         case 'loans':
-            level_2(user: $user, db: $db, message: $message, callback_query: $callback_query);
+            loans_menu(user: $user, db: $db, message: $message, callback_query: $callback_query);
         case 'add_new_holding':
             add_holding_menu(user: $user, db: $db, message: $message, callback_query: $callback_query);
         case 'prices':

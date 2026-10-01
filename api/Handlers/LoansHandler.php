@@ -3,7 +3,7 @@
 use JetBrains\PhpStorm\NoReturn;
 
 #[NoReturn]
-function level_2(
+function loans_menu(
     User            $user,
     DatabaseManager $db,
     ?array          $message = null,
@@ -66,8 +66,6 @@ function handleLoansCallback(
     $query_data = $callback_query['data'];
     $query_key = array_key_first($query_data);
 
-    sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
-
     switch ($query_key) {
         case 'loans_list':
             $data = [
@@ -121,6 +119,9 @@ function handleLoansCallback(
                 }
             }
             break;
+
+        case 'inplace_inst_pay_toggle':
+            inplaceInstallmentPaymentToggle($user, $callback_query['data']['inplace_inst_pay_toggle'], $message, $db);
 
         default:
             sendToTelegram('editMessageText', [
@@ -382,7 +383,8 @@ function handleLoansTextMessage(
             join: 'LEFT JOIN loans l ON i.loan_id = l.id'
         );
 
-        if ($installment) { // else: Default Irrelevance message will be sent
+        if ($installment) {
+            // else: Default Irrelevance message will be sent
 
             $db->update(
                 table: 'installments',
@@ -396,8 +398,7 @@ function handleLoansTextMessage(
                 sendToTelegram('editMessageText', [
                     'chat_id' => $user->getid(),
                     'message_id' => $matches[2],
-                    'text' => createLoanDetailText($loan, 'MarkdownV2', $matches[2]),
-                    'parse_mode' => 'MarkdownV2',
+                    'rich_message' => createLoanDetailRichMessage($loan, $matches[2]),
                     'reply_markup' => ['inline_keyboard' => createLoanDetailKeyboard($loan)]
                 ]);
             }
@@ -492,21 +493,18 @@ function sendInstallmentsForNextNDays(User $user, DatabaseManager $db, int $n = 
 }
 
 #[NoReturn]
-function sendLoanDetail(array $loan, array $data, string|int|null $mssg_id_to_edit = null): void
+function sendLoanDetail(array $loan, array $data, string|int|null $message_id = null): void
 {
 
-    if (!$mssg_id_to_edit) {
-        $temp_mssg = sendLoadingMessage($data['chat_id'], 'در حال دریافت اطلاعات اقساط ...');
-        if ($temp_mssg) $mssg_id_to_edit = $temp_mssg['result']['message_id'];
-        else exit;
-    }
-
-    $data['message_id'] = $mssg_id_to_edit;
-    $data['text'] = createLoanDetailText($loan, 'MarkdownV2', $mssg_id_to_edit);
-    $data['parse_mode'] = 'MarkdownV2';
+    $data['rich_message'] = createLoanDetailRichMessage($loan, $message_id);
     $data['reply_markup'] = ['inline_keyboard' => createLoanDetailKeyboard($loan)];
 
-    sendToTelegram('editMessageText', $data);
+    if ($message_id) {
+        $data['message_id'] = $message_id;
+        sendToTelegram('editMessageText', $data);
+    } else {
+        sendToTelegram('sendRichMessage', $data);
+    }
 
     exit;
 }
@@ -534,12 +532,10 @@ function payInstallmentFromCronJob(User $user, array $callback_query, array $mes
     exit();
 }
 
-function inplaceInstallmentPaymentToggle(User $user, array $callback_query, array $message, DatabaseManager $db): void
+#[NoReturn]
+function inplaceInstallmentPaymentToggle(User $user, string|int $installment_id, array $message, DatabaseManager $db): void
 {
 
-    $installment_id = $callback_query['data']['inplace_inst_pay_toggle'];
-
-    // FIXME: Duplicate code fragment
     $db->query("update installments set is_paid = !is_paid where id = $installment_id")->fetch();
 
     $loan = getLoanWithInstallments(user_id: $user->getId(), db: $db, jalali: true, installment_id: $installment_id);
@@ -548,8 +544,7 @@ function inplaceInstallmentPaymentToggle(User $user, array $callback_query, arra
         sendToTelegram('editMessageText', [
             'chat_id' => $user->getid(),
             'message_id' => $message['message_id'],
-            'text' => createLoanDetailText($loan, 'MarkdownV2', $message['message_id']),
-            'parse_mode' => 'MarkdownV2',
+            'rich_message' => createLoanDetailRichMessage($loan, $message['message_id']),
             'reply_markup' => ['inline_keyboard' => createLoanDetailKeyboard($loan)]
         ]);
     }
