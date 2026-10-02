@@ -31,9 +31,9 @@ function mainMenu(
                 ], [
                     ['id' => 'prices', 'text' => '💰 قیمت‌ها', 'admin_key' => 0],
                     ['id' => 'alerts', 'text' => '🔔 هشدارها', 'admin_key' => 0],
-                ], [
-                    ['id' => 'accounts', 'text' => '🧾 حساب‌ها', 'admin_key' => 0],
-                    ['id' => 'transactions', 'text' => '🔃 تراکنش‌ها', 'admin_key' => 0]
+//                ], [
+//                    ['id' => 'accounts', 'text' => '🧾 حساب‌ها', 'admin_key' => 0],
+//                    ['id' => 'transactions', 'text' => '🔃 تراکنش‌ها', 'admin_key' => 0]
                 ], [
                     ['id' => 'administration', 'text' => '👑 بخش مدیریت', 'style' => 'danger', 'admin_key' => 1],
                     ['id' => 'settings', 'text' => '⚙ تنظیمات', 'style' => 'primary', 'admin_key' => 0]

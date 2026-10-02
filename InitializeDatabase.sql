@@ -10,44 +10,6 @@ CREATE TABLE IF NOT EXISTS `users`
     is_admin   BOOLEAN NOT NULL DEFAULT 0
 ) DEFAULT CHARSET = utf8mb4;
 
-CREATE TABLE IF NOT EXISTS `buttons`
-(
-    id        VARCHAR(36) PRIMARY KEY,
-    attrs     JSON    NOT NULL,
-    admin_key BOOLEAN NOT NULL DEFAULT 0
-) DEFAULT CHARSET = utf8mb4;
-INSERT INTO `buttons` (`id`, `attrs`, `admin_key`)
-VALUES ('0', '{\"text\": \"🏠 صفحه اصلی\"}', 0),
-       ('1', '{\"text\": \"💼 دارایی‌ها\"}', 0),
-       ('2', '{\"text\": \"🏦 وام و اقساط\"}', 0),
-       ('3', '{\"text\": \"🛠 ابزارها\"}', 0),
-       ('4', '{\"text\": \"👑 بخش مدیریت\"}', 1),
-       ('5', '{\"text\": \"💰 قیمت‌ها\"}', 0),
-       ('7', '{\"text\": \"⚙ تنظیمات\"}', 0),
-       ('8', '{\"text\": \"🔔 هشدارها\"}', 0),
-       ('9', '{\"text\": \"🧾 حساب‌ها\"}', 0),
-       ('10', '{\"text\": \"➕ افزودن حساب جدید\"}', 0),
-       ('11', '{\"text\": \"🔃 تراکنش‌ها\"}', 0),
-       ('12', '{\"text\": \"➕ افزودن تراکنش جدید\"}', 0),
-       ('s0', '{\"text\": \"🔙 برگشت 🔙\"}', 0),
-       ('s1', '{\"text\": \"❌ لغو ❌\"}', 0),
-       ('s2', '{\"text\": \"❤ علاقه‌مندی‌ها ❤\"}', 0),
-       ('s3', '{\"text\": \"Empty Button\"}', 0),
-       ('s4', '{\"text\": \"💲 ارز پایه\"}', 0),
-       ('s5', '{\"text\": \"مشخصات دیتابیس\"}', 0),
-       ('s6', '{\"text\": \"مشخصات هاست\"}', 0);
-
-CREATE TABLE IF NOT EXISTS `keyboard_layout`
-(
-    `parent_id` VARCHAR(36) NOT NULL,
-    `row_idx`   INT         NOT NULL,
-    `col_idx`   INT         NOT NULL,
-    `button_id` VARCHAR(36) NOT NULL,
-    PRIMARY KEY (`parent_id`, `row_idx`, `col_idx`),
-    FOREIGN KEY (`parent_id`) REFERENCES `buttons` (`id`) ON DELETE CASCADE,
-    FOREIGN KEY (`button_id`) REFERENCES `buttons` (`id`) ON DELETE CASCADE
-) DEFAULT CHARSET = utf8mb4;
-
 CREATE TABLE IF NOT EXISTS `assets`
 (
     id            INT AUTO_INCREMENT PRIMARY KEY,

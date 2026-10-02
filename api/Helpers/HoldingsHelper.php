@@ -98,27 +98,6 @@ function sendHoldingDetail(User $user, array $holding, string|int $message_id, b
     sendToTelegram('editMessageText', $data);
 }
 
-function checkAndAddEditHoldingButton(array $data, User $user, DatabaseManager $db): array
-{
-    $progress = $user->getProgress();
-    if ($progress && key($progress) === 'view_holding') {
-        $holding = getHoldingsWithAssetDetails(['h.id' => $progress['view_holding']['holding_id'], 'h.user_id' => $user->getId()], $db, true);
-
-        if ($holding) {
-            array_unshift($data['reply_markup']['keyboard'], [
-                createWebAppBtn(
-                    text: '✏ ویرایش ' . $holding['asset_name'],
-                    path: '/assets/holding.html',
-                    params: ['holding' => base64_encode(json_encode($holding))],
-                    add_api: true
-                )
-            ]);
-        }
-    }
-
-    return $data;
-}
-
 /**
  * Return a list of holdings (Or just one, if `Single == true`) containing `asset_name`,
  * `asset_type`, `current_price`, `base_currency` and `exchange_rate` (Based on user's base currency).

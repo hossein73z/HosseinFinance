@@ -218,8 +218,8 @@ function handleHoldingsWebAppData(User $user, array $message, DatabaseManager $d
         $db->update('users', ['progress' => null], ['id' => $user->getId()]);
         sendAllHoldings($user, $db);
     } else {
+        // TODO: Needs to be checked
         $data['text'] = 'داده‌های ارسالی قابل پردازش نیستند!';
-        $data = checkAndAddEditHoldingButton($data, $user, $db);
         sendToTelegram('sendMessage', $data);
     }
     exit;

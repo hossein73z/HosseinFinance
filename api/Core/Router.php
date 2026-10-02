@@ -101,6 +101,9 @@ function handleCallbackQuery(array $callback_query, DatabaseManager $db): void
             case 'show_favorites':
                 prices_menu($user, $db, $message, $callback_query);
 
+            case 'set_base_currency':
+                setBaseCurrency($user, $callback_query, $message, $db);
+
             default:
                 levelHandler($user, $db, $message, $callback_query);
         }
@@ -147,6 +150,10 @@ function levelHandler(
             sendHostInformation($user);
         case'database_info':
             sendDBInformation($user);
+        case 'settings':
+            settingsMenu(user: $user, db: $db, message: $message, callback_query: $callback_query);
+        case 'select_base_currency':
+            sendSelectBaseCurrencyMessage($user, $db);
         default:
             exit('Unhandled ' . ($message && isset($message['text']) ? "message: text=\"$message[text]\"" : "button: id=\"$button_id\""));
     }
