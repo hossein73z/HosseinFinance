@@ -97,8 +97,12 @@ function handleLoansCallback(
             }
             break;
 
-        case 'inplace_inst_pay_toggle':
-            inplaceInstallmentPaymentToggle($user, $callback_query['data']['inplace_inst_pay_toggle'], $message, $db);
+        case 'toggle_inst_pay':
+            // Data structure: query_data = [toggle_inst_pay = [loan_id, installment_id]];
+            $loan_id = $query_data[$query_key][0];
+            $inst_id = $query_data[$query_key][1];
+
+            inplaceInstallmentPaymentToggle($user, $loan_id, $inst_id, $message, $db);
 
         case 'insts_for_n_days':
             sendInstallmentsForNextNDays($user, $db, mssg_id_to_edit: $message['message_id']);
@@ -263,7 +267,7 @@ function handleLoansWebAppData(
         }
 
         $loan = getLoanWithInstallments(user_id: $user->getId(), db: $db, jalali: true, loan_id: $web_app_data['id']);
-        sendLoanDetail($user, $loan, $db, $text);
+        sendLoanDetail($user, $loan, $db, null, $text);
         exit;
     }
 
@@ -448,12 +452,12 @@ function payInstallmentFromCronJob(User $user, array $callback_query, array $mes
 }
 
 #[NoReturn]
-function inplaceInstallmentPaymentToggle(User $user, string|int $installment_id, array $message, DatabaseManager $db): void
+function inplaceInstallmentPaymentToggle(User $user, string|int $loan_id, string|int $installment_id, array $message, DatabaseManager $db): void
 {
 
     $db->query("update installments set is_paid = !is_paid where id = $installment_id")->fetch();
 
-    $loan = getLoanWithInstallments(user_id: $user->getId(), db: $db, jalali: true, installment_id: $installment_id);
+    $loan = getLoanWithInstallments(user_id: $user->getId(), db: $db, jalali: true, loan_id: $loan_id);
 
     if ($loan) sendLoanDetail($user, $loan, null, $message['message_id']);
     exit();

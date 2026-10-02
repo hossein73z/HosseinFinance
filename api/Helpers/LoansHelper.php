@@ -309,7 +309,7 @@ function createLoanDetailRichMessage(array $loan): array
             $date = beautifulNumber($installment['due_date'], null);
             $amount = beautifulNumber($installment['amount']);
 
-            $emoji_callback = json_encode(['inplace_inst_pay_toggle' => $installment['id']]);
+            $emoji_callback = json_encode(['toggle_inst_pay' => [$installment['loan_id'], $installment['id']]]);
             $emoji_button_html = "<tg-button style='link' type='callback_data' data='$emoji_callback'>$payment_emoji</tg-button>";
             $installments_text .= "<br>‏&nbsp;&nbsp;&nbsp;&nbsp;$inst_num) $emoji_button_html $date: $amount";
         }
@@ -345,7 +345,7 @@ function createLoanDetailInlineKeyboard(array $installments, int $col_count = 4)
         else $payment_emoji = "⚪";
         $button_array[] = [
             'text' => beautifulNumber("$payment_emoji $installment[due_date]", null),
-            'callback_data' => json_encode(['inplace_inst_pay_toggle' => $installment['id']]),
+            'callback_data' => json_encode(['toggle_inst_pay' => [$installment['loan_id'], $installment['id']]]),
         ];
         if (sizeof($button_array) >= $col_count) {
             $keyboard[] = $button_array;
