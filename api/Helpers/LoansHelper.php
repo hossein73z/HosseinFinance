@@ -324,7 +324,7 @@ function createLoanDetailRichMessage(array $loan): array
             "<br>" . "شروع یادآوری اقساط از " . beautifulNumber($loan['alert_offset']) . " روز قبل از سررسید" .
             "<br>" . "جزئیات اقساط: ";
 
-        $footer = "<footer>برای تغییر وضعیت پرداخت هر قسط، ایموجی آن قسط را لمس کنید.</footer>";
+        $footer = "<footer>برای تغییر وضعیت پرداخت هر قسط، ایموجی آن قسط را لمس کنید و یا از دکمه‌های شیشه‌زیر استفاده کنید.</footer>";
         $html = "<h3>$loan[name]</h3>" . "<p>$loan_general_info$installments_text</p><hr>$footer";
     } else $html = '<p>هیچ قسطی برای این وام ثبت نشده است!</p>';
 
@@ -352,8 +352,11 @@ function createLoanDetailInlineKeyboard(array $installments, int $col_count = 4)
             $button_array = [];
         }
     }
+    $disabled_button = ['text' => '─────', 'disabled' => true];
+    if (sizeof($button_array) != 0) $button_array = array_pad($button_array, $col_count, $disabled_button);
+
     $keyboard[] = $button_array;
-    $keyboard[] = [['text' => 'برگشت به لیست وام‌ها', 'callback_data' => json_encode(['loans_list' => false])]];
+    $keyboard[] = [['text' => 'برگشت به لیست وام‌ها', 'style' => 'primary', 'callback_data' => json_encode(['loans_list' => false])]];
 
     return $keyboard;
 }
