@@ -151,14 +151,15 @@ function prepareLoanForWebApp(array $loan): array
 {
     unset($loan['user_id']);
     unset($loan['created_at']);
-    if ($loan['installments'])
+    if ($loan['installments']) {
         foreach ($loan['installments'] as &$installment) {
             unset($installment['loan_id']);
             unset($installment['alert_date']);
             unset($installment['is_due']);
             unset($installment['remaining_days']);
         }
-
+        $loan['installments'] = array_values($loan['installments']);
+    }
     return $loan;
 }
 
@@ -276,7 +277,7 @@ function createLoansRichMessage(array $loans, bool $summerized = true): array
     return ['is_rtl' => true, 'html' => $html];
 }
 
-function createLoanDetailRichMessage(array $loan): array
+function createLoanDetailRichMessage(array $loan, int|string|null $installment_id = null): array
 {
     /**
      * Generates a formatted loan details text with installment information.
@@ -296,25 +297,8 @@ function createLoanDetailRichMessage(array $loan): array
     $installments = &$loan['installments'];
     if ($installments) {
 
-        $installments_text = '';
-        foreach ($installments as $i => $installment) {
-
-            // Create payment status emoji
-            if ($installment['is_paid']) $payment_emoji = "🟢";
-            elseif ($installment['is_due']) $payment_emoji = $installment['remaining_days'] == 0 ? "🟡" : "🔴";
-            else $payment_emoji = "⚪";
-
-            // Create installment text
-            $inst_num = beautifulNumber(intval($i) + 1, null);
-            $date = beautifulNumber($installment['due_date'], null);
-            $amount = beautifulNumber($installment['amount']);
-
-            $emoji_callback = json_encode(['toggle_inst_pay' => [$installment['loan_id'], $installment['id']]]);
-            $emoji_button_html = "<tg-button style='link' type='callback_data' data='$emoji_callback'>$payment_emoji</tg-button>";
-            $installments_text .= "<br>‏&nbsp;&nbsp;&nbsp;&nbsp;$inst_num) $emoji_button_html $date: $amount";
-        }
-
-        $loan_general_info =
+        // Loan's general info about
+        $general_info =
             "<br>" . "مبلغ وام: " . beautifulNumber($loan['total_amount']) .
             "<br>" . "تاریخ دریافت: " . beautifulNumber($loan['received_date'], null) .
             "<br>" . "کل بازپرداخت: " . beautifulNumber(array_sum(array_column($installments, 'amount'))) .
@@ -324,8 +308,45 @@ function createLoanDetailRichMessage(array $loan): array
             "<br>" . "شروع یادآوری اقساط از " . beautifulNumber($loan['alert_offset']) . " روز قبل از سررسید" .
             "<br>" . "جزئیات اقساط: ";
 
+        // Loan's installments details
+        $installments_text = '';
+        foreach ($installments as $i => $installment) {
+
+            // Create installment's payment status emoji
+            if ($installment['is_paid']) $payment_emoji = "🟢";
+            elseif ($installment['is_due']) $payment_emoji = $installment['remaining_days'] == 0 ? "🟡" : "🔴";
+            else $payment_emoji = "⚪";
+
+            // Create emoji button for the installment
+            $emoji_callback = json_encode(['toggle_inst_pay' => [$installment['loan_id'], $installment['id']]]);
+            $emoji_button_html = "<tg-button style='link' type='callback_data' data='$emoji_callback'>$payment_emoji</tg-button>";
+
+            // Create delete/confirmation button for the installment
+            if ($installment_id && $installment['id'] == $installment_id) {
+                $delete_conf_callback = json_encode(['delete_inst_conf' => $installment['id']]);
+                $delete_deny_callback = json_encode(['view_loan_inplace' => $installment['loan_id']]);
+                $delete_button_html =
+                    "<tg-button style='primary' type='disabled'>" . "حذف" . "</tg-button>" .
+                    "<tg-button style='danger' type='callback_data' data='$delete_conf_callback'>" . "تأیید حذف" . "</tg-button>" .
+                    "<tg-button style='success' type='callback_data' data='$delete_deny_callback'>" . "لغو" . "</tg-button>";
+            } else {
+                $delete_callback = json_encode(['delete_inst' => $installment['id']]);
+                $delete_button_html = "<tg-button style='primary' type='callback_data' data='$delete_callback'>" . "حذف" . "</tg-button>";
+            }
+
+            // Prepare installment's text
+            $inst_num = beautifulNumber(intval($i) + 1, null);
+            $date = beautifulNumber($installment['due_date'], null);
+            $amount = beautifulNumber($installment['amount']);
+
+            $installments_text .= "<br>‏&nbsp;&nbsp;&nbsp;&nbsp;$inst_num) $emoji_button_html $date: $amount $delete_button_html";
+        }
+
         $footer = "<footer>برای تغییر وضعیت پرداخت هر قسط، ایموجی آن قسط را لمس کنید و یا از دکمه‌های شیشه‌زیر استفاده کنید.</footer>";
-        $html = "<h3>$loan[name]</h3>" . "<p>$loan_general_info$installments_text</p><hr>$footer";
+
+        // Final HTML code
+        $html = "<h3>$loan[name]</h3>" . "<p>$general_info$installments_text</p><hr>$footer";
+
     } else $html = '<p>هیچ قسطی برای این وام ثبت نشده است!</p>';
 
     return ['is_rtl' => true, 'html' => $html];

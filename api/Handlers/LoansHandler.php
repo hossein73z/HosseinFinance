@@ -89,10 +89,40 @@ function handleLoansCallback(
             $db->update('users', $user->toDbArray(), ['id' => $user->getId()]);
             break;
 
+        // Show loan's detail in a new message with initial message
         case 'view_loan':
+
             $loan = getLoanWithInstallments(user_id: $user->getId(), db: $db, jalali: true, loan_id: $query_data[$query_key]);
             if ($loan) {
                 sendLoanDetail($user, $loan, $db);
+                sendToTelegram('deleteMessage', ['chat_id' => $user->getId(), 'message_id' => $message['message_id']]);
+            }
+            break;
+
+        // Show loan's detail in current message without initial message
+        case 'view_loan_inplace':
+            $loan = getLoanWithInstallments(user_id: $user->getId(), db: $db, jalali: true, loan_id: $query_data[$query_key]);
+            if ($loan) sendLoanDetail($user, $loan, $db, $message['message_id']);
+            break;
+
+        // Show delete confirmation message in loan's detail message
+        case 'delete_inst':
+            $loan = getLoanWithInstallments(user_id: $user->getId(), db: $db, jalali: true, installment_id: $query_data[$query_key]);
+            if ($loan) sendLoanDetail($user, $loan, $db, $message['message_id'], null, $query_data[$query_key]);
+            break;
+
+        // Delete installment and send new loan's detail message to update user's keyboard
+        case 'delete_inst_conf':
+            $loan = getLoanWithInstallments(user_id: $user->getId(), db: $db, jalali: true, installment_id: $query_data[$query_key]);
+            if ($loan) {
+                $result = $db->delete('installments', ['id' => $query_data[$query_key]]);
+                if ($result)
+                    foreach ($loan['installments'] as $i => $installment)
+                        if ($installment['id'] == $query_data[$query_key]) {
+                            unset($loan['installments'][$i]);
+                            break;
+                        }
+                sendLoanDetail($user, $loan, $db, text: $result ? '✅ قسط مورد نظر با موفقیت حذف شد!' : '❌ خطا در حذف قسط!');
                 sendToTelegram('deleteMessage', ['chat_id' => $user->getId(), 'message_id' => $message['message_id']]);
             }
             break;
@@ -390,11 +420,11 @@ function sendInstallmentsForNextNDays(User $user, DatabaseManager $db, int $n = 
         return false;
 }
 
-function sendLoanDetail(User $user, array $loan, ?DatabaseManager $db = null, string|int|null $message_id = null, ?string $text = null): void
+function sendLoanDetail(User $user, array $loan, ?DatabaseManager $db = null, string|int|null $message_id = null, ?string $text = null, string|int|null $inst_id_to_delete = null): void
 {
     $data = [
         'chat_id' => $user->getid(),
-        'rich_message' => createLoanDetailRichMessage($loan),
+        'rich_message' => createLoanDetailRichMessage($loan, $inst_id_to_delete),
         'reply_markup' => ['inline_keyboard' => createLoanDetailInlineKeyboard($loan['installments'])]
     ];
 
