@@ -62,7 +62,7 @@ function handleLoansCallback(
                     belongTo: 'main_menu',
                     keyboard: [
                         [createWebAppBtn('➕ افزودن وام جدید', '/assets/loan.html')],
-                        [['id' => 'main_menu', 'text' => '🔙 برگشت 🔙', 'style' => 'primary', 'admin_key' => 0],],
+                        [['id' => 'main_menu', 'text' => '🔙 برگشت 🔙', 'style' => 'primary', 'admin_key' => 0]]
                     ]
                 ));
 

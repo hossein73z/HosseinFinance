@@ -18,6 +18,7 @@ require_once __DIR__ . '/Handlers/HoldingsHandler.php';
 require_once __DIR__ . '/Handlers/LoansHandler.php';
 require_once __DIR__ . '/Handlers/PricesHandler.php';
 require_once __DIR__ . '/Handlers/AlertsHandler.php';
+require_once __DIR__ . '/Handlers/Administration.php';
 require_once __DIR__ . '/Handlers/AccountsHandler.php';
 require_once __DIR__ . '/Handlers/TransactionsHandler.php';
 require_once __DIR__ . '/Handlers/SettingsHandler.php';
@@ -27,7 +28,6 @@ require_once __DIR__ . '/Functions/ExternalEndpointsFunctions.php';
 require_once __DIR__ . '/Functions/KeyboardFunctions.php';
 require_once __DIR__ . '/Functions/MessageFunctions.php';
 require_once __DIR__ . '/Functions/StringHelper.php';
-require_once __DIR__ . '/Functions/AdminFunctions.php';
 
 // Helpers
 require_once __DIR__ . '/Helpers/HoldingsHelper.php';

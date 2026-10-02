@@ -141,6 +141,12 @@ function levelHandler(
             sendAllFavorites($user, $db);
         case 'alerts':
             alerts_menu(user: $user, db: $db, message: $message, callback_query: $callback_query);
+        case 'administration':
+            adminMenu(user: $user, db: $db, message: $message, callback_query: $callback_query);
+        case'host_info':
+            sendHostInformation($user);
+        case'database_info':
+            sendDBInformation($user);
         default:
             exit('Unhandled ' . ($message && isset($message['text']) ? "message: text=\"$message[text]\"" : "button: id=\"$button_id\""));
     }
