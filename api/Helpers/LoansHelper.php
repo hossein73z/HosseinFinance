@@ -353,7 +353,7 @@ function createLoanDetailInlineKeyboard(array $installments, int $col_count = 4)
         }
     }
     $keyboard[] = $button_array;
-    $keyboard[] = [['text' => 'برگشت به لیست وام‌ها', 'callback_data' => json_encode(['loans_list' => null])]];
+    $keyboard[] = [['text' => 'برگشت به لیست وام‌ها', 'callback_data' => json_encode(['loans_list' => false])]];
 
     return $keyboard;
 }
