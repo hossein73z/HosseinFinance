@@ -63,7 +63,7 @@ function sendAllAlerts(User $user, DatabaseManager $db, int|string|null $message
         'rich_message' => ['is_rtl' => true, 'html' => &$html],
         'chat_id' => $user->getid(),
         'reply_markup' => ['inline_keyboard' => [
-            [['text' => 'مدیریت هشدارها', 'callback_data' => json_encode(['mng_alerts' => null])]]
+            [['text' => 'افزودن هشدار جدید', 'callback_data' => json_encode(['add_alert' => null])]]
         ]]
     ];
 
@@ -339,6 +339,7 @@ function handleAlertPriceInput(User $user, array $message, DatabaseManager $db):
     exit();
 }
 
+#[NoReturn]
 function handleAlertsCallback(User $user, array $callback_query, array $message, DatabaseManager $db): void
 {
     $data = [
@@ -352,85 +353,34 @@ function handleAlertsCallback(User $user, array $callback_query, array $message,
 
     switch ($query_key) {
 
-        // Add or remove alerts
-        case 'mng_alerts':
+        // Ask for new alert's type (from alerts list)
+        case 'add_alert':
+            $asset_types = $db->read('assets', selectColumns: 'asset_type', distinct: true);
 
-            $action = $query_data[$query_key];
+            if ($asset_types) {
 
-            // Show alerts' management menu
-            if ($action == null) {
-                $data['text'] = 'عملیات مورد نظر را انتخاب کنید:';
-                $data['reply_markup'] = ['inline_keyboard' => [
-                    [['text' => 'افزودن هشدار', 'callback_data' => json_encode(['mng_alerts' => 'add_alert'])]],
-                    [['text' => 'حذف هشدار', 'callback_data' => json_encode(['mng_alerts' => 'remove_alert'])]],
-                    [['text' => 'برگشت به لیست هشدارها', "style" => "primary", 'callback_data' => json_encode(['show_all_alerts' => null])]],
+                $asset_types = array_column($asset_types, 'asset_type');
+                $inline_keyboard = [];
+                foreach ($asset_types as $asset_type)
+                    $inline_keyboard[] = [[
+                        'text' => beautifulNumber($asset_type, null),
+                        'callback_data' => json_encode(['new_alert_type' => $asset_type], JSON_UNESCAPED_UNICODE)
+                    ]];
+                $inline_keyboard[] = [[
+                    'text' => '🔙 برگشت 🔙',
+                    "style" => "primary",
+                    'callback_data' => json_encode(['show_all_alerts' => null])
                 ]];
+
+                $data['text'] = 'یکی از دسته‌بندی‌های زیر را انتخاب کنید:';
+                $data['reply_markup']['inline_keyboard'] = $inline_keyboard;
+                sendToTelegram('editMessageText', $data);
             }
+            break;
 
-            // Show list of asset types to select for new alert
-            if ($action == 'add_alert') {
-                $asset_types = $db->read('assets', selectColumns: 'asset_type', distinct: true);
-
-                if ($asset_types) {
-                    $data['text'] = 'یکی از دسته‌بندی‌های زیر را انتخاب کنید:';
-                    $data['reply_markup']['inline_keyboard'] = [[
-                        ['text' => '🔙 برگشت 🔙', "style" => "primary", 'callback_data' => json_encode(['mng_alerts' => null])],
-                        ['text' => '❌ لغو ❌', "style" => "danger", 'callback_data' => json_encode(['show_all_alerts' => null])]
-                    ]];
-
-                    $asset_types = array_column($asset_types, 'asset_type');
-                    foreach ($asset_types as $asset_type) array_unshift(
-                        $data['reply_markup']['inline_keyboard'],
-                        [['text' => beautifulNumber($asset_type, null), 'callback_data' => json_encode(['new_alert_type' => $asset_type], JSON_UNESCAPED_UNICODE)]]
-                    );
-                } else {
-                    sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id'], 'text' => 'دسته‌بندی‌ای در سیستم یافت نشد!']);
-                    exit;
-                }
-            }
-
-            // Show list of alerts to delete
-            if ($action == 'remove_alert') {
-                $alerts = $db->read(
-                    table: 'alerts',
-                    conditions: ['user_id' => $user->getId()],
-                    selectColumns: '
-                        alerts.*,
-                        assets.id as asset_id,
-                        assets.emoji,
-                        assets.asset_type,
-                        assets.price as current_price,
-                        assets.base_currency,
-                        assets.date as update_date,
-                        assets.time as update_time',
-                    join: 'join assets on assets.name = alerts.asset_name'
-                );
-
-                if ($alerts) {
-                    $data['text'] = 'کدام مورد را می‌خواهید حذف کنید؟';
-
-                    $data['reply_markup']['inline_keyboard'] = [[
-                        ['text' => '🔙 برگشت 🔙', "style" => "primary", 'callback_data' => json_encode(['mng_alerts' => null])],
-                        ['text' => '❌ لغو ❌', "style" => "danger", 'callback_data' => json_encode(['show_all_alerts' => null])]
-                    ]];
-
-                    foreach ($alerts as $alert) array_unshift(
-                        $data['reply_markup']['inline_keyboard'],
-                        [['text' => beautifulNumber($alert['asset_name'], null) . ': ' . beautifulNumber($alert['target_price']), 'callback_data' => json_encode(['del_alert' => [$alert['id'] => $alert['asset_id']]])]]
-                    );
-                } else {
-                    sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id'], 'text' => 'شما هشداری ثبت نکرده‌اید!']);
-                    exit;
-                }
-            }
-
-            sendToTelegram('editMessageText', $data);
-            sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
-            exit;
-
-        // Show list of asset to select for new alert
+        // Show list of assets of specific type to select for new alert
+        case 'new_alert_type': # ── Request from alert list
         case 'fav_alert': # ─────── Request from favorites message
-        case 'new_alert_type': # ── Request from alert manager message
 
             if ($query_key == 'fav_alert') {
                 $data['reply_markup']['inline_keyboard'] = [[
@@ -446,7 +396,7 @@ function handleAlertsCallback(User $user, array $callback_query, array $message,
                 );
             } else {
                 $data['reply_markup']['inline_keyboard'] = [[
-                    ['text' => '🔙 برگشت 🔙', "style" => "primary", 'callback_data' => json_encode(['mng_alerts' => 'add_alert'])],
+                    ['text' => '🔙 برگشت 🔙', "style" => "primary", 'callback_data' => json_encode(['add_alert' => null])],
                     ['text' => '❌ لغو ❌', "style" => "danger", 'callback_data' => json_encode(['show_all_alerts' => null])]
                 ]];
                 $assets = $db->read('assets', ['asset_type' => $query_data[$query_key]]);
@@ -523,7 +473,7 @@ function handleAlertsCallback(User $user, array $callback_query, array $message,
             sendAllAlerts($user, $db, $message['message_id']);
 
         // Ask user to confirm deleting alert (from alerts list)
-        case 'del_alert': # ──────── Request from main alerts' message
+        case 'del_alert':
             $alert_id = $query_data[$query_key];
             sendAllAlerts($user, $db, $message['message_id'], $alert_id);
 
@@ -582,10 +532,7 @@ function handleAlertsCallback(User $user, array $callback_query, array $message,
 
         // Show main list of all alerts
         case 'show_all_alerts':
-            sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
             sendAllAlerts($user, $db, $message['message_id']);
     }
-
-    sendToTelegram('editMessageText', $data);
-    exit;
+    exit();
 }
