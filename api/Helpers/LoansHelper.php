@@ -1,6 +1,11 @@
 <?php
 
-function getLoanWithInstallments(int|string $user_id, DatabaseManager $db, bool $jalali = false, int|string|null $loan_id = null, int|string|null $installment_id = null): bool|array
+function getLoanWithInstallments(
+    int|string      $user_id,
+    DatabaseManager $db,
+    bool            $jalali = false,
+    int|string|null $loan_id = null,
+    int|string|null $installment_id = null): bool|array
 {
     /**
      * Retrieves loans with their related installments for a specific user.
@@ -57,7 +62,8 @@ function getLoanWithInstallments(int|string $user_id, DatabaseManager $db, bool 
                             'amount', i.amount,
                             'due_date', i.due_date,
                             'alert_date', i.alert_date,
-                            'is_paid', i.is_paid
+                            'is_paid', i.is_paid,
+                            'status', i.status
                         ) ORDER BY due_date ASC
                     ),
                 ']') AS installments
@@ -318,7 +324,7 @@ function createLoanDetailRichMessage(array $loan, int|string|null $installment_i
             else $payment_emoji = "⚪";
 
             // Create emoji button for the installment
-            $emoji_callback = json_encode(['toggle_inst_pay' => [$installment['loan_id'], $installment['id']]]);
+            $emoji_callback = json_encode(['toggle_inst_active' => [$installment['loan_id'], $installment['id']]]);
             $emoji_button_html = "<tg-button style='link' type='callback_data' data='$emoji_callback'>$payment_emoji</tg-button>";
 
             // Create delete/confirmation button for the installment
@@ -339,10 +345,13 @@ function createLoanDetailRichMessage(array $loan, int|string|null $installment_i
             $date = beautifulNumber($installment['due_date'], null);
             $amount = beautifulNumber($installment['amount']);
 
-            $installments_text .= "<br>‏&nbsp;&nbsp;&nbsp;&nbsp;$inst_num) $emoji_button_html $date: $amount $delete_button_html";
+            $inst_text = ($installment['status'] == 'active') ? "$date: $amount" : "<s>$date: $amount</s>";
+
+            $installments_text .= "<br>‏&nbsp;&nbsp;&nbsp;&nbsp;$inst_num) $emoji_button_html $inst_text $delete_button_html";
         }
 
-        $footer = "<footer>برای تغییر وضعیت پرداخت هر قسط، ایموجی آن قسط را لمس کنید و یا از دکمه‌های شیشه‌زیر استفاده کنید.</footer>";
+        $footer = "<footer>برای تغییر وضعیت پرداخت اقساط از دکمه‌های شیشه‌ای زیر استفاده کنید.</footer>";
+        $footer .= "<footer>برای فعال/غیرفعال سازی اقساط ایموجی کنار آنها را لمس کنید.</footer>";
 
         // Final HTML code
         $html = "<h3>$loan[name]</h3>" . "<p>$general_info$installments_text</p><hr>$footer";

@@ -134,6 +134,13 @@ function handleLoansCallback(
 
             inplaceInstallmentPaymentToggle($user, $loan_id, $inst_id, $message, $db);
 
+        case 'toggle_inst_active':
+            // Data structure: query_data = [toggle_inst_pay = [loan_id, installment_id]];
+            $loan_id = $query_data[$query_key][0];
+            $inst_id = $query_data[$query_key][1];
+
+            inplaceInstallmentactiveToggle($user, $loan_id, $inst_id, $message, $db);
+
         case 'insts_for_n_days':
             sendInstallmentsForNextNDays($user, $db, mssg_id_to_edit: $message['message_id']);
             break;
@@ -486,6 +493,18 @@ function inplaceInstallmentPaymentToggle(User $user, string|int $loan_id, string
 {
 
     $db->query("update installments set is_paid = !is_paid where id = $installment_id")->fetch();
+
+    $loan = getLoanWithInstallments(user_id: $user->getId(), db: $db, jalali: true, loan_id: $loan_id);
+
+    if ($loan) sendLoanDetail($user, $loan, null, $message['message_id']);
+    exit();
+}
+
+#[NoReturn]
+function inplaceInstallmentactiveToggle(User $user, string|int $loan_id, string|int $installment_id, array $message, DatabaseManager $db): void
+{
+
+    $db->query("UPDATE installments SET status = IF(status = 'active', 'inactive', 'active') WHERE id = $installment_id")->fetch();
 
     $loan = getLoanWithInstallments(user_id: $user->getId(), db: $db, jalali: true, loan_id: $loan_id);
 
