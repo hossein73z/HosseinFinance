@@ -89,17 +89,20 @@ function sendAllAlerts(User $user, DatabaseManager $db, int|string|null $message
             $base_currency = beautifulNumber($alert['base_currency'], null);
 
             $toggle_callback = json_encode(['toggle_alert_activation' => $alert['id']]);
-            $toggle_button = "<tg-button type='callback_data' style='link' data='$toggle_callback'>" . $status_emoji . "</tg-button>";
+            $toggle_button = "<tg-button type='callback_data' style='link' data='$toggle_callback'>$status_emoji</tg-button>";
 
-            $edit_callback = json_encode(['edit_alert_price' => $alert['id']]);
-            $edit_button = "<tg-button type='callback_data' style='primary' data='$edit_callback'>" . "ویرایش" . "</tg-button>";
+            $price_callback = json_encode(['edit_alert_price' => $alert['id']]);
+            $price_button = "<tg-button type='callback_data' style='link' data='$price_callback'>$alert_price</tg-button>";
 
             $delete_callback = json_encode(['del_alert' => [$alert['id'] => $alert['asset_id']]]);
             $delete_button = "<tg-button type='callback_data' style='danger' data='$delete_callback'>" . "حذف" . "</tg-button>";
 
-            $rich_text .= "<li>$toggle_button $asset_name: $alert_price $base_currency $edit_button $delete_button</li>";
+            $rich_text .= "<li>$toggle_button $asset_name: $price_button $base_currency $delete_button</li>";
         }
-        $rich_text .= '</ul>';
+
+        $footer = "برای فعال/غیرفعال‌سازی هشدار و یا ویرایش قیمت، به ترتیب ایموجی وضعیت هشدار یا قیمت آن را لمس کنید.";
+        $rich_text .= "</ul><hr>$footer";
+
     } else $rich_text = 'شما هشداری ثبت نکرده‌اید!';
 
     if (!$message_id) {
