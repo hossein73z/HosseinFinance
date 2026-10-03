@@ -82,9 +82,35 @@ function handleHoldingsCallback(User $user, array $callback_query, array $messag
             }
             break;
 
+        case 'delete_holding':
+            $holding_id = $query_data[$query_key];
+            $holding = getHoldingsWithAssetDetails(['h.id' => $holding_id, 'h.user_id' => $user->getId()], $db, true);
+            if ($holding)
+                sendHoldingDetail($user, $holding, $message['message_id'], is_deleting: true);
+            break;
+
+        case 'delete_holding_conf':
+            $holding_id = $query_data[$query_key];
+
+            $result = $db->delete('holdings', ['id' => $holding_id, 'user_id' => $user->getId()]);
+
+            if ($result) $data['text'] = '✔ دارایی مورد نظر با موفقیت حذف شد!';
+            else $data['text'] = '❌ خطای پایگاه داده در حذف دارایی!';
+
+            $data['chat_id'] = $user->getId();
+            $data['reply_markup'] = [
+                'keyboard' => $user->getKeyboard(),
+                'resize_keyboard' => true,
+                'is_persistent' => false,
+                'input_field_placeholder' => $user->getButton()->getText()
+            ];
+            sendToTelegram('sendMessage', $data);
+            sendAllHoldings($user, $db);
+            sendToTelegram('deleteMessage', ['chat_id' => $user->getId(), 'message_id' => $message['message_id']]);
+            break;
+
         case 'show_all_holdings':
             sendAllHoldings($user, $db, $message['message_id']);
-            sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
             exit;
 
         default:

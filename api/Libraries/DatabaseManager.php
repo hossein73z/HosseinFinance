@@ -534,7 +534,7 @@ class DatabaseManager
         }
     }
 
-    public function delete(string $table, array $conditions, bool $resetAutoIncrement = false): int
+    public function delete(string $table, array $conditions, bool $resetAutoIncrement = true): int
     {
         if (empty($conditions)) {
             throw new InvalidArgumentException("Missing WHERE conditions for delete operation on table $table.");
