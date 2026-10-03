@@ -39,8 +39,13 @@ function prices_menu(
             if ($progress && in_array(array_key_first($progress), ["fav_new_alert", "fav_edit_alert"])) {
                 handleAlertPriceInput($user, $message, $db);
             } elseif (in_array($message['text'], $asset_types)) {
-
-                $base_prices = CreateNamePricePairs(array_merge($asset_types, [$user->getBaseCurrency()]), $db);
+                $asset_names = array_values(array_unique(array_column($assets, 'name')));
+                foreach ($assets as $index => $asset) {
+                    if ($asset['asset_type'] != $message['text'])
+                        unset($assets[$index]);
+                }
+                $assets = array_values($assets);
+                $base_prices = CreateNamePricePairs($asset_names, $db);
 
                 if ($assets) $data['text'] = createPricesTextForSingleAssetType($assets, $base_prices, $user->getBaseCurrency());
                 else $data['text'] = 'این دسته بندی خالی‌ست!';
