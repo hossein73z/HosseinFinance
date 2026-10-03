@@ -78,12 +78,12 @@ function handleCallbackQuery(array $callback_query, DatabaseManager $db): void
                 holdings_menu($user, $db, $message, $callback_query);
 
             case 'mng_alerts':
-            case 'fav_alert':
-            case 'new_alert_type':
-            case 'new_alert_asset_id':
-            case 'edit_alert_price':
-            case 'new_asset_alert':
-            case 'edit_asset_alert':
+            case 'fav_alert_type':
+            case 'alert_type':
+            case 'new_alert':
+            case 'edit_alert':
+            case 'fav_new_alert':
+            case 'fav_edit_alert':
             case 'del_alert':
             case 'del_asset_alert':
             case 'conf_del_alert':

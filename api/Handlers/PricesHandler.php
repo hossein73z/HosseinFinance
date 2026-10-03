@@ -35,7 +35,10 @@ function prices_menu(
         } elseif ($pressed_button_id = getPressedButtonID($message['text'], $user)) {
             levelHandler($user, $db, button_id: $pressed_button_id);
         } else {
-            if (in_array($message['text'], $asset_types)) {
+            $progress = $user->getProgress();
+            if ($progress && in_array(array_key_first($progress), ["fav_new_alert", "fav_edit_alert"])) {
+                handleAlertPriceInput($user, $message, $db);
+            } elseif (in_array($message['text'], $asset_types)) {
 
                 $base_prices = CreateNamePricePairs(array_merge($asset_types, [$user->getBaseCurrency()]), $db);
 

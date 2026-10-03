@@ -128,7 +128,7 @@ function createFavoritesInlineMarkup(
             ($is_live) ?
                 [['text' => 'توقف نمایش زنده ⏸', 'callback_data' => json_encode(['set_live' => false])]] :
                 [['text' => 'نمایش زنده قیمت‌ها ▶', 'callback_data' => json_encode(['set_live' => true])]],
-            [['text' => 'افزودن هشدار قیمت', 'callback_data' => json_encode(['fav_alert' => null])]],
+            [['text' => 'افزودن هشدار قیمت', 'callback_data' => json_encode(['fav_alert_type' => null])]],
             [['text' => 'حذف / اضافه', 'callback_data' => json_encode(['edit_fav' => null])]]
         ] : [
             [['text' => 'حذف / اضافه', 'callback_data' => json_encode(['edit_fav' => null])]]
