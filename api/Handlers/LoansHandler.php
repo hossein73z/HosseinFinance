@@ -432,7 +432,7 @@ function sendLoanDetail(User $user, array $loan, ?DatabaseManager $db = null, st
     $data = [
         'chat_id' => $user->getid(),
         'rich_message' => createLoanDetailRichMessage($loan, $inst_id_to_delete),
-        'reply_markup' => ['inline_keyboard' => createLoanDetailInlineKeyboard($loan['installments'])]
+        'reply_markup' => ['inline_keyboard' => [[['text' => 'برگشت به لیست وام‌ها', 'style' => 'primary', 'callback_data' => json_encode(['loans_list' => false])]]]]
     ];
 
     if ($message_id) {
