@@ -11,7 +11,7 @@ function alerts_menu(
 {
 
     if ($callback_query) {
-        managePriceAlerts($user, $callback_query, $message, $db);
+        handleAlertsCallback($user, $callback_query, $message, $db);
     } elseif (!$message) {
         $user->setProgress(null);
         $user->setButton(new Button(
@@ -42,7 +42,7 @@ function alerts_menu(
 }
 
 #[NoReturn]
-function sendAllAlerts(User $user, DatabaseManager $db, int|string|null $message_id = null): void
+function sendAllAlerts(User $user, DatabaseManager $db, int|string|null $message_id = null, ?int $alert_id = null): void
 {
     $alerts = $db->query("
         SELECT
@@ -95,9 +95,18 @@ function sendAllAlerts(User $user, DatabaseManager $db, int|string|null $message
             $price_callback = json_encode(['edit_alert_price' => $alert['id']]);
             $price_button = "<tg-button type='callback_data' style='link' data='$price_callback'>$alert_price</tg-button>";
 
-            $delete_callback = json_encode(['del_alert' => [$alert['id'] => $alert['asset_id']]]);
-            $delete_button = "<tg-button type='callback_data' style='danger' data='$delete_callback'>" . "حذف" . "</tg-button>";
-
+            // Create delete/confirmation button for the alert
+            if ($alert_id && $alert['id'] == $alert_id) {
+                $delete_conf_callback = json_encode(['conf_del_alert' => $alert['id']]);
+                $delete_deny_callback = json_encode(['show_all_alerts' => null]);
+                $delete_button =
+                    "<tg-button style='primary' type='disabled'>" . "حذف" . "</tg-button>" .
+                    "<tg-button style='danger' type='callback_data' data='$delete_conf_callback'>" . "تأیید حذف" . "</tg-button>" .
+                    "<tg-button style='success' type='callback_data' data='$delete_deny_callback'>" . "لغو" . "</tg-button>";
+            } else {
+                $delete_callback = json_encode(['del_alert' => $alert['id']]);
+                $delete_button = "<tg-button type='callback_data' style='primary' data='$delete_callback'>" . "حذف" . "</tg-button>";
+            }
             $alert_line_html = "<li>$toggle_button $price_button $base_currency $delete_button</li>";
 
             $asset_title_html = "هشدارهای " . "<b><u>$asset_name</u></b> ($current_price $base_currency)";
@@ -330,7 +339,7 @@ function handleAlertPriceInput(User $user, array $message, DatabaseManager $db):
     exit();
 }
 
-function managePriceAlerts(User $user, array $callback_query, array $message, DatabaseManager $db): void
+function handleAlertsCallback(User $user, array $callback_query, array $message, DatabaseManager $db): void
 {
     $data = [
         'chat_id' => $user->getid(),
@@ -513,31 +522,35 @@ function managePriceAlerts(User $user, array $callback_query, array $message, Da
             $db->query("UPDATE alerts SET status = IF(status = 'active', 'inactive', 'active') WHERE id = $alert_id;")->fetch();
             sendAllAlerts($user, $db, $message['message_id']);
 
-        // Ask user to confirm deleting alert
+        // Ask user to confirm deleting alert (from alerts list)
         case 'del_alert': # ──────── Request from main alerts' message
-        case 'del_asset_alert': # ── Request from favorites message
+            $alert_id = $query_data[$query_key];
+            sendAllAlerts($user, $db, $message['message_id'], $alert_id);
 
-            // Query structure due to length limitation: [query_key => [alert_id => asset_id]]
+        // Ask user to confirm deleting alert (from favorites message)
+        case 'del_asset_alert':
+
+            // Query structure due to length limitation: [del_asset_alert => [alert_id => asset_id]]
             $alert_id = array_key_first($query_data[$query_key]);
             $asset_id = $query_data[$query_key][$alert_id];
 
             $data['text'] = 'آیا از حذف اطمینان دارید؟';
-            $data['reply_markup']['inline_keyboard'] = [
-                $query_key == 'del_alert' ? [
-                    ['text' => 'تایید', "style" => "danger", 'callback_data' => json_encode(['conf_del_alert' => [$alert_id => $asset_id]])],
-                    ['text' => 'لغو', "style" => "success", 'callback_data' => json_encode(['show_all_alerts' => null])],
-                ] : [
-                    ['text' => 'تایید', "style" => "danger", 'callback_data' => json_encode(['conf_del_asset_alert' => [$alert_id => $asset_id]])],
-                    ['text' => 'لغو', "style" => "success", 'callback_data' => json_encode(['show_asset_alerts' => $asset_id])],
-                ]
-            ];
+            $data['reply_markup']['inline_keyboard'] = [[
+                ['text' => 'تایید', "style" => "danger", 'callback_data' => json_encode(['conf_del_asset_alert' => [$alert_id => $asset_id]])],
+                ['text' => 'لغو', "style" => "success", 'callback_data' => json_encode(['show_asset_alerts' => $asset_id])],
+            ]];
 
             sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
             sendToTelegram('editMessageText', $data);
             exit;
 
-        // Delete alert and send alerts' message to the user
+        // Delete alert (from alerts list)
         case 'conf_del_alert':
+            $alert_id = $query_data[$query_key];
+            $db->delete('alerts', ['id' => $alert_id, 'user_id' => $user->getId()]);
+            sendAllAlerts($user, $db, $message['message_id']);
+
+        // Delete alert and send alerts' message to the user (from favorites message)
         case 'conf_del_asset_alert':
 
             // Query structure due to length limitation: [query_key => [alert_id => asset_id]]
@@ -556,10 +569,8 @@ function managePriceAlerts(User $user, array $callback_query, array $message, Da
                 $data['text'] = '❌ خطای پایگاه داده!';
             }
 
-            sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
             sendToTelegram('editMessageText', $data);
-            if ($query_key == 'conf_del_alert') sendAllAlerts($user, $db);
-            else sendAssetAlerts($user, $db, $asset_id);
+            sendAssetAlerts($user, $db, $asset_id);
 
         // Show list of alerts for specific asset
         // Called from favorites menu
