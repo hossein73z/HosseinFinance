@@ -102,27 +102,28 @@ function getLoanWithInstallments(
                 $remaining_days = new DateTime('today')->diff($due_date);
                 $is_due = $remaining_days->days === 0 || $remaining_days->invert;
 
-                // Initialize installments' summary
-                if ($is_paid) $summary_key_word = 'paid';
-                elseif ($is_due) $summary_key_word = 'overdue';
-                else $summary_key_word = 'remaining';
-
-                // Add installments' summary to loan object
-                $loan['insts_summary'][$summary_key_word . '_count'] += 1;
-                $loan['insts_summary'][$summary_key_word . '_sum'] += $installment['amount'];
-
                 // Add `is_due` and `is_paid` to the installment
                 $installment['is_due'] = $is_due;
                 $installment['is_paid'] = $is_paid;
                 $installment['remaining_days'] = ($is_due ? -1 : 1) * $remaining_days->days;
 
-                // Store next installment
-                // NOTE: Due date is stored as Gregorian object
-                if ($loan['next_installment'] === null && $installment['remaining_days'] >= 0 && !$is_paid) {
-                    $loan['next_installment'] = $installment;
-                    $loan['next_installment']['due_date'] = $due_date;
-                }
+                if ($installment['status'] != 'inactive') {
+                    // Initialize installments' summary
+                    if ($is_paid) $summary_key_word = 'paid';
+                    elseif ($is_due) $summary_key_word = 'overdue';
+                    else $summary_key_word = 'remaining';
 
+                    // Add installments' summary to loan object
+                    $loan['insts_summary'][$summary_key_word . '_count'] += 1;
+                    $loan['insts_summary'][$summary_key_word . '_sum'] += $installment['amount'];
+
+                    // Store next installment
+                    // NOTE: Due date is stored as Gregorian object
+                    if ($loan['next_installment'] === null && $installment['remaining_days'] >= 0 && !$is_paid) {
+                        $loan['next_installment'] = $installment;
+                        $loan['next_installment']['due_date'] = $due_date;
+                    }
+                }
                 // Change dates to Jalali string
                 if ($jalali) {
                     $installment['due_date'] = JalaliDate::fromGregorianString($installment['due_date'])->format();
