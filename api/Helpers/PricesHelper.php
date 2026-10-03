@@ -11,7 +11,7 @@ function CreateNamePricePairs(array $asset_names, DatabaseManager $db): array
     );
 }
 
-function createPricesTextForSingleAssetType(array $assets, array $base_prices, string $user_base_currency): string
+function createPricesHMTLForSingleAssetType(array $assets, array $base_prices, string $user_base_currency): string
 {
     $date = preg_split('/-/u', $assets[0]['date']);
     $date[1] = str_replace(
@@ -20,26 +20,31 @@ function createPricesTextForSingleAssetType(array $assets, array $base_prices, s
         $date[1]
     );
 
-    $text = "آخرین قیمت ها در $date[2] $date[1] $date[0] ساعت " . $assets[0]['time'] . "\n";
-    $text = beautifulNumber($text, null);
+    $date_string = beautifulNumber("$date[2] $date[1] $date[0]", null);
+    $time_string = beautifulNumber($assets[0]['time'], null);
+    $type_string = beautifulNumber($assets[0]['asset_type'], null);
+
+    $title_html = "<h3>" . "آخرین قیمت های «" . $type_string . "» در " . $date_string . " ساعت " . $time_string . "</h3>";
 
     // Create price texts and add them to the text
     foreach ($assets as $asset) {
         $asset_price = beautifulNumber($asset['price']);
         $asset_name = beautifulNumber($asset['name'], null);
         $asset_base_currency = beautifulNumber($asset['base_currency'], null);
-        $text .= "\n$asset_name: $asset_price $asset_base_currency";
 
-        if (
-            $asset['base_currency'] != $user_base_currency &&
-            $base_prices[$user_base_currency]
-        ) {
+        $price_line_string = "$asset_name: $asset_price $asset_base_currency";
+
+        // Create converted price for price line
+        if ($asset['base_currency'] != $user_base_currency && $base_prices[$user_base_currency]) {
             $exchange_rate = $base_prices[$asset['base_currency']] / $base_prices[$user_base_currency];
             $based_price = $asset['price'] * $exchange_rate;
-            $text .= ' --> ' . beautifulNumber($based_price) . ' ' . $user_base_currency;
+            $price_line_string .= ' --> ' . beautifulNumber($based_price) . ' ' . $user_base_currency;
         }
+
+        $price_line_html = ($price_line_html ?? ''). "<li>$price_line_string</li>";
     }
-    return $text;
+
+    return $title_html. "<ul>" . ($price_line_html ?? '') . "</ul>";
 }
 
 function deleteOldActiveLiveMessage(User $user, int|string $message_id, DatabaseManager $db): bool|array

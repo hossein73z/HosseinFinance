@@ -47,8 +47,16 @@ function prices_menu(
                 $assets = array_values($assets);
                 $base_prices = CreateNamePricePairs($asset_names, $db);
 
-                if ($assets) $data['text'] = createPricesTextForSingleAssetType($assets, $base_prices, $user->getBaseCurrency());
-                else $data['text'] = 'این دسته بندی خالی‌ست!';
+                if ($assets) $html = createPricesHMTLForSingleAssetType($assets, $base_prices, $user->getBaseCurrency());
+                else $html = 'این دسته بندی خالی‌ست!';
+
+                $data = [
+                    'chat_id' => $user->getId(),
+                    'rich_message' => ['is_rtl' => true, 'html' => $html],
+                ];
+
+                sendToTelegram('sendRichMessage', $data);
+                exit();
 
             } else $data['text'] = 'پیام نامفهوم است!' . "\n" . 'یکی از دسته‌بندی‌های زیر را انتخاب کنید:';
         }
@@ -56,7 +64,7 @@ function prices_menu(
 
     sendInitialLevelMessage($user, $db, $data ?? null);
     if (!$message) sendAllFavorites($user, $db);
-    exit($user->getButton()->getText());
+    exit;
 }
 
 function handlePricesCallback(
