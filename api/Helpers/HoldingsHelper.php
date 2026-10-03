@@ -4,27 +4,30 @@ function sendAllHoldings(User $user, DatabaseManager $db, string|int|null $messa
 {
     $holdings = getHoldingsWithAssetDetails(['user_id' => $user->getId()], $db);
     if ($holdings) {
-        $html = "<h1>دارایی‌های ثبت شده‌ی شما:</h1>";
-        $html .= '<p><br></p>';
+
+        $title_html = "دارایی‌های ثبت شده‌ی شما:";
+
+        $holdings_html = "";
         $total_pro_los = 0;
         foreach ($holdings as $holding) {
             $total_pro_los += $holding['amount'] * ($holding['current_price'] - $holding['avg_price']) * $holding['exchange_rate'];
-            $html .= createHoldingDetailRichHTML(
+            $holding_html = createHoldingDetailRichHTML(
                 holding: $holding,
                 user_base_currency: $user->getBaseCurrency(),
                 attributes: ['org_amount', 'org_total_price', 'profit']
             );
-            $html .= '<hr>';
+            $holdings_html .= $holding_html;
         }
 
-        $pro_los_html =
+        $pro_los_string =
             ($total_pro_los == 0) ?
-                "<p>🟤 جمع سود/زیان: ۰ " . $user->getBaseCurrency() . '</p>' : (
+                "🟤 جمع سود/زیان: ۰ " . $user->getBaseCurrency() : (
             ($total_pro_los > 0) ?
-                "<p>🟢 جمع سود: " . beautifulNumber($total_pro_los) . ' ' . $user->getBaseCurrency() . '</p>' :
-                "<p>🔴 جمع ضرر: " . beautifulNumber($total_pro_los) . ' ' . $user->getBaseCurrency() . '</p>'
+                "🟢 جمع سود: " . beautifulNumber($total_pro_los) . ' ' . $user->getBaseCurrency() :
+                "🔴 جمع ضرر: " . beautifulNumber($total_pro_los) . ' ' . $user->getBaseCurrency()
             );
-        $html .= '<p><br></p>' . $pro_los_html;
+
+        $html = "<h3>$title_html<br></h3><ul>$holdings_html</ul><hr><p>$pro_los_string</p>";
 
     } else {
         $html = '<p>.شما هیچ دارایی‌ای ثبت نکرده‌اید</p>';
@@ -154,58 +157,48 @@ function createHoldingDetailRichHTML(
         'new_total_price',
         'space',
         'profit'
-    ]
-): string
+    ]): string
 {
-    $html = '<h3>' . beautifulNumber($holding['asset_name'], null);
-    if ($detail_btn) {
-        $callback_data = json_encode(['view_holding' => $holding['id']], JSON_UNESCAPED_UNICODE);
-        $html .= " <tg-button type='callback_data' style='link' data='$callback_data'>" . 'جزئیات و ویرایش' . '</tg-button>';
-    }
-    $html .= '</h3>';
-    $html .= '<ul>';
-    foreach ($attributes as $attribute) {
 
-        if ($attribute == 'space') {
-            $html .= '<li>';
-            $html .= '</li>';
-        }
+    $holding_name = beautifulNumber($holding['asset_name'], null);
+    if ($detail_btn) {
+        $detail_callback = json_encode(['view_holding' => $holding['id']], JSON_UNESCAPED_UNICODE);
+        $name_html = "<tg-button type='callback_data' style='link' data='$detail_callback'>$holding_name</tg-button>";
+    } else
+        $name_html = $holding_name;
+
+    $detail_html = '';
+    foreach ($attributes as $index => $attribute) {
+
+        $detail_html .= "<li>";
 
         if ($attribute == 'date' && isset($holding['date'])) {
             $date = JalaliDate::fromString($holding['date'])->toPersianMonths();
-            $html .= '<li>';
-            $html .= "تاریخ خرید: " . beautifulNumber("$date[day] $date[month] $date[year]", null);
-            $html .= '</li>';
+            $date_string = beautifulNumber("$date[day] $date[month] $date[year]", null);
+            $detail_html .= "تاریخ خرید: " . $date_string;
         }
 
-        if ($attribute == 'org_amount') {
-            $html .= '<li>';
-            $html .= "مقدار / تعداد: " . beautifulNumber(floatval($holding['amount']));
-            $html .= '</li>';
-        }
+        if ($attribute == 'org_amount')
+            $detail_html .= "مقدار / تعداد: " . beautifulNumber(floatval($holding['amount']));
 
         if ($attribute == 'org_price') {
-            $html .= '<li>';
-            $html .= "قیمت خرید هر واحد: " . beautifulNumber(floatval($holding['avg_price'])) . " " . $holding['base_currency'];
-            $html .= '</li>';
+            $avg_price_string = beautifulNumber(floatval($holding['avg_price']));
+            $detail_html .= "قیمت خرید هر واحد: " . "$avg_price_string $holding[base_currency]";
         }
 
         if ($attribute == 'new_price') {
-            $html .= '<li>';
-            $html .= "قیمت لحظه‌ای هر واحد: " . beautifulNumber($holding['current_price']) . " " . $holding['base_currency'];
-            $html .= '</li>';
+            $cur_price_string = beautifulNumber($holding['current_price']);
+            $detail_html .= "قیمت لحظه‌ای هر واحد: " . "$cur_price_string $holding[base_currency]";
         }
 
         if ($attribute == 'org_total_price') {
-            $html .= '<li>';
-            $html .= "قیمت خرید کل دارایی: " . beautifulNumber($holding['avg_price'] * $holding['amount']) . " " . $holding['base_currency'];
-            $html .= '</li>';
+            $org_total_price = beautifulNumber($holding['avg_price'] * $holding['amount']);
+            $detail_html .= "قیمت خرید کل دارایی: " . "$org_total_price $holding[base_currency]";
         }
 
         if ($attribute == 'new_total_price') {
-            $html .= '<li>';
-            $html .= "قیمت لحظه‌ای کل دارایی: " . beautifulNumber($holding['current_price'] * $holding['amount']) . " " . $holding['base_currency'];
-            $html .= '</li>';
+            $new_total_price = beautifulNumber($holding['current_price'] * $holding['amount']);
+            $detail_html .= "قیمت لحظه‌ای کل دارایی: " . "$new_total_price $holding[base_currency]";
         }
 
         if ($attribute == 'profit') {
@@ -219,13 +212,13 @@ function createHoldingDetailRichHTML(
                     "🟢 سود: " . beautifulNumber($pro_los) . ' ' . $user_base_currency :
                     "🔴 ضرر: " . beautifulNumber($pro_los) . ' ' . $user_base_currency
                 );
-            $html .= '<li>';
-            $html .= $pro_los_string;
-            $html .= '</li>';
+            $detail_html .= $pro_los_string;
         }
+
+        $detail_html .= (array_key_last($attributes) == $index) ? "<br></li>" : "</li>";
     }
 
-    return $html;
+    return "<li>$name_html<ul>$detail_html</ul></li>";
 }
 
 function calculateProLos(float $p1, float $p2, float $amount = 1, float $conversion_rate = 1): float
