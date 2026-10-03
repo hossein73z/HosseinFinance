@@ -504,7 +504,7 @@ function inplaceInstallmentPaymentToggle(User $user, string|int $loan_id, string
 function inplaceInstallmentactiveToggle(User $user, string|int $loan_id, string|int $installment_id, array $message, DatabaseManager $db): void
 {
 
-    $db->query("UPDATE installments SET status = IF(status = 'active', 'inactive', 'active') WHERE id = $installment_id")->fetch();
+    $db->query("UPDATE installments SET is_active = !is_active WHERE id = $installment_id")->fetch();
 
     $loan = getLoanWithInstallments(user_id: $user->getId(), db: $db, jalali: true, loan_id: $loan_id);
 

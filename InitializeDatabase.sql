@@ -122,6 +122,7 @@ CREATE TABLE IF NOT EXISTS `installments`
     due_date   DATE           NOT NULL,
     alert_date DATE           NOT NULL,
     is_paid    BOOLEAN        NOT NULL DEFAULT 0,
+    is_active  BOOLEAN        NOT NULL DEFAULT 1,
 
     UNIQUE INDEX idx_unique_installment (loan_id, due_date),
     FOREIGN KEY (loan_id) REFERENCES loans (id) ON DELETE CASCADE ON UPDATE CASCADE

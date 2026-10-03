@@ -63,7 +63,7 @@ function getLoanWithInstallments(
                             'due_date', i.due_date,
                             'alert_date', i.alert_date,
                             'is_paid', i.is_paid,
-                            'status', i.status
+                            'is_active', i.is_active
                         ) ORDER BY due_date ASC
                     ),
                 ']') AS installments
@@ -107,7 +107,7 @@ function getLoanWithInstallments(
                 $installment['is_paid'] = $is_paid;
                 $installment['remaining_days'] = ($is_due ? -1 : 1) * $remaining_days->days;
 
-                if ($installment['status'] != 'inactive') {
+                if ($installment['is_active']) {
                     // Initialize installments' summary
                     if ($is_paid) $summary_key_word = 'paid';
                     elseif ($is_due) $summary_key_word = 'overdue';
@@ -202,7 +202,7 @@ function createLoansRichMessage(array $loans, bool $summerized = true): array
 
                 if ($summerized) {
                     $insts_html = $insts_html ?? "<br>‏";
-                    if ($installment['status'] != 'active')
+                    if (!$installment['is_active'])
                         $insts_html .= "🟤";
                     elseif ($installment['is_paid'])
                         $insts_html .= "🟢";
@@ -215,7 +215,7 @@ function createLoansRichMessage(array $loans, bool $summerized = true): array
                         $insts_html .= "⚪";
                 } else {
                     $due_year = $due_date->jy;
-                    if ($installment['status'] != 'active')
+                    if (!$installment['is_active'])
                         $insts_per_year[$due_year][] = "🟤";
                     elseif ($installment['is_paid'])
                         $insts_per_year[$due_year][] = "🟢";
@@ -343,7 +343,7 @@ function createLoanDetailRichMessage(array $loan, int|string|null $installment_i
                 $inst_buttons_html =
                     "<tg-button style='primary' type='callback_data' data='$delete_callback'>" . "حذف" . "</tg-button>" .
                     "<tg-button style='primary' type='callback_data' data='$pay_callback'>" . ($installment['is_paid'] ? 'پرداخت شده' : 'پرداخت نشده') . "</tg-button>" .
-                    "<tg-button style='primary' type='callback_data' data='$active_callback'>" . ($installment['status'] == 'active' ? 'فعال' : 'غیرفعال') . "</tg-button>";
+                    "<tg-button style='primary' type='callback_data' data='$active_callback'>" . ($installment['is_active'] ? 'فعال' : 'غیرفعال') . "</tg-button>";
             }
 
             // Prepare installment's text
@@ -351,7 +351,7 @@ function createLoanDetailRichMessage(array $loan, int|string|null $installment_i
             $date = beautifulNumber($installment['due_date'], null);
             $amount = beautifulNumber($installment['amount']);
 
-            $inst_text = ($installment['status'] == 'active') ? "$payment_emoji $date: $amount" : "<s>$payment_emoji $date: $amount</s>";
+            $inst_text = ($installment['is_active']) ? "$payment_emoji $date: $amount" : "<s>$payment_emoji $date: $amount</s>";
 
             $installments_text .= "<br>‏&nbsp;&nbsp;&nbsp;&nbsp;$inst_num) $inst_text $inst_buttons_html";
         }
