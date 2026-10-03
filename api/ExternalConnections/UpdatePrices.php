@@ -123,6 +123,20 @@ if (preg_match_all('/\|[  ].*? ((\d\d?) (.*?) (\d\d\d\d)) -[  ](\d\d:\d\d)/ums
             $new_assets['base_currencies']/**/ = $matches[3];
         }
     }
+    // --- Price Category 6: Basic Metals (فلزات پایه) ---
+    if (preg_match('/^⭕️ قیمت فلزات پایه /mu', $message['text'])) {
+
+        $pattern = "قیمت (.*?)‏.*?\nقیمت لحظه ای : (.*?) (.*?)\n";
+        $matched = preg_match_all(pattern: "/$pattern/um", subject: $message['text'], matches: $matches);
+        if ($matched) {
+
+            $asset_type = 'فلزات پایه';
+
+            $new_assets['names']/************/ = $matches[1];
+            $new_assets['prices']/***********/ = $matches[2];
+            $new_assets['base_currencies']/**/ = $matches[3];
+        }
+    }
 
     if ($asset_type && isset($new_assets)) {
         // Successful extraction: Save to database and respond.
