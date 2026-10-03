@@ -202,7 +202,9 @@ function createLoansRichMessage(array $loans, bool $summerized = true): array
 
                 if ($summerized) {
                     $insts_html = $insts_html ?? "<br>‏";
-                    if ($installment['is_paid'])
+                    if ($installment['status'] != 'active')
+                        $insts_html .= "🟤";
+                    elseif ($installment['is_paid'])
                         $insts_html .= "🟢";
                     elseif ($installment['is_due'])
                         if ($installment['remaining_days'] == 0)
@@ -213,7 +215,9 @@ function createLoansRichMessage(array $loans, bool $summerized = true): array
                         $insts_html .= "⚪";
                 } else {
                     $due_year = $due_date->jy;
-                    if ($installment['is_paid'])
+                    if ($installment['status'] != 'active')
+                        $insts_per_year[$due_year][] = "🟤";
+                    elseif ($installment['is_paid'])
                         $insts_per_year[$due_year][] = "🟢";
                     elseif ($installment['is_due'])
                         if ($installment['remaining_days'] == 0)
