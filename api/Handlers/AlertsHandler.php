@@ -58,9 +58,9 @@ function sendAllAlerts(User $user, DatabaseManager $db, int|string|null $message
         WHERE alerts.user_id = '{$user->getId()}'
         ORDER BY assets.asset_type, alerts.asset_name, alerts.target_price")->fetchAll();
 
-    $rich_text = '';
+    $html = '';
     $data = [
-        'rich_message' => ['is_rtl' => true, 'html' => &$rich_text],
+        'rich_message' => ['is_rtl' => true, 'html' => &$html],
         'chat_id' => $user->getid(),
         'reply_markup' => ['inline_keyboard' => [
             [['text' => 'مدیریت هشدارها', 'callback_data' => json_encode(['mng_alerts' => null])]]
@@ -68,24 +68,25 @@ function sendAllAlerts(User $user, DatabaseManager $db, int|string|null $message
     ];
 
     if ($alerts) {
-        $rich_text = '<h4>هشدارهای شما:</h4>';
-        $rich_text .= '<ul>';
+
+        $alerts_html = '<ul>';
         foreach ($alerts as $alert) {
             $status_emoji = '⚠';
             switch ($alert['status']) {
                 case 'active':
-                    $status_emoji = '🔁';
+                    $status_emoji = '🔄';
                     break;
                 case 'triggered':
                     $status_emoji = '✅';
                     break;
                 case 'inactive':
-                    $status_emoji = '❌';
+                    $status_emoji = '🚫';
                     break;
             }
 
             $asset_name = beautifulNumber($alert['asset_name'], null);
             $alert_price = beautifulNumber($alert['target_price']);
+            $current_price = beautifulNumber($alert['current_price']);
             $base_currency = beautifulNumber($alert['base_currency'], null);
 
             $toggle_callback = json_encode(['toggle_alert_activation' => $alert['id']]);
@@ -97,13 +98,26 @@ function sendAllAlerts(User $user, DatabaseManager $db, int|string|null $message
             $delete_callback = json_encode(['del_alert' => [$alert['id'] => $alert['asset_id']]]);
             $delete_button = "<tg-button type='callback_data' style='danger' data='$delete_callback'>" . "حذف" . "</tg-button>";
 
-            $rich_text .= "<li>$toggle_button $asset_name: $price_button $base_currency $delete_button</li>";
+            $alert_line_html = "<li>$toggle_button $price_button $base_currency $delete_button</li>";
+
+            $asset_title_html = "هشدارهای " . "<b><u>$asset_name</u></b> ($current_price $base_currency)";
+
+            if (!isset($prev_asset_name)) {
+                $prev_asset_name = $asset_name;
+                $alerts_html .= "<li>$asset_title_html<ul>$alert_line_html";
+            } elseif ($prev_asset_name != $asset_name) {
+                $prev_asset_name = $asset_name;
+                $alerts_html .= "</ul></li><li>$asset_title_html<ul>$alert_line_html";
+            } else {
+                $alerts_html .= $alert_line_html;
+            }
         }
+        $alerts_html .= "</ul></li></ul>";
 
-        $footer = "برای فعال/غیرفعال‌سازی هشدار و یا ویرایش قیمت، به ترتیب ایموجی وضعیت هشدار یا قیمت آن را لمس کنید.";
-        $rich_text .= "</ul><hr>$footer";
+        $footer = "برای فعال/غیرفعال‌سازی هشدار و یا ویرایش قیمت، به ترتیب ایموجی وضعیت و یا قیمت آن را لمس کنید.";
+        $html = "<h3>هشدارهای شما:</h3>$alerts_html<hr>$footer";
 
-    } else $rich_text = 'شما هشداری ثبت نکرده‌اید!';
+    } else $html = 'شما هشداری ثبت نکرده‌اید!';
 
     if (!$message_id) {
         sendToTelegram('sendRichMessage', $data);
@@ -148,13 +162,13 @@ function sendAssetAlerts(User $user, DatabaseManager $db, string|int $asset_id, 
             $status_emoji = '⚠';
             switch ($alert['status']) {
                 case 'active':
-                    $status_emoji = '🔁';
+                    $status_emoji = '🔄';
                     break;
                 case 'triggered':
                     $status_emoji = '✅';
                     break;
                 case 'inactive':
-                    $status_emoji = '❌';
+                    $status_emoji = '🚫';
                     break;
             }
 
