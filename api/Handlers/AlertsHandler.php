@@ -88,13 +88,16 @@ function sendAllAlerts(User $user, DatabaseManager $db, int|string|null $message
             $alert_price = beautifulNumber($alert['target_price']);
             $base_currency = beautifulNumber($alert['base_currency'], null);
 
+            $toggle_callback = json_encode(['toggle_alert_activation' => $alert['id']]);
+            $toggle_button = "<tg-button type='callback_data' style='link' data='$toggle_callback'>" . $status_emoji . "</tg-button>";
+
             $edit_callback = json_encode(['edit_alert_price' => $alert['id']]);
-            $edit_button = "<tg-button type='callback_data' style='link' data='$edit_callback'>" . "ویرایش" . "</tg-button>";
+            $edit_button = "<tg-button type='callback_data' style='primary' data='$edit_callback'>" . "ویرایش" . "</tg-button>";
 
             $delete_callback = json_encode(['del_alert' => [$alert['id'] => $alert['asset_id']]]);
             $delete_button = "<tg-button type='callback_data' style='danger' data='$delete_callback'>" . "حذف" . "</tg-button>";
 
-            $rich_text .= "<li>$status_emoji $asset_name: $alert_price $base_currency $edit_button $delete_button</li>";
+            $rich_text .= "<li>$toggle_button $asset_name: $alert_price $base_currency $edit_button $delete_button</li>";
         }
         $rich_text .= '</ul>';
     } else $rich_text = 'شما هشداری ثبت نکرده‌اید!';
@@ -486,6 +489,12 @@ function managePriceAlerts(User $user, array $callback_query, array $message, Da
 
             askForAlertPrice($user, $asset);
             exit;
+
+        // Toggle alert's activation status
+        case 'toggle_alert_activation':
+            $alert_id = $query_data[$query_key];
+            $db->query("UPDATE alerts SET status = IF(status = 'active', 'inactive', 'active') WHERE id = $alert_id;")->fetch();
+            sendAllAlerts($user, $db, $message['message_id']);
 
         // Ask user to confirm deleting alert
         case 'del_alert': # ──────── Request from main alerts' message
