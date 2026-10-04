@@ -206,11 +206,10 @@ function createLoansRichMessage(array $loans, bool $summerized = true): array
                         $insts_html .= "🟤";
                     elseif ($installment['is_paid'])
                         $insts_html .= "🟢";
+                    elseif ($installment['remaining_days'] == 0)
+                        $insts_html .= "🟡";
                     elseif ($installment['is_due'])
-                        if ($installment['remaining_days'] == 0)
-                            $insts_html .= "🟡";
-                        else
-                            $insts_html .= "🔴";
+                        $insts_html .= "🔴";
                     else
                         $insts_html .= "⚪";
                 } else {
@@ -219,11 +218,10 @@ function createLoansRichMessage(array $loans, bool $summerized = true): array
                         $insts_per_year[$due_year][] = "🟤";
                     elseif ($installment['is_paid'])
                         $insts_per_year[$due_year][] = "🟢";
+                    elseif ($installment['remaining_days'] == 0)
+                        $insts_per_year[$due_year][] = "🟡";
                     elseif ($installment['is_due'])
-                        if ($installment['remaining_days'] == 0)
-                            $insts_per_year[$due_year][] = "🟡";
-                        else
-                            $insts_per_year[$due_year][] = "🔴";
+                        $insts_per_year[$due_year][] = "🔴";
                     else
                         $insts_per_year[$due_year][] = "⚪";
                 }
@@ -254,14 +252,14 @@ function createLoansRichMessage(array $loans, bool $summerized = true): array
         } else
             $next_payment_text = 'پایان یافته';
 
-        // General HTML information of the loan without outer tag: $loan_general_html
+        // General HTML information of the loan without outer tag:
         $loan_general_html = $summerized ?
             ": $next_payment_text" :
             "<br>┤─ " . "مبلغ وام: " . beautifulNumber($loan['total_amount']) .
             "<br>┤─ " . "تاریخ دریافت: " . beautifulNumber($loan['received_date'], null) .
             "<br>┤─ " . "قسط بعدی: " . beautifulNumber($next_payment_text, null);
 
-        $loans_html .= "<li>" . $loan_name_html . $loan_general_html . $insts_html . "<br>‏" . "</li>";
+        $loans_html .= "<li>" . $loan_name_html . $loan_general_html . $insts_html . "<br>" . "</li>";
     }
 
     // Calculate total numbers for summery
