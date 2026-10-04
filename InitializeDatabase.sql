@@ -27,18 +27,18 @@ VALUES ('ریال', '🇮🇷', 'ارزهای آزاد', 1, 'ریال', '1357-11
 
 CREATE TABLE IF NOT EXISTS `holdings`
 (
-    id        INT AUTO_INCREMENT PRIMARY KEY,
-    user_id   BIGINT         NOT NULL,
-    asset_id  INT            NOT NULL,
-    amount    NUMERIC(18, 8) NOT NULL DEFAULT 0.0,
-    note      TEXT,
-    avg_price NUMERIC(18, 8) NOT NULL,
-    date      TEXT                    DEFAULT NULL,
-    time      TEXT                    DEFAULT NULL,
+    id         INT AUTO_INCREMENT PRIMARY KEY,
+    user_id    BIGINT         NOT NULL,
+    asset_name VARCHAR(191)   NOT NULL,
+    amount     NUMERIC(18, 8) NOT NULL DEFAULT 0.0,
+    note       TEXT,
+    avg_price  NUMERIC(18, 8) NOT NULL,
+    date       TEXT                    DEFAULT NULL,
+    time       TEXT                    DEFAULT NULL,
 
-    UNIQUE KEY idx_unique_holding (user_id, asset_id),
+    UNIQUE KEY idx_unique_holding (user_id, asset_name),
     FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE ON UPDATE CASCADE,
-    FOREIGN KEY (asset_id) REFERENCES assets (id) ON DELETE RESTRICT
+    FOREIGN KEY (asset_name) REFERENCES assets (name) ON DELETE RESTRICT
 ) DEFAULT CHARSET = utf8mb4;
 
 CREATE TABLE IF NOT EXISTS favorites

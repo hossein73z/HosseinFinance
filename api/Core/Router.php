@@ -70,10 +70,6 @@ function handleCallbackQuery(array $callback_query, DatabaseManager $db): void
         // Non-level-related callbacks
         switch (array_key_first($callback_query['data'])) {
             case'view_holding':
-            case'edit_holding':
-            case'edit_holding_name':
-            case'edit_holding_price':
-            case'edit_holding_amount':
             case'show_all_holdings':
                 holdings_menu($user, $db, $message, $callback_query);
 
@@ -136,8 +132,6 @@ function levelHandler(
             holdings_menu(user: $user, db: $db, message: $message, callback_query: $callback_query);
         case 'loans':
             loans_menu(user: $user, db: $db, message: $message, callback_query: $callback_query);
-        case 'buy_new_holding':
-            buy_holding_menu(user: $user, db: $db, message: $message, callback_query: $callback_query);
         case 'prices':
             prices_menu(user: $user, db: $db, message: $message, callback_query: $callback_query);
         case 'favorites':

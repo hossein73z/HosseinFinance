@@ -26,16 +26,28 @@ function holdings_menu(
         ));
     } else { // Received a message in the level
 
-        // Received message contains web_app data
-        if (isset($message['web_app_data']))
-            handleHoldingsWebAppData($user, $message, $db);
-
         // Received message is a button
-        elseif ($pressed_button_id = getPressedButtonID($message['text'], $user))
-            levelHandler($user, $db, button_id: $pressed_button_id);
+        if ($pressed_button_id = getPressedButtonID($message['text'], $user))
+            switch ($pressed_button_id) {
+                case 'buy_new_holding':
+                    addHoldingProgress($user, null, $db);
+                    break;
 
-        // Received message is not recognizable
-        else $data['text'] = 'پیام نامفهوم است. لطفاً یکی از دکمه‌های زیر را انتخاب کنید.';
+                case 'back':
+                    $progress = $user->getProgress();
+                    $progress_key = array_key_first($progress);
+                    unset($progress[$progress_key][array_key_first($progress[$progress_key])]); // TODO: Clean this
+                    $user->setProgress($progress);
+                    addHoldingProgress($user, null, $db);
+                    break;
+
+                default:
+                    levelHandler($user, $db, button_id: $pressed_button_id);
+            }
+        else {
+            addHoldingProgress($user, $message, $db);
+            $data['text'] = 'پیام نامفهوم است. لطفاً یکی از دکمه‌های زیر را انتخاب کنید.';
+        }
     }
 
     sendInitialLevelMessage($user, $db, $data ?? null);
@@ -53,32 +65,12 @@ function handleHoldingsCallback(User $user, array $callback_query, array $messag
     switch ($query_key) {
 
         case 'view_holding':
-        case 'edit_holding':
             $holding_id = $query_data[$query_key];
             $holding = getHoldingsWithAssetDetails(['h.id' => $holding_id, 'h.user_id' => $user->getId()], $db, true);
             if ($holding) {
-                sendHoldingDetail($user, $holding, $message['message_id'], is_editing: $query_key === 'edit_holding');
+                sendHoldingDetail($user, $holding, $message['message_id']);
                 sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
-                exit(($query_key == 'view_holding' ? 'View' : 'Edit') . " holding: id=$holding_id asset_name=\"$holding[asset_name]\"");
-            }
-            break;
-
-        case 'edit_holding_name':
-        case 'edit_holding_price':
-        case 'edit_holding_amount':
-            $holding_id = $query_data[$query_key];
-            $holding = getHoldingsWithAssetDetails(['h.id' => $holding_id, 'h.user_id' => $user->getId()], $db, true);
-            if ($holding) {
-
-                $progress['edit_holding'] = [];
-                if ($query_key != 'edit_holding_name') $progress['edit_holding']['asset_type'] = $holding['asset_type'];
-                if ($query_key != 'edit_holding_name') $progress['edit_holding']['asset_name'] = $holding['asset_name'];
-                if ($query_key != 'edit_holding_price') $progress['edit_holding']['avg_price'] = $holding['avg_price'];
-                if ($query_key != 'edit_holding_amount') $progress['edit_holding']['amount'] = $holding['amount'];
-                $progress['edit_holding']['holding_id'] = $holding['id'];
-
-                sendToTelegram('deleteMessage', ['chat_id' => $user->getId(), 'message_id' => $message['message_id']]);
-                buy_holding_menu($user->setProgress($progress), $db);
+                exit("View holding: id=$holding_id asset_name=\"$holding[asset_name]\"");
             }
             break;
 
@@ -126,174 +118,7 @@ function handleHoldingsCallback(User $user, array $callback_query, array $messag
     exit;
 }
 
-function handleHoldingsWebAppData(User $user, array $message, DatabaseManager $db): void
-{
-    $web_app_data = json_decode($message['web_app_data']['data'], true);
-
-    $action = $web_app_data['action'] ?? null;
-
-    $expected_data = false;
-
-    if ($action == 'add') {
-
-        $new_holding = $web_app_data['holding'];
-        try {
-            $db->create(
-                table: 'holdings',
-                data: [
-                    "user_id" => $user->getId(),
-                    "asset_id" => $new_holding["asset_id"],
-                    "amount" => $new_holding["amount"],
-                    "avg_price" => $new_holding["avg_price"],
-                    "date" => JalaliDate::fromString($new_holding["date"])->toGregorian()->format('Y-m-d'),
-                    "time" => $new_holding["time"],
-                    "note" => $new_holding["note"],
-                ]
-            );
-            $data['text'] = '✅ دارایی جدید با موفقیت ثبت شد.';
-        } catch (PDOException $e) {
-
-            if ($e->errorInfo[1] == 1062) {
-                /**
-                 * Duplicate Entry.
-                 *
-                 * Informs user of existing holding, redirects
-                 * them to the holding and breaks the process.
-                 */
-
-                $data['text'] = 'شما از قبل این دارایی را در سیستم ثبت کرده اید.' . "\n" .
-                    'درصورت تمایل برای ثبت تغییرات، دارایی ثبت شده را ویرایش کنید.';
-
-                sendToTelegram('sendMessage', $data);
-
-                $holding = getHoldingsWithAssetDetails(['h.asset_id' => $new_holding["asset_id"], 'h.user_id' => $user->getId()], $db, true);
-                if ($holding) {
-                    $db->update(
-                        table: 'users',
-                        data: ['progress' => json_encode(['view_holding' => ['holding_id' => $holding['id']]])],
-                        conditions: ['id' => $user->getId()]
-                    );
-                    sendHoldingDetail($user, $holding, $message['message_id']);
-                }
-                exit;
-            }
-
-            error_log(
-                'Holding: ' . json_encode($new_holding) . "\n" .
-                'Error: ' . json_encode($e->errorInfo, JSON_PRETTY_PRINT)
-            );
-            $data['text'] = '❌ خطای پایگاه داده در ثبت دارایی جدید: ' . $e->errorInfo[2];
-        }
-        $expected_data = true;
-    }
-    if ($action == 'edit') {
-
-        try {
-            $updates = $web_app_data['updates'];
-            if (isset($updates['date'])) $updates['date'] = JalaliDate::fromString($updates['date'])->toGregorian()->format('Y-m-d');
-            $db->update(
-                table: 'holdings',
-                data: $updates,
-                conditions: ['id' => $web_app_data['id']]
-            );
-            $data['text'] = '✅ دارایی با موفقیت ویرایش شد.';
-        } catch (PDOException $e) {
-            error_log(
-                'Updates: ' . json_encode($web_app_data['updates']) . "\n" .
-                'Error: ' . json_encode($e->errorInfo, JSON_PRETTY_PRINT)
-            );
-            $data['text'] = '❌ خطای پایگاه داده در ثبت دارایی جدید: ' . $e->errorInfo[2];
-        }
-        $expected_data = true;
-    }
-    if ($action == 'delete') {
-
-        try {
-            $db->delete(
-                table: 'holdings',
-                conditions: ['id' => $web_app_data['id']],
-                resetAutoIncrement: true
-            );
-            $data['text'] = '✅ دارایی با موفقیت حذف شد.';
-        } catch (PDOException $e) {
-            error_log(
-                'Updates: ' . json_encode($web_app_data['updates']) . "\n" .
-                'Error: ' . json_encode($e->errorInfo, JSON_PRETTY_PRINT)
-            );
-            $data['text'] = '❌ خطای پایگاه داده درحذف دارایی: ' . $e->errorInfo[2];
-        }
-        $expected_data = true;
-    }
-
-    $data = [
-        'chat_id' => $user->getid(),
-        'text' => $user->getButton()->getText(),
-        'reply_markup' => [
-            'keyboard' => $user->getKeyboard(),
-            'resize_keyboard' => true,
-            'is_persistent' => false,
-            'input_field_placeholder' => $user->getButton()->getText()
-        ]
-    ];
-
-    if ($expected_data) {
-        // Send success/failure message
-        sendToTelegram('sendMessage', $data);
-
-        // Clear user progress and show all holdings
-        $db->update('users', ['progress' => null], ['id' => $user->getId()]);
-        sendAllHoldings($user, $db);
-    } else {
-        // TODO: Needs to be checked
-        $data['text'] = 'داده‌های ارسالی قابل پردازش نیستند!';
-        sendToTelegram('sendMessage', $data);
-    }
-    exit;
-}
-
-#[NoReturn]
-function buy_holding_menu(
-    User            $user,
-    DatabaseManager $db,
-    ?array          $message = null,
-    ?array          $callback_query = null): void
-{
-
-    if ($callback_query) {
-        sendToTelegram('editMessageText', [
-            'chat_id' => $user->getid(),
-            'message_id' => $message['message_id'],
-            'text' => 'این پیام منقضی شده است.'
-        ]);
-        exit('Expired callback query.');
-    } elseif ($message && $pressed_button_id = getPressedButtonID($message['text'], $user))
-        switch ($pressed_button_id) {
-            case 'back':
-                $progress = $user->getProgress();
-                $progress_key = array_key_first($progress);
-                unset($progress[$progress_key][array_key_first($progress[$progress_key])]); // TODO: Clean this
-                $user->setProgress($progress);
-                addHoldingProgress($user, null, $db);
-            default:
-                levelHandler($user, $db, button_id: $pressed_button_id);
-        }
-    elseif (!$message) {
-        $user->setButton(new Button(
-            id: 'buy_new_holding',
-            attrs: ['text' => 'ثبت خرید جدید دارایی'],
-            adminKey: false,
-            belongTo: 'main_menu',
-            keyboard: []
-        ));
-    }
-
-    addHoldingProgress($user, $message, $db);
-
-}
-
-
-#[NoReturn]
-function addHoldingProgress(User $user, ?array $message, DatabaseManager $db): void
+function addHoldingProgress(User $user, ?array $message, DatabaseManager $db): null
 {
     /**
      * Required fields for new holding:
@@ -315,22 +140,23 @@ function addHoldingProgress(User $user, ?array $message, DatabaseManager $db): v
             'keyboard' => $user->getKeyboard(),
             'resize_keyboard' => true,
             'is_persistent' => true,
-            'force_reply' => true,
+            'force_reply' => false,
             'input_field_placeholder' => $user->getButton()->getText() // TODO: Write a different text for each level
         ]
     ];
 
     $progress = $user->getProgress();
+    if (!$progress && $message) return null;
     if (!$progress || !in_array(array_key_first($progress), ['add_holding', 'edit_holding']))
-        $progress = ['add_holding' => null];
+        $progress = $user->setProgress(['add_holding' => null])->getProgress();
 
     $progress_key = array_key_first($progress);
 
     // Asset Type
     if (!isset($progress[$progress_key]['asset_type'])) {
         if (!$message) askForHoldingAssetType($user, $data, $db);
-        $assets = $db->read('assets', ['asset_type' => $message['text']]);
-        if ($assets) $progress[$progress_key]['asset_type'] = $assets[0]['asset_type'];
+        $asset = $db->read('assets', ['asset_type' => $message['text']], true);
+        if ($asset) $progress[$progress_key]['asset_type'] = $asset['asset_type'];
         else askForHoldingAssetType($user, $data, $db, 'پیام نامفهوم بود. لطفاً دسته‌بندی مد نظر را از دکمه‌های زیر انتخاب کنید.');
         addHoldingProgress($user->setProgress($progress), null, $db);
     }
@@ -363,16 +189,59 @@ function addHoldingProgress(User $user, ?array $message, DatabaseManager $db): v
     }
 
     // Add the holding if all the required values are presented
-    $holding['id'] = $progress[$progress_key]['holding_id'] ?? null;
-    $holding['user_id'] = $user->getId();
-    $holding['asset_id'] = $db->read('assets', ['name' => $progress[$progress_key]['asset_name']], true)['id'];
-    $holding['amount'] = beautifulNumber($progress[$progress_key]['amount'], null, false);
-    $holding['avg_price'] = beautifulNumber($progress[$progress_key]['avg_price'], null, false);
-    $holding['date'] = new DateTime()->format('Y-m-d');
-    $holding['time'] = new DateTime()->format('h:i');
+    $new_holding["id"] = $progress[$progress_key]["holding_id"] ?? null;
+    $new_holding["user_id"] = $user->getId();
+    $new_holding["asset_name"] = $progress[$progress_key]["asset_name"];
+    $new_holding["amount"] = beautifulNumber($progress[$progress_key]["amount"], null, false);
+    $new_holding["avg_price"] = beautifulNumber($progress[$progress_key]["avg_price"], null, false);
+    $new_holding["date"] = new DateTime()->format('Y-m-d');
+    $new_holding["time"] = new DateTime()->format('h:i');
 
-    upsertHolding($user, $holding, $data, $db);
-    exit('Add holding: ' . json_encode($holding, JSON_UNESCAPED_UNICODE));
+    $existing_holding = getHoldingsWithAssetDetails(["user_id" => $user->getId(), "asset_name" => $new_holding["asset_name"]], $db, true);
+    if ($existing_holding) {
+
+        // New received data
+        $price = $new_holding["avg_price"];
+        $amount = (float)$new_holding["amount"];
+
+        // Data from old existing holding
+        $old_avg_price = $existing_holding["avg_price"];
+        $old_amount = (float)$existing_holding["amount"];
+
+        // New merged data
+        $new_amount = $amount + $old_amount;
+        $new_avg_price = (($price * $amount) + ($old_avg_price * $old_amount)) / $new_amount;
+
+        $new_holding["amount"] = beautifulNumber($new_amount, null, false);
+        $new_holding["avg_price"] = beautifulNumber($new_avg_price, null, false);
+
+        try {
+            $db->update('holdings', $new_holding, ['id' => $existing_holding['id']]);
+            $data['text'] = '✅ دارایی با موفقیت به‌روزرسانی شد.';
+        } catch (PDOException $e) {
+            error_log('Error: ' . json_encode($e->errorInfo, JSON_PRETTY_PRINT));
+            $data['text'] = '❌ خطای پایگاه داده: ' . $e->errorInfo[2];
+        }
+    } else {
+        try {
+            $db->create('holdings', $new_holding);
+            $data['text'] = '✅ دارایی جدید با موفقیت ثبت شد.';
+        } catch (PDOException $e) {
+            error_log('Error: ' . json_encode($e->errorInfo, JSON_PRETTY_PRINT));
+            $data['text'] = '❌ خطای پایگاه داده در ثبت دارایی: ' . $e->errorInfo[2];
+        }
+    }
+    $user->setKeyboard([
+        [['id' => 'buy_new_holding', 'text' => 'ثبت خرید جدید دارایی', 'style' => 'success', 'admin_key' => 0],],
+        [['id' => 'main_menu', 'text' => '🔙 برگشت 🔙', 'style' => 'primary', 'admin_key' => 0],],
+    ])->setProgress(null);
+    $db->update('users', $user->toDbArray(), ['id' => $user->getId()]);
+    $data['reply_markup']['keyboard'] = $user->getKeyboard();
+    sendToTelegram('sendMessage', $data);
+
+    if ($existing_holding) sendHoldingDetail($user, $new_holding);
+    else sendAllHoldings($user, $db);
+    exit('Add holding: ' . json_encode($new_holding, JSON_UNESCAPED_UNICODE));
 }
 
 #[NoReturn]
@@ -489,30 +358,4 @@ function askForHoldingPrice(User $user, array $data, string $asset_name, Databas
         sendToTelegram('sendMessage', $data);
     }
     exit();
-}
-
-function upsertHolding(User $user, array $holding, array $data, DatabaseManager $db): void
-{
-    try {
-        $asset = $db->read('assets', ['id' => $holding['asset_id']], true);
-        if (!$asset) {
-            $data['text'] = '❌ دارایی انتخاب شده پیدا نشد.';
-            sendToTelegram('sendMessage', $data);
-            holdings_menu($user, $db);
-        }
-
-        $db->upsert('holdings', $holding);
-        $data['text'] = '✅ دارایی جدید با موفقیت ثبت شد.';
-    } catch (PDOException $e) {
-        error_log('Error: ' . json_encode($e->errorInfo, JSON_PRETTY_PRINT));
-        $data['text'] = '❌ خطای پایگاه داده در ثبت دارایی: ' . $e->errorInfo[2];
-    }
-
-    $data['reply_markup']['force_reply'] = false;
-
-    // Send success/failure message
-    sendToTelegram('sendMessage', $data);
-
-    // Redirect user to view all holdings
-    holdings_menu($user, $db);
 }
