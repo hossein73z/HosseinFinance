@@ -211,7 +211,7 @@ function createLoansRichMessage(array $loans, bool $summerized = true): array
 
                     $insts_html = $insts_html ?? "<br>‏";
                     if (!$installment['is_active'])
-                        $insts_html .= "🟤";
+                        $insts_html .= $installment['is_paid'] ? "🟤" : "⚫";
                     elseif ($installment['is_paid'])
                         $insts_html .= "🟢";
                     elseif ($installment['remaining_days'] == 0)
@@ -223,7 +223,7 @@ function createLoansRichMessage(array $loans, bool $summerized = true): array
                 } else {
                     $due_year = $due_date->jy;
                     if (!$installment['is_active'])
-                        $insts_per_year[$due_year][] = "🟤";
+                        $insts_per_year[$due_year][] = $installment['is_paid'] ? "🟤" : "⚫";
                     elseif ($installment['is_paid'])
                         $insts_per_year[$due_year][] = "🟢";
                     elseif ($installment['remaining_days'] == 0)
@@ -289,8 +289,19 @@ function createLoansRichMessage(array $loans, bool $summerized = true): array
         "<li>⚪ " . "جمع اقساط سررسید نشده: " . beautifulNumber($total_remaining) . "</li>" .
         "</ul>";
 
+    $footer =
+        "<fotter>" .
+        "معانی ایموجی‌های اقساط:" .
+        "<br>" . "🟤 --> پرداخت شده ولی غیرفعال" .
+        "<br>" . "⚫ --> پداخت نشده و غیرفعال" .
+        "<br>" . "🟢 --> پداخت شده و فعال" .
+        "<br>" . "🟡 --> پرداخت نشده و فعال با سررسید امروز" .
+        "<br>" . "🔴 --> پرداخت نشده و فعال با سررسید گذشته" .
+        "<br>" . "⚪ --> پرداخت نشده، فعال و سررسید نشده" .
+        "</fotter>";
+
     // Final HTML code
-    $html = "$total_summery_html<hr><h3>" . "وام‌های ثبت شده‌ی شما: " . "</h3><ul>$loans_html</ul>";
+    $html = "$total_summery_html<hr><h3>" . "وام‌های ثبت شده‌ی شما: " . "</h3><ul>$loans_html</ul><hr>$footer";
     return ['is_rtl' => true, 'html' => $html];
 }
 
@@ -348,8 +359,8 @@ function createLoanDetailRichMessage(array $loan, int|string|null $installment_i
                 $active_callback = json_encode(['toggle_inst_active' => [$installment['loan_id'], $installment['id']]]); # Activation button
                 $inst_buttons_html =
                     "<tg-button style='primary' type='callback_data' data='$delete_callback'>" . "حذف" . "</tg-button>" .
-                    "<tg-button style='primary' type='callback_data' data='$pay_callback'>" . ($installment['is_paid'] ? 'پرداخت شده' : 'پرداخت نشده') . "</tg-button>" .
-                    "<tg-button style='primary' type='callback_data' data='$active_callback'>" . ($installment['is_active'] ? 'فعال' : 'غیرفعال') . "</tg-button>";
+                    "<tg-button style='primary' type='callback_data' data='$pay_callback'>" . ($installment['is_paid'] ? 'پرداخت نشده' : 'پرداخت شده') . "</tg-button>" .
+                    "<tg-button style='primary' type='callback_data' data='$active_callback'>" . ($installment['is_active'] ? 'غیرفعال' : 'فعال') . "</tg-button>";
             }
 
             // Prepare installment's text
