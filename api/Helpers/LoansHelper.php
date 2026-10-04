@@ -201,6 +201,14 @@ function createLoansRichMessage(array $loans, bool $summerized = true): array
                 $due_date = JalaliDate::fromString($installment['due_date']);
 
                 if ($summerized) {
+
+                    // Calculate and add year divider
+                    if ((isset($loan_id) && $loan_id == $installment['loan_id']) &&
+                        (isset($due_year) && $due_year != $due_date->jy))
+                        $insts_html .= '|';
+                    $loan_id = $installment['loan_id'];
+                    $due_year = $due_date->jy;
+
                     $insts_html = $insts_html ?? "<br>‏";
                     if (!$installment['is_active'])
                         $insts_html .= "🟤";
