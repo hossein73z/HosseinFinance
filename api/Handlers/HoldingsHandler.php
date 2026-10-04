@@ -20,7 +20,7 @@ function holdings_menu(
             adminKey: false,
             belongTo: 'main_menu',
             keyboard: [
-                [['id' => 'add_new_holding', 'text' => 'افزودن دارایی جدید', 'style' => 'success', 'admin_key' => 0],],
+                [['id' => 'buy_new_holding', 'text' => 'ثبت خرید جدید دارایی', 'style' => 'success', 'admin_key' => 0],],
                 [['id' => 'main_menu', 'text' => '🔙 برگشت 🔙', 'style' => 'primary', 'admin_key' => 0],],
             ]
         ));
@@ -78,7 +78,7 @@ function handleHoldingsCallback(User $user, array $callback_query, array $messag
                 $progress['edit_holding']['holding_id'] = $holding['id'];
 
                 sendToTelegram('deleteMessage', ['chat_id' => $user->getId(), 'message_id' => $message['message_id']]);
-                add_holding_menu($user->setProgress($progress), $db);
+                buy_holding_menu($user->setProgress($progress), $db);
             }
             break;
 
@@ -252,7 +252,7 @@ function handleHoldingsWebAppData(User $user, array $message, DatabaseManager $d
 }
 
 #[NoReturn]
-function add_holding_menu(
+function buy_holding_menu(
     User            $user,
     DatabaseManager $db,
     ?array          $message = null,
@@ -279,8 +279,8 @@ function add_holding_menu(
         }
     elseif (!$message) {
         $user->setButton(new Button(
-            id: 'add_new_holding',
-            attrs: ['text' => 'افزودن دارایی جدید'],
+            id: 'buy_new_holding',
+            attrs: ['text' => 'ثبت خرید جدید دارایی'],
             adminKey: false,
             belongTo: 'main_menu',
             keyboard: []
@@ -443,7 +443,7 @@ function askForHoldingAmount(User $user, array $data, DatabaseManager $db, ?stri
                 ['id' => 'holdings', 'text' => '❌ لغو ❌', 'style' => 'danger', 'admin_key' => 0],]
     ];
 
-    $data['text'] = $text ?? 'مقدار دارایی را به عدد وارد کنید:';
+    $data['text'] = $text ?? 'مقدار خرید دارایی را به عدد وارد کنید:';
     $data['reply_markup']['keyboard'] = $keyboard;
     $response = sendToTelegram('sendMessage', $data);
     if ($response) {
@@ -464,7 +464,7 @@ function askForHoldingPrice(User $user, array $data, string $asset_name, Databas
         $base = beautifulNumber($asset['base_currency'], null);
 
         $data['rich_message']['html'] = $html ??
-            ('میانگین قیمت خرید دارایی را به عدد وارد کنید:' . "<br>" .
+            ('قیمت خرید را به عدد وارد کنید:' . "<br>" .
                 'قیمت کنونی ' . "«{$name}»: <b>$price</b> $base");
         $data['reply_markup']['resize_keyboard'] = true;
         $keyboard = [

@@ -136,8 +136,8 @@ function levelHandler(
             holdings_menu(user: $user, db: $db, message: $message, callback_query: $callback_query);
         case 'loans':
             loans_menu(user: $user, db: $db, message: $message, callback_query: $callback_query);
-        case 'add_new_holding':
-            add_holding_menu(user: $user, db: $db, message: $message, callback_query: $callback_query);
+        case 'buy_new_holding':
+            buy_holding_menu(user: $user, db: $db, message: $message, callback_query: $callback_query);
         case 'prices':
             prices_menu(user: $user, db: $db, message: $message, callback_query: $callback_query);
         case 'favorites':
