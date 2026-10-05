@@ -24,9 +24,7 @@ function holdings_menu(
                 [['id' => 'main_menu', 'text' => '🔙 برگشت 🔙', 'style' => 'primary', 'admin_key' => 0],],
             ]
         ));
-    } else { // Received a message in the level
-
-        // Received message is a button
+    } else {
         if ($pressed_button_id = getPressedButtonID($message['text'], $user))
             switch ($pressed_button_id) {
                 case 'buy_new_holding':

@@ -1,45 +1,58 @@
 <?php
 
 // See and manage transactions
-function level_11(
+use JetBrains\PhpStorm\NoReturn;
+
+#[NoReturn]
+function transaction_menu(
     User            $user,
     DatabaseManager $db,
-    ?Button         $level_button = null,
     ?array          $message = null,
     ?array          $callback_query = null): void
 {
-    // Create keyboards
-    $level_button = $level_button ?: $user->getButton();
-    $keyboard = refineKeyboardForTelegram($level_button->getKeyboard());
+    if ($callback_query) {
+        handleTransactionsCallback($user, $message);
+    } elseif (!$message) {
+        $user->setProgress(null);
+        $user->setButton(new Button(
+            id: 'transactions',
+            attrs: ['text' => '🔃 تراکنش‌ها'],
+            adminKey: false,
+            belongTo: 'main_menu',
+            keyboard: [
+                [['id' => 'add_transaction', 'text' => 'ثبت تراکنش جدید دارایی', 'style' => 'success', 'admin_key' => 0],],
+                [['id' => 'main_menu', 'text' => '🔙 برگشت 🔙', 'style' => 'primary', 'admin_key' => 0],],
+            ]
+        ));
+    } else {
+        if ($pressed_button_id = getPressedButtonID($message['text'], $user))
+            switch ($pressed_button_id) {
+                case 'add_transaction':
+//                    addTransactionProgress($user, null, $db);
+                    break;
 
-    $data = [
-        'chat_id' => $user->getid(),
-        'text' => $level_button->getText(),
-        'reply_markup' => [
-            'keyboard' => $keyboard,
-            'resize_keyboard' => true,
-            'is_persistent' => false,
-            'input_field_placeholder' => $level_button->getText()
-        ]
-    ];
+                case 'back':
+                    $progress = $user->getProgress();
+                    unset($progress['add_transaction'][array_key_first($progress['add_transaction'])]); // TODO: Clean this
+                    $user->setProgress($progress);
+                    addTransactionProgress($user, null, $db);
+                    break;
 
-    if ($callback_query) handleTransactionsCallback($user, $message);
-    if ($message) handleTransactionsTextMessage($user, $data, $message, $db);
-
-    // Send initial message
-    $response = sendToTelegram('sendMessage', $data);
-
-    // Update user's level and progress
-    if ($response) {
-        $db->update('users', ['button' => json_encode($level_button), 'progress' => null], ['id' => $user->getId()]);
-
-        // Send Informative message
-        sendAllTransactions($user, $db);
+                default:
+                    levelHandler($user, $db, button_id: $pressed_button_id);
+            }
+        else {
+            addTransactionProgress($user, $message, $db);
+            $data['text'] = 'پیام نامفهوم است. لطفاً یکی از دکمه‌های زیر را انتخاب کنید.';
+        }
     }
 
+    sendInitialLevelMessage($user, $db, $data ?? null);
+    sendAllTransactions($user, $db);
     exit;
 }
 
+#[NoReturn]
 function handleTransactionsCallback(User $user, array $message): void
 {
     $data = [
@@ -51,6 +64,7 @@ function handleTransactionsCallback(User $user, array $message): void
     exit;
 }
 
+#[NoReturn]
 function handleTransactionsTextMessage(User $user, array $data, array $message, DatabaseManager $db): void
 {
 
@@ -85,6 +99,7 @@ function handleTransactionsTextMessage(User $user, array $data, array $message, 
     exit;
 }
 
+#[NoReturn]
 function addTransactionFromMessage(User $user, array $callback_query, array $message, DatabaseManager $db): void
 {
     if ($message) {
@@ -127,29 +142,35 @@ function addTransactionFromMessage(User $user, array $callback_query, array $mes
 
 function sendAllTransactions(User $user, DatabaseManager $db): void
 {
-    $transactions = $db->read(
-        table: 'transactions t',
-        conditions: ['t.user_id' => $user->getId()],
-        selectColumns: 't.*, a.name as account_name, a.type as account_type',
-        join: 'join accounts a on a.id = t.account_id',
-        orderBy: ['t.date' => 'ASC', 't.time' => 'ASC'],
-        limit: 10,
-    );
+    $transactions = $db->read('transactions', ['user_id' => $user->getId()], orderBy: ['date' => 'DESC', 'time' => 'DESC']);
     if ($transactions) {
-        $data['text'] = 'لیست تراکنش‌های شما:';
-        $data['chat_id'] = $user->getId();
+        $html = "<h3>" . "لیست تراکنش‌های شما" . "<br></h3>";
 
-        foreach ($transactions as $transaction) {
-            $data['text'] .= "\n" . ($transaction['type'] == 'outward' ? '📤 برداشت از: ' : '📥 واریز به: ') .
-                beautifulNumber($transaction['account_name'], null) . ' (' . beautifulNumber($transaction['account_type'], null) . ')';
-            $data['text'] .= "\n" . 'مبلغ: ' . beautifulNumber($transaction['amount']);
-            $data['text'] .= "\n" . 'زمان: ' . beautifulNumber(JalaliDate::fromGregorianString($transaction['date'])->format(), null) . ' ' . beautifulNumber($transaction['time'], null);
+        $html .= "<ul>";
+        foreach ($transactions as $tx) {
+            $asset_name = beautifulNumber($tx['asset_name'], null);
+            $amount = beautifulNumber($tx['amount']);
+            $price = beautifulNumber($tx['price']);
+            if ($tx['type'] == 'transfer') $type_emoji = '🔄';
+            elseif ($tx['type'] == 'inward') $type_emoji = '🔻';
+            elseif ($tx['type'] == 'outward') $type_emoji = '🔺';
+            else $type_emoji = '⚠';
+
+            $html .= "<li>$type_emoji $amount × ($asset_name) --> $price</li>";
         }
+        $html .= "</ul>";
     } else {
-        $data['text'] = 'شما هنوز تراکنشی ثبت نکرده‌اید!';
+        $html = 'شما هنوز تراکنشی ثبت نکرده‌اید!';
     }
-    sendToTelegram('sendMessage', $data);
-    exit;
+
+    $data = [
+        'chat_id' => $user->getId(),
+        'rich_message' => [
+            'is_rtl' => true,
+            'html' => $html,
+        ]
+    ];
+    sendToTelegram('sendRichMessage', $data);
 }
 
 // Create new transaction

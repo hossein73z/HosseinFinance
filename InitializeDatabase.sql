@@ -86,19 +86,19 @@ CREATE TABLE IF NOT EXISTS `accounts`
 
 CREATE TABLE IF NOT EXISTS `transactions`
 (
-    id          BIGINT AUTO_INCREMENT PRIMARY KEY,
-    user_id     BIGINT                                 NOT NULL,
-    account_id  INT                                    NOT NULL,
-    new_balance NUMERIC(18, 8)                         NOT NULL DEFAULT 0,
-    amount      NUMERIC(18, 8)                         NOT NULL,
-    category    VARCHAR(50)                            NOT NULL DEFAULT 'دسته‌بندی نشده',
-    type        ENUM ('outward', 'inward', 'transfer') NOT NULL DEFAULT 'outward',
-    date        VARCHAR(10)                                     DEFAULT NULL,
-    time        VARCHAR(8)                                      DEFAULT NULL,
-    note        TEXT,
+    id         BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id    BIGINT                                 NOT NULL,
+    asset_name VARCHAR(191)                           NOT NULL,
+    amount     NUMERIC(18, 8)                         NOT NULL DEFAULT 0.0,
+    price      NUMERIC(20, 8)                         NOT NULL DEFAULT 0.0,
+    category   VARCHAR(50)                            NOT NULL DEFAULT 'دسته‌بندی نشده',
+    type       ENUM ('outward', 'inward', 'transfer') NOT NULL DEFAULT 'outward',
+    date       DATE                                   NOT NULL DEFAULT (CURRENT_DATE),
+    time       TIME                                   NULL     DEFAULT '00:00:00',
+    note       TEXT,
 
     FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE ON UPDATE CASCADE,
-    FOREIGN KEY (account_id) REFERENCES accounts (id) ON DELETE RESTRICT
+    FOREIGN KEY (asset_name) REFERENCES assets (name) ON DELETE RESTRICT
 ) DEFAULT CHARSET = utf8mb4;
 
 CREATE TABLE IF NOT EXISTS `loans`

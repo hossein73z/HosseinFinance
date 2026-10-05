@@ -138,6 +138,8 @@ function levelHandler(
             sendAllFavorites($user, $db);
         case 'alerts':
             alerts_menu(user: $user, db: $db, message: $message, callback_query: $callback_query);
+        case 'transactions':
+            transaction_menu(user: $user, db: $db, message: $message, callback_query: $callback_query);
         case 'administration':
             adminMenu(user: $user, db: $db, message: $message, callback_query: $callback_query);
         case'host_info':

@@ -24,5 +24,5 @@ function sendInitialLevelMessage(User $user, DatabaseManager $db, ?array $data =
 
     $response = sendToTelegram('sendMessage', $data);
     if ($response)
-        $db->update('users', ['button' => json_encode($user->getButton()), 'progress' => null], ['id' => $user->getId()]);
+        $db->update('users', $user->toDbArray(), ['id' => $user->getId()]);
 }
