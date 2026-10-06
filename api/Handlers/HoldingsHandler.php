@@ -63,12 +63,32 @@ function handleHoldingsCallback(User $user, array $callback_query, array $messag
     switch ($query_key) {
 
         case 'view_holding':
+        case 'edit_holding':
             $holding_id = $query_data[$query_key];
             $holding = getHoldingsWithAssetDetails(['h.id' => $holding_id, 'h.user_id' => $user->getId()], $db, true);
             if ($holding) {
-                sendHoldingDetail($user, $holding, $message['message_id']);
+                sendHoldingDetail($user, $holding, $message['message_id'], is_editing: $query_key === 'edit_holding');
                 sendToTelegram('answerCallbackQuery', ['callback_query_id' => $callback_query['id']]);
-                exit("View holding: id=$holding_id asset_name=\"$holding[asset_name]\"");
+                exit(($query_key == 'view_holding' ? 'View' : 'Edit') . " holding: id=$holding_id asset_name=\"$holding[asset_name]\"");
+            }
+            break;
+
+        case 'edit_holding_name':
+        case 'edit_holding_price':
+        case 'edit_holding_amount':
+            $holding_id = $query_data[$query_key];
+            $holding = getHoldingsWithAssetDetails(['h.id' => $holding_id, 'h.user_id' => $user->getId()], $db, true);
+            if ($holding) {
+
+                $progress['edit_holding'] = [];
+                if ($query_key != 'edit_holding_name') $progress['edit_holding']['asset_type'] = $holding['asset_type'];
+                if ($query_key != 'edit_holding_name') $progress['edit_holding']['asset_name'] = $holding['asset_name'];
+                if ($query_key != 'edit_holding_price') $progress['edit_holding']['avg_price'] = $holding['avg_price'];
+                if ($query_key != 'edit_holding_amount') $progress['edit_holding']['amount'] = $holding['amount'];
+                $progress['edit_holding']['holding_id'] = $holding['id'];
+
+                sendToTelegram('deleteMessage', ['chat_id' => $user->getId(), 'message_id' => $message['message_id']]);
+                addHoldingProgress($user->setProgress($progress), null, $db);
             }
             break;
 
@@ -195,24 +215,42 @@ function addHoldingProgress(User $user, ?array $message, DatabaseManager $db): n
     $new_holding["date"] = new DateTime()->format('Y-m-d');
     $new_holding["time"] = new DateTime()->format('h:i');
 
-    $existing_holding = getHoldingsWithAssetDetails(["user_id" => $user->getId(), "asset_name" => $new_holding["asset_name"]], $db, true);
+    $existing_holding = null;
+    if ($progress_key == 'add_holding') {
+        /**
+         * If adding new holding, check holding's existence
+         * by `asset_name` since there is no `id` provided
+         */
+
+        $existing_holding = getHoldingsWithAssetDetails(["user_id" => $user->getId(), "asset_name" => $new_holding["asset_name"]], $db, true);
+        if ($existing_holding) {
+            /** If holding already exists, calculate new amount and average price */
+
+            // New received data
+            $price = $new_holding["avg_price"];
+            $amount = (float)$new_holding["amount"];
+
+            // Data from old existing holding
+            $old_avg_price = $existing_holding["avg_price"];
+            $old_amount = (float)$existing_holding["amount"];
+
+            // New merged data
+            $new_amount = $amount + $old_amount;
+            $new_avg_price = (($price * $amount) + ($old_avg_price * $old_amount)) / $new_amount;
+
+            $new_holding["amount"] = beautifulNumber($new_amount, null, false);
+            $new_holding["avg_price"] = beautifulNumber($new_avg_price, null, false);
+        }
+    }
+    if ($progress_key == 'edit_holding') {
+        /**
+         * If editing a holding, find existing holding by
+         * `id`, since the `asset_name` might be edited
+         */
+        $existing_holding = getHoldingsWithAssetDetails(["h.user_id" => $user->getId(), "h.id" => $new_holding["id"]], $db, true);
+    }
+
     if ($existing_holding) {
-
-        // New received data
-        $price = $new_holding["avg_price"];
-        $amount = (float)$new_holding["amount"];
-
-        // Data from old existing holding
-        $old_avg_price = $existing_holding["avg_price"];
-        $old_amount = (float)$existing_holding["amount"];
-
-        // New merged data
-        $new_amount = $amount + $old_amount;
-        $new_avg_price = (($price * $amount) + ($old_avg_price * $old_amount)) / $new_amount;
-
-        $new_holding["amount"] = beautifulNumber($new_amount, null, false);
-        $new_holding["avg_price"] = beautifulNumber($new_avg_price, null, false);
-
         try {
             $db->update('holdings', $new_holding, ['id' => $existing_holding['id']]);
             $data['text'] = '✅ دارایی با موفقیت به‌روزرسانی شد.';
@@ -229,6 +267,7 @@ function addHoldingProgress(User $user, ?array $message, DatabaseManager $db): n
             $data['text'] = '❌ خطای پایگاه داده در ثبت دارایی: ' . $e->errorInfo[2];
         }
     }
+
     $user->setKeyboard([
         [['id' => 'buy_new_holding', 'text' => 'ثبت خرید جدید دارایی', 'style' => 'success', 'admin_key' => 0],],
         [['id' => 'main_menu', 'text' => '🔙 برگشت 🔙', 'style' => 'primary', 'admin_key' => 0],],
@@ -237,7 +276,9 @@ function addHoldingProgress(User $user, ?array $message, DatabaseManager $db): n
     $data['reply_markup']['keyboard'] = $user->getKeyboard();
     sendToTelegram('sendMessage', $data);
 
-    if ($existing_holding) sendHoldingDetail($user, $new_holding);
+    $holding = getHoldingsWithAssetDetails(["user_id" => $user->getId(), "asset_name" => $new_holding["asset_name"]], $db, true);
+
+    if ($existing_holding) sendHoldingDetail($user, $holding);
     else sendAllHoldings($user, $db);
     exit('Add holding: ' . json_encode($new_holding, JSON_UNESCAPED_UNICODE));
 }

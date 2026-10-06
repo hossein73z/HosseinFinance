@@ -41,29 +41,74 @@ function sendAllHoldings(User $user, DatabaseManager $db, string|int|null $messa
     }
 }
 
-function sendHoldingDetail(User $user, array $holding, string|int|null $message_id = null, bool $is_deleting = false): void
+function sendHoldingDetail(User $user, array $holding, string|int|null $message_id = null, bool $is_editing = false, bool $is_deleting = false): void
 {
     $user_base_currency = $user->getBaseCurrency() ?? 'ریال';
 
     $html = createHoldingDetailRichHTML($holding, user_base_currency: $user_base_currency, detail_btn: false);
     $html .= '<hr>';
 
-    if ($is_deleting) {
+    if ($is_editing) {
+
+        $html .= '<h3>قصد ویرایش کدام ویژگی از این دارایی را داری؟</h3>';
+
+        $html .= '<tg-button-row>';
+
+        // asset_name
+        $edit_callback = json_encode(['edit_holding_name' => $holding['id']]);
+        $html .= "<tg-button type='callback_data' style='link' data='$edit_callback'>" . 'نوع دارایی' . "</tg-button>";
+
+        // amount
+        $edit_callback = json_encode(['edit_holding_amount' => $holding['id']]);
+        $html .= "<tg-button type='callback_data' style='link' data='$edit_callback'>" . 'مقدار دارایی' . "</tg-button>";
+
+        // avg_price
+        $edit_callback = json_encode(['edit_holding_price' => $holding['id']]);
+        $html .= "<tg-button type='callback_data' style='link' data='$edit_callback'>" . 'قیمت خرید' . "</tg-button>";
+
+        $html .= '</tg-button-row>';
+        $html .= '<tg-button-row>';
+
+        // note
+//        $edit_callback = json_encode(['edit_holding_note' => $holding['id']]);
+        $html .= "<tg-button type='disabled'>" . 'یادداشت' . "</tg-button>";
+
+        // date
+//        $edit_callback = json_encode(['edit_holding_date' => $holding['id']]);
+        $html .= "<tg-button type='disabled'>" . 'تاریخ' . "</tg-button>";
+
+        // time
+//        $edit_callback = json_encode(['edit_holding_time' => $holding['id']]);
+        $html .= "<tg-button type='disabled'>" . 'ساعت' . "</tg-button>";
+
+        $html .= '</tg-button-row>';
+
+        // Cancel button
+        $edit_callback = json_encode(['view_holding' => $holding['id']]);
+        $html .= "<tg-button-row><tg-button type='callback_data' style='link' data='$edit_callback'>" . 'لغو' . "</tg-button></tg-button-row>";
+
+
+    } elseif ($is_deleting) {
 
         // Delete confirm button
         $confirm_callback = json_encode(['delete_holding_conf' => $holding['id']]);
         $confirm_button = "<tg-button type='callback_data' style='danger' data='$confirm_callback'>" . 'تأیید حذف' . "</tg-button>";
         // Cancel delete button
         $cancel_callback = json_encode(['view_holding' => $holding['id']]);
-        $delete_button = "<tg-button type='callback_data' style='success' data='$cancel_callback'>" . 'لغو' . "</tg-button>";
+        $cancel_button = "<tg-button type='callback_data' style='success' data='$cancel_callback'>" . 'لغو' . "</tg-button>";
 
+        $html .= "<tg-button-row>$confirm_button $cancel_button</tg-button-row>";
     } else {
-        $confirm_button = '';
+
+        // Edit button
+        $edit_callback = json_encode(['edit_holding' => $holding['id']]);
+        $edit_button = "<tg-button type='callback_data' data='$edit_callback'>" . 'ویرایش' . "</tg-button>";
         // Delete button
         $delete_callback = json_encode(['delete_holding' => $holding['id']]);
         $delete_button = "<tg-button type='callback_data' data='$delete_callback'>" . 'حذف دارایی' . "</tg-button>";
+
+        $html .= "<tg-button-row>$edit_button $delete_button</tg-button-row>";
     }
-    $html .= "<tg-button-row>$confirm_button $delete_button</tg-button-row>";
 
     // Back button
     $back_callback = json_encode(['show_all_holdings' => null]);

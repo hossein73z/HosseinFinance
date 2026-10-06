@@ -78,11 +78,13 @@ function cleanAndValidateNumber(string $messageText): ?float
  * Cleans, validates, and formats a number string by adding thousands delimiters.
  * Preserves the original number of decimal places if present.
  *
- * @param string $text The raw input number string (e.g., "1125000000", "123.45").
+ * @param string|null $text The raw input number string (e.g., "1125000000", "123.45").
  * @return string|null The formatted string (e.g., "1,125,000,000") or null on invalid input.
  */
-function beautifulNumber(string $text, string|null $delimiter = ',', bool $persianNumbers = true): ?string
+function beautifulNumber(?string $text, string|null $delimiter = ',', bool $persianNumbers = true): ?string
 {
+    if (!$text) return $text;
+
     if ($delimiter) {
         // 1. Clean and validate the input using the existing function.
         $cleanedNumberString = cleanAndValidateNumber($text);

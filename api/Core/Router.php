@@ -70,6 +70,10 @@ function handleCallbackQuery(array $callback_query, DatabaseManager $db): void
         // Non-level-related callbacks
         switch (array_key_first($callback_query['data'])) {
             case'view_holding':
+            case'edit_holding':
+            case'edit_holding_name':
+            case'edit_holding_price':
+            case'edit_holding_amount':
             case'show_all_holdings':
                 holdings_menu($user, $db, $message, $callback_query);
 
