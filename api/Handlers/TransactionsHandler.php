@@ -28,7 +28,7 @@ function transaction_menu(
         if ($pressed_button_id = getPressedButtonID($message['text'], $user))
             switch ($pressed_button_id) {
                 case 'add_transaction':
-//                    addTransactionProgress($user, null, $db);
+                    addTransactionProgress($user, null, $db);
                     break;
 
                 case 'back':
@@ -173,287 +173,304 @@ function sendAllTransactions(User $user, DatabaseManager $db): void
     sendToTelegram('sendRichMessage', $data);
 }
 
-// Create new transaction
-function level_12(
-    User            $user,
-    DatabaseManager $db,
-    ?Button         $level_button = null,
-    ?array          $message = null,
-    ?array          $callback_query = null): void
-{
-    // Create keyboards
-    $level_button = $level_button ?: $user->getButton();
-    $keyboard = refineKeyboardForTelegram($level_button->getKeyboard());
-
-    $data = [
-        'chat_id' => $user->getid(),
-        'text' => $level_button->getText(),
-        'reply_markup' => [
-            'keyboard' => $keyboard,
-            'resize_keyboard' => true,
-            'is_persistent' => false,
-            'input_field_placeholder' => $level_button->getText()
-        ]
-    ];
-
-    if ($callback_query) handleAddTransactionCallback($user, $callback_query, $message);
-
-    addTransactionProgress($user, $data, $message, $db);
-}
-
-function handleAddTransactionCallback(User $user, array $callback_query, array $message): void
-{
-    $data = [
-        'chat_id' => $user->getid(),
-        'message_id' => $message['message_id'],
-        'text' => 'این پیام منقضی شده است.'
-    ];
-    sendToTelegram('editMessageText', $data);
-    exit;
-}
-
-function addTransactionProgress(User $user, array $data, ?array $message, DatabaseManager $db): void
+function addTransactionProgress(User $user, ?array $message, DatabaseManager $db): null
 {
     /**
      * Required fields for new transaction:
-     *  - type
-     *  - account_id
+     *  - type (outward / inward / transfer)
+     *  - asset_type
+     *  - asset_name
      *  - amount
-     *  - category
-     *  - date
-     *  - time
+     *  - price
+     *  - TODO: category
+     *  - TODO: note
+     *  - TODO: date
+     *  - TODO: time
      *
-     * If any of these values are not presented, asks for it,
-     * otherwise adds the transaction to the database.
+     * If any of these values are not presented, asks for
+     * it, otherwise adds the transaction to the database.
      */
 
+    $data = [
+        'chat_id' => $user->getid(),
+        'reply_markup' => [
+            'keyboard' => $user->getKeyboard(),
+            'resize_keyboard' => true,
+            'is_persistent' => true,
+            'force_reply' => false,
+            'input_field_placeholder' => $user->getButton()->getText() // TODO: Write a different text for each level
+        ]
+    ];
+
     $progress = $user->getProgress();
-    if (!$progress || !isset($progress['add_transaction'])) {
-        askForTransactionType($user, $data, $db);
-    } else {
+    if (!$progress && $message) return null;
+    if (!$progress || !in_array(array_key_first($progress), ['add_transaction', 'edit_transaction']))
+        $progress = $user->setProgress(['add_transaction' => null])->getProgress();
 
-        // HACK: Lazy work
+    $progress_key = array_key_first($progress);
 
-        /*
-         * Each `if` works with this principle:
-         *  $message == null -> Requests the information.
-         *  $message != null -> Saves the received information.
-         */
+    // Type (outward / inward / transfer)
+    if (!isset($progress[$progress_key]['type'])) {
+        if (!$message) askForTransactionType($user, $data, $db);
+        $allowed = ['outward' => 'فروش', 'inward' => 'خرید'/*, 'transfer' => 'تبدیل'*/];
+        $selected = array_search($message['text'], $allowed, true);
+        if ($selected !== false) $progress[$progress_key]['type'] = $selected;
+        else askForTransactionType($user, $data, $db,
+            'پیام نامفهوم بود. لطفاً نوع تراکنش را از دکمه‌های زیر انتخاب کنید.');
+        addTransactionProgress($user->setProgress($progress), null, $db);
+    }
 
-        // Type
-        if (!isset($progress['add_transaction']['type'])) {
-            if (!$message) askForTransactionType($user, $data, $db);
-            $type = '';
-            if ($message['text'] == 'واریز') $type = 'inward';
-            elseif ($message['text'] == 'برداشت') $type = 'outward';
-            else askForTransactionType($user->setProgress($progress), $data, $db, 'پیام نامفهوم بود. لطفاً نوع تراکنش (برداشت/واریز) را از دکمه‌های زیر انتخاب کنید!');
-            $progress['add_transaction']['type'] = $type;
-            addTransactionProgress($user->setProgress($progress), $data, null, $db);
-        }
-        // Account Name
-        if (!isset($progress['add_transaction']['account_id'])) {
-            if (!$message) askForTransactionAccount($user, $progress['add_transaction']['type'], $data, $db);
-            $account = $db->read('accounts', ['user_id' => $user->getId(), 'name' => $message['text']], true);
-            if ($account) $progress['add_transaction']['account_id'] = $account['id'];
-            else askForTransactionAccount($user, $progress['add_transaction']['type'], $data, $db, 'حساب مورد نظر در سیستم یافت نشد!');
-            addTransactionProgress($user->setProgress($progress), $data, null, $db);
-        }
-        // Amount
-        if (!isset($progress['add_transaction']['amount'])) {
-            if (!$message) askForTransactionAmount($user, $data, $db);
-            $amount = cleanAndValidateNumber($message['text']);
-            if ($amount === null) askForTransactionAmount($user, $data, $db, 'پیام نامفهوم بود. لطفاً مبلغ را تنها با استفاده از ارقام وارد کنید!');
-            $progress['add_transaction']['amount'] = $amount;
-            addTransactionProgress($user->setProgress($progress), $data, null, $db);
-        }
-        if (!isset($progress['add_transaction']['category'])) {
-            if (!$message) askForTransactionCategory($user, $data, $db);
-            $category = trim($message['text'] ?? '');
-            if ($category === '') {
-                askForTransactionCategory($user, $data, $db, 'دسته‌بندی تراکنش نمی‌تواند خالی باشد. لطفاً یک دسته‌بندی وارد کنید.');
-            }
-            $progress['add_transaction']['category'] = $category;
-            addTransactionProgress($user->setProgress($progress), $data, null, $db);
-        }
-        // Date
-        if (!isset($progress['add_transaction']['date'])) {
-            if (!$message) askForTransactionDate($user, $data, $db);
-            if ($message['text'] == 'امروز') {
-                $progress['add_transaction']['date'] = new DateTime()->format('Y-m-d');
-            } elseif ($message['text'] == 'دیروز') {
-                $progress['add_transaction']['date'] = new DateTime()->modify('-1 days')->format('Y-m-d');
-            } elseif ($message['text'] == '۲ روز پیش') {
-                $progress['add_transaction']['date'] = new DateTime()->modify('-2 days')->format('Y-m-d');
-            } else {
-                $date_text = toEnglishDigits(trim($message['text']));
-                if (!preg_match('/^(\d{4})[\/.\-](\d{1,2})[\/.\-](\d{1,2})$/u', $date_text, $date_matches)) {
-                    askForTransactionDate($user, $data, $db, 'فرمت تاریخ صحیح نیست. لطفاً به صورت yyyy/mm/dd یا yyyy-mm-dd وارد کنید.');
-                }
-                $date_j = JalaliDate::fromString($date_text);
-                $normalized_date = JalaliDate::fromGregorianObject($date_j->toGregorian());
-                $expected = sprintf('%04d-%02d-%02d', intval($date_matches[1]), intval($date_matches[2]), intval($date_matches[3]));
-                if ($normalized_date->format('-') !== $expected) {
-                    askForTransactionDate($user, $data, $db, 'تاریخ وارد شده نامعتبر است. دوباره تلاش کنید.');
-                }
-                $progress['add_transaction']['date'] = $date_j->toGregorian()->format('Y-m-d');
-            }
-            addTransactionProgress($user->setProgress($progress), $data, null, $db);
-        }
-        // Time
-        if (!isset($progress['add_transaction']['time'])) {
-            if (!$message) askForTransactionTime($user, $data, $db);
-            if ($message['text'] == 'اکنون') {
-                $progress['add_transaction']['time'] = new DateTime()->format('H:i');
-            } else {
-                $time_text = toEnglishDigits(trim($message['text']));
-                if (!preg_match('/^([01]?\d|2[0-3]):([0-5]\d)$/u', $time_text, $time_matches)) {
-                    askForTransactionTime($user, $data, $db, 'فرمت زمان صحیح نیست. لطفاً به صورت HH:MM وارد کنید.');
-                }
-                $progress['add_transaction']['time'] = sprintf('%02d:%02d', intval($time_matches[1]), intval($time_matches[2]));
-            }
-            addTransactionProgress($user->setProgress($progress), $data, null, $db);
-        }
+    // Asset Type
+    if (!isset($progress[$progress_key]['asset_type'])) {
+        if (!$message) askForTransactionAssetType($user, $data, $db);
+        $asset = $db->read('assets', ['asset_type' => $message['text']], true);
+        if ($asset) $progress[$progress_key]['asset_type'] = $asset['asset_type'];
+        else askForTransactionAssetType($user, $data, $db,
+            'پیام نامفهوم بود. لطفاً دسته‌بندی مد نظر را از دکمه‌های زیر انتخاب کنید.');
+        addTransactionProgress($user->setProgress($progress), null, $db);
+    }
+
+    // Asset Name
+    if (!isset($progress[$progress_key]['asset_name'])) {
+        if (!$message) askForTransactionAssetName($user, $data, $progress[$progress_key]['asset_type'], $db);
+        $asset = $db->read('assets', ['name' => $message['text']], true);
+        if ($asset) $progress[$progress_key]['asset_name'] = $asset['name'];
+        else askForTransactionAssetName($user, $data, $progress[$progress_key]['asset_type'], $db,
+            'پیام نامفهوم بود. لطفاً دارایی مد نظر را از دکمه‌های زیر انتخاب کنید.');
+        addTransactionProgress($user->setProgress($progress), null, $db);
+    }
+
+    // Amount
+    if (!isset($progress[$progress_key]['amount'])) {
+        if (!$message) askForTransactionAmount($user, $data, $db);
+        $valid_number = cleanAndValidateNumber($message['text']);
+        if ($valid_number) $progress[$progress_key]['amount'] = $valid_number;
+        else askForTransactionAmount($user, $data, $db,
+            'پیام نامفهوم بود. لطفاً مقدار را به عدد وارد کنید.');
+        addTransactionProgress($user->setProgress($progress), null, $db);
+    }
+
+    // Price
+    if (!isset($progress[$progress_key]['price'])) {
+        if (!$message) askForTransactionPrice($user, $data, $progress[$progress_key]['asset_name'], $db);
+        $valid_number = cleanAndValidateNumber($message['text']);
+        if ($valid_number) $progress[$progress_key]['price'] = $valid_number;
+        else askForTransactionPrice($user, $data, $progress[$progress_key]['asset_name'], $db,
+            'پیام نامفهوم بود. لطفاً قیمت را به عدد وارد کنید.');
+        addTransactionProgress($user->setProgress($progress), null, $db);
     }
 
     // Add the transaction if all the required values are presented
-    $transaction['user_id'] = $user->getId();
-    $transaction['account_id'] = $progress['add_transaction']['account_id'];
-    $transaction['amount'] = $progress['add_transaction']['amount'];
-    if (isset($progress['add_transaction']['category'])) $transaction['category'] = $progress['add_transaction']['category'];
-    $transaction['type'] = $progress['add_transaction']['type'];
-    $transaction['date'] = $progress['add_transaction']['date'];
-    $transaction['time'] = $progress['add_transaction']['time'];
+    $new_tx = [
+        "id" => $progress[$progress_key]["transaction_id"] ?? null,
+        "user_id" => $user->getId(),
+        "asset_name" => $progress[$progress_key]["asset_name"],
+        "amount" => beautifulNumber($progress[$progress_key]["amount"], null, false),
+        "price" => beautifulNumber($progress[$progress_key]["price"], null, false),
+        "type" => $progress[$progress_key]["type"],
+        "category" => $progress[$progress_key]["category"] ?? 'دسته‌بندی نشده',
+        "date" => $progress[$progress_key]["date"] ?? new DateTime()->format('Y-m-d'),
+        "time" => $progress[$progress_key]["time"] ?? new DateTime()->format('H:i:s'),
+        "note" => $progress[$progress_key]["note"] ?? null,
+    ];
 
-    addTransaction($user, $transaction, $data, $db);
-}
-
-function askForTransactionType(User $user, array $data, DatabaseManager $db, ?string $text = null): void
-{
-    $data['text'] = $text ?? 'نوع تراکنش را از دکمه‌های زیر انتخاب کنید:';
-    array_unshift($data['reply_markup']['keyboard'], [['text' => 'واریز'], ['text' => 'برداشت']]);
-    $response = sendToTelegram('sendMessage', $data);
-    if ($response) {
-        $progress = ['add_transaction' => ['type' => null]];
-        $db->update('users', ['progress' => json_encode($progress)], ['id' => $user->getId()]);
-    }
-    exit;
-}
-
-function askForTransactionAccount(
-    User            $user,
-    string          $type,
-    array           $data,
-    DatabaseManager $db,
-    ?string         $text = null): void
-{
-    $type_text = $type == 'inward' ? 'مقصد' : 'مبدأ';
-    $data['text'] = $text ?? 'حساب ' . $type_text . ' را از دکمه‌های زیر انتخاب کنید:';
-    $accounts = $db->read('accounts', ['user_id' => $user->getId()]);
-    foreach ($accounts as $account)
-        array_unshift($data['reply_markup']['keyboard'], [['text' => $account['name']]]);
-    $response = sendToTelegram('sendMessage', $data);
-    if ($response) {
-        $progress = $user->getProgress();
-        $progress['add_transaction']['account_id'] = null;
-        $db->update('users', ['progress' => json_encode($progress)], ['id' => $user->getId()]);
-    }
-    exit;
-}
-
-function askForTransactionAmount(
-    User            $user,
-    array           $data,
-    DatabaseManager $db,
-    ?string         $text = null): void
-{
-    $data['text'] = $text ?? 'مبلغ تراکنش را بع عدد ارسال کنید.';
-    $response = sendToTelegram('sendMessage', $data);
-    if ($response) {
-        $progress = $user->getProgress();
-        $progress['add_transaction']['amount'] = null;
-        $db->update('users', ['progress' => json_encode($progress)], ['id' => $user->getId()]);
-    }
-    exit;
-}
-
-function askForTransactionCategory(
-    User            $user,
-    array           $data,
-    DatabaseManager $db,
-    ?string         $text = null): void
-{
-    $data['text'] = $text ?? 'دسته‌بندی تراکنش را وارد کنید' . "\n" . 'مثال: خوراک، حمل‌ونقل، حقوق، تفریح';
-    $response = sendToTelegram('sendMessage', $data);
-    if ($response) {
-        $progress = $user->getProgress();
-        $progress['add_transaction']['category'] = null;
-        $db->update('users', ['progress' => json_encode($progress)], ['id' => $user->getId()]);
-    }
-    exit;
-}
-
-function askForTransactionDate(
-    User            $user,
-    array           $data,
-    DatabaseManager $db,
-    ?string         $text = null): void
-{
-    $data['text'] = $text ?? 'تاریخ تراکنش را با فرمت مثال زده شده ارسال کنید یا از دکمه‌های زیر استفاده کنید. مثال:' . "\n" . JalaliDate::fromGregorian()->format('-');
-    array_unshift(
-        $data['reply_markup']['keyboard'],
-        [['text' => 'امروز'], ['text' => 'دیروز'], ['text' => '۲ روز پیش']]
-    );
-    $response = sendToTelegram('sendMessage', $data);
-    if ($response) {
-        $progress = $user->getProgress();
-        $progress['add_transaction']['date'] = null;
-        $db->update(
-            'users', ['progress' => json_encode($progress)], ['id' => $user->getId()]);
-    }
-    exit;
-}
-
-function askForTransactionTime(
-    User            $user,
-    array           $data,
-    DatabaseManager $db,
-    ?string         $text = null): void
-{
-    $data['text'] = $text ?? 'زمان تراکنش را با فرمت مثال زده شده ارسال کنید یا از دکمه‌ی زیر برای ساعت کنونی استفاده کنید. مثال:' . "\n" . new DateTime()->format('H:i');
-    array_unshift($data['reply_markup']['keyboard'], [['text' => 'اکنون']]);
-    $response = sendToTelegram('sendMessage', $data);
-    if ($response) {
-        $progress = $user->getProgress();
-        $progress['add_transaction']['time'] = null;
-        $db->update('users', ['progress' => json_encode($progress)], ['id' => $user->getId()]);
-    }
-    exit;
-}
-
-function addTransaction(User $user, array $transaction, array $data, DatabaseManager $db): void
-{
     try {
-        $account = $db->read('accounts', ['id' => $transaction['account_id'], 'user_id' => $user->getId()], true);
-        if (!$account) {
-            $data['text'] = '❌ حساب انتخاب شده پیدا نشد.';
-            sendToTelegram('sendMessage', $data);
-            level_11($user, $db);
+        if (isset($new_tx["id"])) {
+            $db->update('transactions', $new_tx, ['id' => $new_tx['id']]);
+            $data['text'] = '✅ تراکنش با موفقیت به‌روزرسانی شد.';
+        } else {
+            $db->create('transactions', $new_tx);
+            $data['text'] = '✅ تراکنش جدید با موفقیت ثبت شد.';
         }
-
-        $new_balance = $account['current_balance'] + ($transaction['type'] === 'inward' ? $transaction['amount'] : -$transaction['amount']);
-        $transaction['new_balance'] = $new_balance;
-
-        $db->create('transactions', $transaction);
-        $db->update('accounts', ['current_balance' => $new_balance], ['id' => $account['id']]);
-        $data['text'] = '✅ تراکنش جدید با موفقیت ثبت شد.';
     } catch (PDOException $e) {
         error_log('Error: ' . json_encode($e->errorInfo, JSON_PRETTY_PRINT));
-        $data['text'] = '❌ خطای پایگاه داده در ثبت تراکنش: ' . $e->errorInfo[2];
+        $data['text'] = '❌ خطای پایگاه داده: ' . $e->errorInfo[2];
     }
 
-    // Send success/failure message
+    $user->setKeyboard([
+        [['id' => 'add_transaction', 'text' => 'ثبت تراکنش جدید', 'style' => 'success', 'admin_key' => 0]],
+        [['id' => 'main_menu', 'text' => '🔙 برگشت 🔙', 'style' => 'primary', 'admin_key' => 0]],
+    ])->setProgress(null);
+
+    $db->update('users', $user->toDbArray(), ['id' => $user->getId()]);
+    $data['reply_markup']['keyboard'] = $user->getKeyboard();
     sendToTelegram('sendMessage', $data);
 
-    // Redirect user to view all transactions
-    level_11($user, $db);
+    sendAllTransactions($user, $db);
+
+    updateUserHoldings($new_tx, $db);
+
+    exit('Add transaction: ' . json_encode($new_tx, JSON_UNESCAPED_UNICODE));
 }
+
+#[NoReturn]
+function askForTransactionType(User $user, array $data, DatabaseManager $db, ?string $text = null): void
+{
+    $keyboard = [
+        [['text' => 'فروش']/*, ['text' => 'تبدیل']*/, ['text' => 'خرید']],
+        [['id' => 'transactions', 'text' => '❌ لغو ❌', 'style' => 'danger', 'admin_key' => 0]]
+    ];
+
+    $data['text'] = $text ?? 'نوع تراکنش را انتخاب کنید:';
+    $data['reply_markup']['keyboard'] = $keyboard;
+    $response = sendToTelegram('sendMessage', $data);
+    if ($response) {
+        $user->setKeyboard($keyboard);
+        $db->update('users', $user->toDbArray(), ['id' => $user->getId()]);
+    }
+    exit();
+}
+
+#[NoReturn]
+function askForTransactionAssetType(User $user, array $data, DatabaseManager $db, ?string $text = null): void
+{
+    $asset_types = $db->read(
+        table: 'assets',
+        selectColumns: 'asset_type',
+        distinct: true,
+        orderBy: ['asset_type' => 'DESC']
+    );
+
+    if ($asset_types) {
+        $asset_types = array_column($asset_types, 'asset_type');
+        $keyboard = [];
+        foreach ($asset_types as $asset_type) $keyboard[] = [['text' => $asset_type]];
+        $keyboard[] = [
+            array_key_first($user->getProgress()) != 'edit_transaction' ?
+                ['id' => 'back', 'text' => '🔙 برگشت 🔙', 'style' => 'primary', 'admin_key' => 0] : [],
+            ['id' => 'transactions', 'text' => '❌ لغو ❌', 'style' => 'danger', 'admin_key' => 0]
+        ];
+        $data['text'] = $text ?? 'دسته‌بندی دارایی مورد نظر را از دکمه‌های زیر انتخاب کنید:';
+        $data['reply_markup']['keyboard'] = $keyboard;
+        $response = sendToTelegram('sendMessage', $data);
+        if ($response) {
+            $user->setKeyboard($keyboard);
+            $db->update('users', $user->toDbArray(), ['id' => $user->getId()]);
+        }
+    } else {
+        $data['text'] = 'دسته‌بندی‌ای در سیستم یافت نشد!';
+        sendToTelegram('sendMessage', $data);
+    }
+    exit();
+}
+
+#[NoReturn]
+function askForTransactionAssetName(User $user, array $data, string $asset_type, DatabaseManager $db, ?string $text = null): void
+{
+    $assets = $db->read('assets', ['asset_type' => $asset_type]);
+    if ($assets) {
+
+        $keyboard = [];
+        foreach ($assets as $asset) $keyboard[] = [['text' => $asset['name']]];
+        $keyboard[] = [
+            array_key_first($user->getProgress()) != 'edit_transaction' ?
+                ['id' => 'back', 'text' => '🔙 برگشت 🔙', 'style' => 'primary', 'admin_key' => 0] : [],
+            ['id' => 'transactions', 'text' => '❌ لغو ❌', 'style' => 'danger', 'admin_key' => 0],
+        ];
+
+        $data['text'] = $text ?? 'گزینه‌ی مورد نظر را از دکمه‌های زیر انتخاب کنید:';
+        $data['reply_markup']['keyboard'] = $keyboard;
+        $response = sendToTelegram('sendMessage', $data);
+        if ($response) {
+            $user->setKeyboard($keyboard);
+            $db->update('users', $user->toDbArray(), ['id' => $user->getId()]);
+        }
+    } else {
+        $data['text'] = 'این دسته‌بندی خالی‌ست!';
+        sendToTelegram('sendMessage', $data);
+    }
+    exit();
+}
+
+#[NoReturn]
+function askForTransactionAmount(User $user, array $data, DatabaseManager $db, ?string $text = null): void
+{
+    $keyboard = [[
+        array_key_first($user->getProgress()) != 'edit_transaction' ?
+            ['id' => 'back', 'text' => '🔙 برگشت 🔙', 'style' => 'primary', 'admin_key' => 0] : [],
+        ['id' => 'transactions', 'text' => '❌ لغو ❌', 'style' => 'danger', 'admin_key' => 0],
+    ]];
+
+    $data['text'] = $text ?? 'مقدار تراکنش را به عدد وارد کنید:';
+    $data['reply_markup']['keyboard'] = $keyboard;
+    $response = sendToTelegram('sendMessage', $data);
+    if ($response) {
+        $user->setKeyboard($keyboard);
+        $db->update('users', $user->toDbArray(), ['id' => $user->getId()]);
+    }
+    exit();
+}
+
+#[NoReturn]
+function askForTransactionPrice(User $user, array $data, string $asset_name, DatabaseManager $db, ?string $html = null): void
+{
+    $asset = $db->read('assets', ['name' => $asset_name], true);
+    if ($asset) {
+        $name = beautifulNumber($asset['name'], null);
+        $price = beautifulNumber($asset['price'], delimiter: '،');
+        $base = beautifulNumber($asset['base_currency'], null);
+
+        $data['rich_message']['html'] = $html ??
+            ("قیمت تراکنش را به عدد وارد کنید:<br>قیمت کنونی «" . "{$name}»: <b>$price</b> $base");
+
+        $keyboard = [[
+            array_key_first($user->getProgress()) != 'edit_transaction' ?
+                ['id' => 'back', 'text' => '🔙 برگشت 🔙', 'style' => 'primary', 'admin_key' => 0] : [],
+            ['id' => 'transactions', 'text' => '❌ لغو ❌', 'style' => 'danger', 'admin_key' => 0]
+        ]];
+        $data['reply_markup']['keyboard'] = $keyboard;
+        $response = sendToTelegram('sendRichMessage', $data);
+        if ($response) {
+            $user->setKeyboard($keyboard);
+            $db->update('users', $user->toDbArray(), ['id' => $user->getId()]);
+        }
+    } else {
+        $data['text'] = 'این گزینه در دیتابیس وجود ندارد!';
+        sendToTelegram('sendMessage', $data);
+    }
+    exit();
+}
+
+function updateUserHoldings(array $transaction, DatabaseManager $db): void
+{
+    $holding_txs = $db->read(
+        table: 'transactions',
+        conditions: ['user_id' => $transaction['user_id'], 'asset_name' => $transaction['asset_name']],
+        orderBy: ['date' => 'ASC', 'time' => 'ASC'],
+    ) ?? [];
+
+    $buy_amount = 0.0;
+    $sel_amount = 0.0;
+    $total_cost = 0.0;
+    foreach ($holding_txs as $tx) {
+        $amount = (float)$tx['amount'];
+        $price = (float)$tx['price'];
+
+        if ($tx['type'] == 'inward') {
+            $total_cost += $price;
+            $buy_amount += $amount;
+        } elseif ($tx['type'] == 'outward') {
+            $sel_amount += $amount;
+        }
+    }
+
+    $total_amount = $buy_amount - $sel_amount;
+    $avg_buy_price = $total_cost / $buy_amount;
+
+    try {
+        if ($total_amount > 0) {
+            $db->upsert(
+                table: 'holdings',
+                data: [
+                    'user_id' => $transaction['user_id'],
+                    'asset_name' => $transaction['asset_name'],
+                    'amount' => $total_amount,
+                    'avg_price' => $avg_buy_price,
+                ]);
+        } else
+            $db->delete('holdings', ['user_id' => $transaction['user_id'], 'asse_name' => $transaction['asset_name'],]);
+    } catch (PDOException $e) {
+        error_log('Error: ' . json_encode($e->errorInfo, JSON_PRETTY_PRINT));
+    }
+}
+
