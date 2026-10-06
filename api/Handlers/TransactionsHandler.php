@@ -298,8 +298,6 @@ function addTransactionProgress(User $user, ?array $message, DatabaseManager $db
 
     sendAllTransactions($user, $db);
 
-    updateUserHoldings($new_tx, $db);
-
     exit('Add transaction: ' . json_encode($new_tx, JSON_UNESCAPED_UNICODE));
 }
 
@@ -430,47 +428,3 @@ function askForTransactionPrice(User $user, array $data, string $asset_name, Dat
     }
     exit();
 }
-
-function updateUserHoldings(array $transaction, DatabaseManager $db): void
-{
-    $holding_txs = $db->read(
-        table: 'transactions',
-        conditions: ['user_id' => $transaction['user_id'], 'asset_name' => $transaction['asset_name']],
-        orderBy: ['date' => 'ASC', 'time' => 'ASC'],
-    ) ?? [];
-
-    $buy_amount = 0.0;
-    $sel_amount = 0.0;
-    $total_cost = 0.0;
-    foreach ($holding_txs as $tx) {
-        $amount = (float)$tx['amount'];
-        $price = (float)$tx['price'];
-
-        if ($tx['type'] == 'inward') {
-            $total_cost += $price;
-            $buy_amount += $amount;
-        } elseif ($tx['type'] == 'outward') {
-            $sel_amount += $amount;
-        }
-    }
-
-    $total_amount = $buy_amount - $sel_amount;
-    $avg_buy_price = $total_cost / $buy_amount;
-
-    try {
-        if ($total_amount > 0) {
-            $db->upsert(
-                table: 'holdings',
-                data: [
-                    'user_id' => $transaction['user_id'],
-                    'asset_name' => $transaction['asset_name'],
-                    'amount' => $total_amount,
-                    'avg_price' => $avg_buy_price,
-                ]);
-        } else
-            $db->delete('holdings', ['user_id' => $transaction['user_id'], 'asse_name' => $transaction['asset_name'],]);
-    } catch (PDOException $e) {
-        error_log('Error: ' . json_encode($e->errorInfo, JSON_PRETTY_PRINT));
-    }
-}
-
