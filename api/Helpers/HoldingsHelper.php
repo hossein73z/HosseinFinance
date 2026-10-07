@@ -85,7 +85,7 @@ function sendHoldingDetail(User $user, array $holding, string|int|null $message_
 
         // Cancel button
         $edit_callback = json_encode(['view_holding' => $holding['id']]);
-        $html .= "<tg-button-row><tg-button type='callback_data' style='link' data='$edit_callback'>" . 'لغو' . "</tg-button></tg-button-row>";
+        $html .= "<tg-button-row><tg-button type='callback_data' style='danger' data='$edit_callback'>" . 'لغو' . "</tg-button></tg-button-row>";
 
 
     } elseif ($is_deleting) {
@@ -188,7 +188,7 @@ function createHoldingDetailRichHTML(
         $detail_callback = json_encode(['view_holding' => $holding['id']], JSON_UNESCAPED_UNICODE);
         $name_html = "<tg-button type='callback_data' style='link' data='$detail_callback'>$holding_name</tg-button>";
     } else
-        $name_html = $holding_name;
+        $name_html = "<h2>$holding_name:</h2>";
 
     $detail_html = '';
     foreach ($attributes as $index => $attribute) {
