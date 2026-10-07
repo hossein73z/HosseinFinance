@@ -398,3 +398,29 @@ function askForHoldingPrice(User $user, array $data, string $asset_name, Databas
     }
     exit();
 }
+
+function calculateHodlingAmountAndAveragePrice(array $holding_txs): ?array
+{
+    $buy_amount = 0.0;
+    $sel_amount = 0.0;
+    $total_cost = 0.0;
+    foreach ($holding_txs as $tx) {
+        $amount = (float)$tx['amount'];
+        $price = (float)$tx['price'];
+
+        if ($tx['type'] == 'inward') {
+            $total_cost += $price;
+            $buy_amount += $amount;
+        } elseif ($tx['type'] == 'outward') {
+            $sel_amount += $amount;
+        }
+    }
+
+    $total_amount = ($buy_amount - $sel_amount) ?? 0;
+    $avg_buy_price = ($total_cost / $buy_amount) ?? 0;
+
+    if ($total_amount > 0) {
+        return [$total_amount, $avg_buy_price];
+    } else
+        return [0, $avg_buy_price];
+}
